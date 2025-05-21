@@ -1,0 +1,86 @@
+*.log
+
+# Visual Studio temporary files
+.vs/
+
+# ReSharper folders
+_ReSharper*
+
+# NuGet package directory
+packages/
+
+# MSTest test Results
+[Tt]est[Rr]esult*
+
+# NCrunch
+_NCrunch_*
+.*crunch*.local.xml
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Mono-specific files
+*.pidb
+*.idea/workspace.xml
+.idea/
+
+# Visual Studio Code directories
+.vscode/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+# JetBrains Rider
+.idea/
+
+# Rider files
+.idea
+
+# Files for debugging
+*.pdb
+
+# VS Code
+.vscode/
+
+# Ignore build output and logs
+bin/
+obj/
+dist/
+*.log
+
+# Ignore NuGet packages
+*.nupkg
+packages/
+*.lock.json
+
+# Ignore Rider specific files
+*.sln.iml
+
+# Ignore node_modules directory if using npm for frontend packages
+node_modules/
+
+# Ignore backup and session files for vim
+*.tmp
+*.vim
+
+# Ignore private settings
+secrets.json
+
+# Ignore Logs
+Logs/
+
+# Ignore certificates
+*.pem
