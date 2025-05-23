@@ -1,6 +1,6 @@
 namespace EchoPhase.Interfaces
 {
-	public interface ITriggerHandler
+	public interface ITriggerRunner
 	{
 		Task<string> HandleAsync(string input);
 	}

@@ -2,7 +2,7 @@ using Wasmtime;
 
 using EchoPhase.Interfaces;
 
-public class WasmHandler : ITriggerHandler, IDisposable
+public class WasmRunner : ITriggerRunner, IDisposable
 {
     private readonly Engine _engine;
     private readonly Store _store;
@@ -11,7 +11,7 @@ public class WasmHandler : ITriggerHandler, IDisposable
     private readonly Instance _instance;
     private readonly Function _function;
 
-    public WasmHandler(string wasmPath, string functionName = "handle")
+    public WasmRunner(string wasmPath, string functionName = "handle")
     {
 		if (String.IsNullOrWhiteSpace(wasmPath))
 			throw new ArgumentNullException("Missing WASM path.");
