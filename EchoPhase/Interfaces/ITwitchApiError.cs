@@ -2,8 +2,8 @@ namespace EchoPhase.Interfaces
 {
 	public interface ITwitchApiError
 	{
-		string Error { get; }
-		int Status { get; }
-		string Message { get; }
+		public string Error { get; }
+		public int Status { get; }
+		public string Message { get; }
 	}
 }

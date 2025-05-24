@@ -3,7 +3,7 @@ using EchoPhase.Interfaces;
 
 namespace EchoPhase.Clients
 {
-	public class DiscordClient : DiscordClientBase
+	public class DiscordClient : DiscordClientBase, IDiscordClient
 	{
 		private readonly HttpClient _client;
 		private readonly ILogger<DiscordClient> _logger;
@@ -16,8 +16,9 @@ namespace EchoPhase.Clients
 			_logger = logger;
 		}
 
-		public async Task<IDiscordApiResponse<List<DiscordGuildResponseDto>>> GetUserGuildsAsync(DiscordUserGuildsQueryDto query) =>
-			await SendAsync<DiscordUserGuildsQueryDto, object, List<DiscordGuildResponseDto>>(
+		public async Task<IDiscordApiResponse<IEnumerable<DiscordUserGuildsResponseDto>>> GetUserGuildsAsync(
+			DiscordUserGuildsQueryDto query
+		) => await SendAsync<DiscordUserGuildsQueryDto, object, List<DiscordUserGuildsResponseDto>>(
 				"users/@me/guilds",
 				HttpMethod.Get,
 				query,

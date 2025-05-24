@@ -1,6 +1,6 @@
 namespace EchoPhase.Interfaces
 {
-	public interface ITwitchApiResponse<T> : IClientResponse<ITwitchApiResponseDto<T>, ITwitchApiError>
+	public interface ITwitchApiResponse<out T> : IClientResponse<ITwitchApiResponseDto<T>, ITwitchApiError>
 	{
 	}
 }

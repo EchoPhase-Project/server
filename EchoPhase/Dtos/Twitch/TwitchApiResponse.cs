@@ -3,12 +3,8 @@ using EchoPhase.Clients.Models;
 
 namespace EchoPhase.Dtos
 {
-	public class TwitchApiResponse<T> : ClientResponse<ITwitchApiResponseDto<T>, ITwitchApiError>, ITwitchApiResponse<T>
+	public class TwitchApiResponse<T> : ClientResponse<ITwitchApiResponseDto<T>, ITwitchApiError>, ITwitchApiResponse<T> where T : class
 	{
-		public TwitchApiResponse()
-		{
-		}
-
 		public TwitchApiResponse(IClientResponse<ITwitchApiResponseDto<T>, ITwitchApiError> inner)
 		{
 			this.Data = inner.Data;

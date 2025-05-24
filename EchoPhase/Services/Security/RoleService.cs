@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Identity;
 using EchoPhase.Models;
 using EchoPhase.Roles;
 using EchoPhase.Repositories;
-using EchoPhase.Interfaces;
 
 namespace EchoPhase.Services.Security
 {
@@ -29,7 +28,11 @@ namespace EchoPhase.Services.Security
 			if (!await _roleManager.RoleExistsAsync(roleName))
 			{
 				var role = new UserRole(roleName);
-				await _roleManager.CreateAsync(role);
+				var result = await _roleManager.CreateAsync(role);
+				if (!result.Succeeded)
+				{
+					throw new Exception($"Failed to create role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+				}
 			}
 		}
 
@@ -84,6 +87,5 @@ namespace EchoPhase.Services.Security
 
 			return roles;
 		}
-
 	}
 }

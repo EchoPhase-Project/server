@@ -84,3 +84,6 @@ Logs/
 
 # Ignore certificates
 *.pem
+
+# Migrations
+Migrations/

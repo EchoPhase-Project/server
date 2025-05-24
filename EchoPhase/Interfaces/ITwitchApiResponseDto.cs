@@ -1,9 +1,9 @@
 namespace EchoPhase.Interfaces
 {
-	public interface ITwitchApiResponseDto<TResponse>
+	public interface ITwitchApiResponseDto<out T>
 	{
-		public TResponse? Data { get; set; }
-		public ITwitchApiPagination? Pagination { get; set; }
+		public T? Data { get; }
+		public ITwitchApiPagination? Pagination { get; }
 	}
 }
 

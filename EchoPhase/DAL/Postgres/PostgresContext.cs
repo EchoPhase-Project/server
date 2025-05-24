@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +7,7 @@ using EchoPhase.Interfaces;
 
 namespace EchoPhase.DAL.Postgres
 {
-    public class PostgresContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
+    public class PostgresContext : IdentityDbContext<User, UserRole, Guid>
     {
 		public static readonly string DefaultSchema = "EchoPhase";
 		public string Schema { get; }
@@ -29,10 +28,19 @@ namespace EchoPhase.DAL.Postgres
 
             builder.Entity<User>(entity =>
 			{
-				entity.ToTable("User");
+				entity.ToTable("Users");
                 entity.HasKey(e => e.Id);
 				entity.HasIndex(u => u.UserName)
 					.IsUnique();
+
+				entity.Property(u => u.Name)
+					.HasMaxLength(36)
+					.IsRequired();
+				entity.Property(u => u.UserName)
+					.HasMaxLength(36)
+					.IsRequired();
+				entity.Property(u => u.ProfileImageName)
+					.HasMaxLength(64);
 
 				entity.Property(e => e.UpdatedAt)
 					.IsRequired();
@@ -60,13 +68,11 @@ namespace EchoPhase.DAL.Postgres
 
 			builder.Entity<UserRole>(entity =>
 			{
-				entity.HasData(
-					new UserRole { Id = new Guid("234e8d44-83c2-48fa-9202-6da66a68d4f1"), ConcurrencyStamp = "1", RoleID = 1, Name = "Dev", NormalizedName = "DEV" },
-					new UserRole { Id = new Guid("b5df24f9-c8fd-418e-881d-6647664557a4"), ConcurrencyStamp = "2", RoleID = 2, Name = "Admin", NormalizedName = "ADMIN" },
-					new UserRole { Id = new Guid("023196cd-d3bc-41c5-8918-00567a39e8ab"), ConcurrencyStamp = "3", RoleID = 3, Name = "Staff", NormalizedName = "STAFF" },
-					new UserRole { Id = new Guid("8693a407-4681-4b21-b6de-22cfeed15f9a"), ConcurrencyStamp = "4", RoleID = 4, Name = "APIDev", NormalizedName = "APIDEV" },
-					new UserRole { Id = new Guid("f67c713c-6e67-4ff7-9597-db1155236213"), ConcurrencyStamp = "5", RoleID = 5, Name = "User", NormalizedName = "USER" }
-				);
+				entity.ToTable("Roles");
+				entity.HasIndex(it => it.Name)
+					.IsUnique();
+				entity.Property(it => it.Name)
+					.IsRequired();
 			});
 
 			builder.Entity<JwtToken>(entity =>
@@ -90,28 +96,42 @@ namespace EchoPhase.DAL.Postgres
 
 		public override int SaveChanges()
 		{
-			ChangeTracker.DetectChanges();
-
-			var now = DateTime.UtcNow;
-
-			foreach (var entry in ChangeTracker.Entries<ITrackingEntity>())
-				if (entry.State == EntityState.Modified)
-					entry.Entity.UpdatedAt = now;
+			ChangeOnSave();
 
 			return base.SaveChanges();
 		}
 
 		public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
+			ChangeOnSave();
+
+			return await base.SaveChangesAsync(cancellationToken);
+		}
+
+		private void ChangeOnSave()
+		{
 			ChangeTracker.DetectChanges();
+
+			var concurrentEntries = ChangeTracker.Entries<IConcurrentEntity>()
+				.Where(e => e.State == EntityState.Modified || e.State == EntityState.Added);
+
+			var trackedEntries = ChangeTracker.Entries<ITrackingEntity>()
+				.Where(e => e.State == EntityState.Modified || e.State == EntityState.Added);
 
 			var now = DateTime.UtcNow;
 
-			foreach (var entry in ChangeTracker.Entries<ITrackingEntity>())
-				if (entry.State == EntityState.Modified)
+			foreach (var entry in trackedEntries)
+			{
+				if (entry.State == EntityState.Added)
+					entry.Entity.CreatedAt = now;
+				else if (entry.State == EntityState.Modified || entry.State == EntityState.Added)
 					entry.Entity.UpdatedAt = now;
+			}
 
-			return await base.SaveChangesAsync(cancellationToken);
+			foreach (var entry in concurrentEntries)
+			{
+				entry.Entity.ConcurrencyStamp = Guid.NewGuid();
+			}
 		}
     }
 }

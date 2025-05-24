@@ -19,8 +19,9 @@ namespace EchoPhase.Clients
 		//public async Task<TwitchUserResponseDto> GetUsersAsync(TwitchUserRequestDto dto) =>
 		//	await SendRequestAsync<TwitchUserRequestDto, TwitchUserResponseDto>("users", HttpMethod.Get, dto);
 
-		public async Task<ITwitchApiResponse<List<TwitchVipResponseDto>>> GetVipsAsync(TwitchVipRequestQueryDto query) =>
-			await SendAsync<TwitchVipRequestQueryDto, object, List<TwitchVipResponseDto>>(
+		public async Task<ITwitchApiResponse<IEnumerable<TwitchVipResponseDto>>> GetVipsAsync(
+			TwitchVipRequestQueryDto query
+		) => await SendAsync<TwitchVipRequestQueryDto, object, List<TwitchVipResponseDto>>(
 				"channels/vips", 
 				HttpMethod.Get, 
 				query,

@@ -1,3 +1,4 @@
+using EchoPhase.Dtos;
 using EchoPhase.Interfaces;
 using EchoPhase.Extensions;
 
@@ -17,21 +18,25 @@ namespace EchoPhase.Clients
 			_logger = logger;
 		}
 
-		protected async Task<IDiscordApiResponse<TResponse>> SendAsync<TQuery, TBody, TResponse>(
+		protected async Task<IDiscordApiResponse<TR>> SendAsync<TQ, TB, TR>(
 			string uri, 
 			HttpMethod method, 
-			TQuery? query, 
-			TBody? body
+			TQ? query, 
+			TB? body
 		)
+			where TQ : class
+			where TB : class
+			where TR : class
 		{
 			_logger.LogInformation("Requested DiscordAPI {URI}", uri);
 
-			return (await base.SendAsync<TQuery, TBody, TResponse, IDiscordApiError>(
+			return (await base.SendAsync<TQ, TB, TR, DiscordApiError>(
 				uri, 
 				method, 
 				query, 
 				body
-			)).ToDiscordApiResponse();
+			))
+				.ToDiscordApiResponse();
 		}
 	}
 }

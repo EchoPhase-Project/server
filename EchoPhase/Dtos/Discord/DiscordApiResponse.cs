@@ -3,12 +3,8 @@ using EchoPhase.Interfaces;
 
 namespace EchoPhase.Dtos
 {
-	public class DiscordApiResponse<T> : ClientResponse<T, IDiscordApiError>, IDiscordApiResponse<T>
+	public class DiscordApiResponse<T> : ClientResponse<T, IDiscordApiError>, IDiscordApiResponse<T> where T : class
 	{
-		public DiscordApiResponse()
-		{
-		}
-
 		public DiscordApiResponse(IClientResponse<T, IDiscordApiError> inner)
 		{
 			this.Data = inner.Data;

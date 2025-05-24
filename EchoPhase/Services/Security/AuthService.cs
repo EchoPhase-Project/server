@@ -48,10 +48,10 @@ namespace EchoPhase.Services.Security
 
 		public async Task<IdentityResult> CreateUserAsync(string name, string username, string password)
 		{
-			var user = new User {
-				UserName = username,
-				Name = name
+			var user = new User(name) {
+				UserName = username
 			};
+
 			var result = await _userManager.CreateAsync(user, password);
 
 			if (result.Succeeded)

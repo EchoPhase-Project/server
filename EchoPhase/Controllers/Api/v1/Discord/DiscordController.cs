@@ -1,14 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
 
 using EchoPhase.Clients;
 using EchoPhase.Dtos;
-using EchoPhase.Interfaces;
 
 namespace EchoPhase.Controllers
 {
     [ApiController]
-    [Route("api/discord")]
+    [Route("api/v1/[controller]")]
     public class DiscordController : ControllerBase
     {
         private readonly DiscordClient _discordClient;
@@ -18,10 +16,10 @@ namespace EchoPhase.Controllers
             _discordClient = discordClient;
         }
 
-        [HttpGet("guilds")]
+        [HttpGet("@me/guilds")]
         public async Task<IActionResult> GetUserGuilds([FromQuery] DiscordUserGuildsQueryDto query)
         {
-            IDiscordApiResponse<List<DiscordGuildResponseDto>> response = await _discordClient.GetUserGuildsAsync(query);
+            var response = await _discordClient.GetUserGuildsAsync(query);
 
             if (response.Error != null)
             {

@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations;
+
 using EchoPhase.Models;
 using EchoPhase.Interfaces;
 
-public class JwtToken : ITrackingEntity
+public class JwtToken : ITrackingEntity, IConcurrentEntity
 {
     public int Id { get; set; }
 
@@ -14,4 +16,7 @@ public class JwtToken : ITrackingEntity
 
 	public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 	public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+	[ConcurrencyCheck]
+	public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
 }

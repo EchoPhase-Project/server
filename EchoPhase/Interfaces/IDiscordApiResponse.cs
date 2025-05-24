@@ -1,7 +1,6 @@
 namespace EchoPhase.Interfaces
 {
-    public interface IDiscordApiResponse<T> : IClientResponse<T, IDiscordApiError>
+    public interface IDiscordApiResponse<out T> : IClientResponse<T, IDiscordApiError>
     {
     }
 }
-

@@ -1,6 +1,8 @@
 using EchoPhase.Interfaces;
 using EchoPhase.Extensions;
 
+using EchoPhase.Dtos;
+
 namespace EchoPhase.Clients
 {
 	public class TwitchClientBase : ClientBase
@@ -17,21 +19,25 @@ namespace EchoPhase.Clients
 			_logger = logger;
 		}
 
-		protected async Task<ITwitchApiResponse<TResponse>> SendAsync<TQuery, TBody, TResponse>(
+		protected async Task<ITwitchApiResponse<TR>> SendAsync<TQ, TB, TR>(
 			string uri, 
 			HttpMethod method, 
-			TQuery? query, 
-			TBody? body
+			TQ? query, 
+			TB? body
 		)
+			where TQ : class
+			where TB : class
+			where TR : class
 		{
 			_logger.LogInformation("Requested TwitchAPI {URI}", uri);
 
-			return (await base.SendAsync<TQuery, TBody, ITwitchApiResponseDto<TResponse>, ITwitchApiError>(
+			return (await base.SendAsync<TQ, TB, TwitchApiResponseDto<TR>, TwitchApiError>(
 				uri, 
 				method, 
 				query, 
 				body
-			)).ToTwitchApiResponse();
+			))
+				.ToTwitchApiResponse();
 		}
 	}
 }

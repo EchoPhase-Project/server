@@ -4,10 +4,10 @@ using EchoPhase.Interfaces;
 
 namespace EchoPhase.Dtos
 {
-	public class TwitchApiResponseDto<TResponse> : ITwitchApiResponseDto<TResponse>
+	public class TwitchApiResponseDto<TR> : ITwitchApiResponseDto<TR>
 	{
 		[JsonPropertyName("data")]
-		public TResponse? Data { get; set; } = default;
+		public TR? Data { get; set; } = default;
 
 		[JsonPropertyName("pagination")]
 		public ITwitchApiPagination? Pagination { get; set; } = default;

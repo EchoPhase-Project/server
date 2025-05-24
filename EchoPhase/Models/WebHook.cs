@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 using EchoPhase.Enums;
 using EchoPhase.Processors.Enums;
 using EchoPhase.Attributes;
@@ -5,7 +7,7 @@ using EchoPhase.Interfaces;
 
 namespace EchoPhase.Models
 {
-	public class WebHook : ITrackingEntity
+	public class WebHook : ITrackingEntity, IConcurrentEntity
 	{
 		public Guid Id { get; set; }
 
@@ -22,5 +24,8 @@ namespace EchoPhase.Models
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+		[ConcurrencyCheck]
+		public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
 	}
 }

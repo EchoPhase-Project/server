@@ -150,7 +150,7 @@ namespace EchoPhase.Extensions
 			return services;
 		}
 
-		public static IServiceCollection AddViews(this IServiceCollection services)
+		public static IServiceCollection AddPreparedMvc(this IServiceCollection services)
 		{
             services.Configure<RazorViewEngineOptions>(o =>
             {
@@ -167,9 +167,9 @@ namespace EchoPhase.Extensions
             });
 
 			services.AddMvc()
-				.AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix)
-				.AddDataAnnotationsLocalization()
-				.AddRazorRuntimeCompilation()
+				//.AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix)
+				//.AddDataAnnotationsLocalization()
+				//.AddRazorRuntimeCompilation()
 				.AddNewtonsoftJson(options =>
 					options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
 				);
@@ -245,6 +245,21 @@ namespace EchoPhase.Extensions
 				options.HeaderName = "X-CSRF-TOKEN-HEADERNAME";
 				options.SuppressXFrameOptionsHeader = false;
 			});
+
+			return services;
+		}
+
+		public static IServiceCollection AddRoles(this IServiceCollection services, params string[] roles)
+		{
+			services.AddScoped<RoleManager<UserRole>>();
+			services.AddScoped<RoleService>();
+
+			var scope = services.BuildServiceProvider().CreateScope();
+			var roleService = scope.ServiceProvider.GetRequiredService<RoleService>();
+			foreach (var role in roles)
+			{
+				roleService.CreateRoleAsync(role).GetAwaiter().GetResult();
+			}
 
 			return services;
 		}

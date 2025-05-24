@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace EchoPhase.Dtos
 {
-	public class DiscordGuildResponseDto
+	public class DiscordUserGuildsResponseDto
 	{
 		[JsonPropertyName("id")]
 		public string Id { get; set; } = null!;

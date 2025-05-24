@@ -11,7 +11,7 @@ using EchoPhase.Services.Security;
 
 namespace PointsApp.Controllers
 {
-	[Route("/api/tokens")]
+	[Route("/api/v1/tokens")]
 	[ApiController]
 	[SitemapExclude]
 	public class TokenAPIController : ControllerBase
@@ -70,6 +70,8 @@ namespace PointsApp.Controllers
 			User user = await _userService.GetUserAsync(User);
 			if (user == null)
                 return NotFound();
+
+			Console.WriteLine(User.Identity?.AuthenticationType);
 
 			var token = await _authService.GenerateTokenAsync(user);
 

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Net.Mime;
 
 using EchoPhase.Interfaces;
 using EchoPhase.Clients.Models;
@@ -25,12 +26,16 @@ namespace EchoPhase.Clients
 			};
 		}
 
-		protected async Task<IClientResponse<TResponse, TError>> SendAsync<TRequestQuery, TRequestBody, TResponse, TError>(
+		protected async Task<IClientResponse<TR, TE>> SendAsync<TQ, TB,	TR,	TE>(
 			string uri, 
 			HttpMethod method,
-			TRequestQuery? query, 
-			TRequestBody? body
+			TQ? query, 
+			TB? body
 		)
+			where TQ : class
+			where TB : class
+			where TR : class
+			where TE : class
 		{
 			var baseUri = _client.BaseAddress ?? throw new InvalidOperationException("HttpClient.BaseAddress is not set.");
 
@@ -45,26 +50,29 @@ namespace EchoPhase.Clients
 			string url = uriBuilder.ToString();
 
 			var httpRequest = new HttpRequestMessage(method, url);
-
-			Console.WriteLine($"Requested API {url} {baseUri.ToString()}");
 			
 			if (body != null)
 			{
-				var serializedBody = JsonSerializer.Serialize(body);
-				httpRequest.Content = new StringContent(serializedBody, Encoding.UTF8, "application/json");
+				var serializedBody = JsonSerializer.Serialize<TB>(body);
+				httpRequest.Content = new StringContent(
+					serializedBody, 
+					Encoding.UTF8, 
+					MediaTypeNames.Application.Json
+				);
 			}
 
 			var response = await _client.SendAsync(httpRequest);
 			string responseString = await response.Content.ReadAsStringAsync();
-			IClientResponse<TResponse, TError> apiResponse = new ClientResponse<TResponse, TError>()
+			
+			ClientResponse<TR, TE> apiResponse = new ClientResponse<TR, TE>()
 			{
 				StatusCode = response.StatusCode
 			};
 
 			if (response.IsSuccessStatusCode)
-				apiResponse.Data = JsonSerializer.Deserialize<TResponse>(responseString, _options);
+				apiResponse.Data = JsonSerializer.Deserialize<TR>(responseString, _options);
 			else
-				apiResponse.Error = JsonSerializer.Deserialize<TError>(responseString, _options);
+				apiResponse.Error = JsonSerializer.Deserialize<TE>(responseString, _options);
 
             return apiResponse;
 		}

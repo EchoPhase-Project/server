@@ -63,7 +63,6 @@ namespace EchoPhase
         {
 			services.AddSitemap();
 
-
 			services.AddLogging(builder =>
 			{
 				builder.ClearProviders();
@@ -80,7 +79,6 @@ namespace EchoPhase
 
 			TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
 			services.AddSingleton(timeZone);
-
 
 			services.AddSwaggerGen(o =>
 			{
@@ -106,6 +104,11 @@ namespace EchoPhase
 
 			services.AddHttpContextAccessor();
 
+			services.AddDbContext<PostgresContext>(options =>
+				options
+					.UseNpgsql(Configuration.GetConnectionString("DefaultConnection"),
+						o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+
 			services.AddRedisCache(Configuration.GetSection("Redis"));
 			//services.AddTwitchClient(Configuration.GetSection("Twitch"));
 			services.AddDiscordClient(Configuration.GetSection("Discord"));
@@ -128,9 +131,9 @@ namespace EchoPhase
 					policy.RequireRole("Admin", "Dev", "Staff");
 				});
 
-				options.AddPolicy("APIAccess", policy =>
+				options.AddPolicy("ApiAccess", policy =>
 				{
-					policy.RequireRole("Admin", "Dev", "APIDev");
+					policy.RequireRole("Admin", "Dev", "ApiDev");
 				});
 
 				options.AddPolicy("Any", policy =>
@@ -151,15 +154,10 @@ namespace EchoPhase
 					.Build();
 			});
 
-			services.AddViews();
+			services.AddPreparedMvc();
 			services.AddCorsPolicies();
 			services.AddAntiforgeryOptions();
 			services.AddLocalizationOptions();
-
-			services.AddDbContext<PostgresContext>(options =>
-				options
-					.UseNpgsql(Configuration.GetConnectionString("DefaultConnection"),
-						o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
 			services.AddHttpsRedirection(options =>
 			{
@@ -181,20 +179,20 @@ namespace EchoPhase
 
 			services.AddSingleton<QrCodeService>();
 
-			services.AddEventService();
-
 			services.AddScoped<UserRepository>();
 
-			services.AddScoped<RoleManager<UserRole>>();
+			services.AddRoles("Admin", "User", "Manager", "Support", "Staff");
+
 			services.AddScoped<IUserService, UserService>();
 			services.AddScoped<IAuthService, AuthService>();
-			services.AddScoped<RoleService>();
 
 			services.AddScoped<IAntiforgeryService, AntiforgeryService>();
 			services.AddScoped<UserManager<User>, UserManager<User>>();
 			services.AddScoped<SignInManager<User>, SignInManager<User>>();
 
 			services.AddHostedService<ShutdownService>();
+
+			services.AddEventService();
 
 			services.AddGrpc();
 
