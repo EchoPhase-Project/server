@@ -1,10 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authorization;
 
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Redis.Models;
-using EchoPhase.Funcs;
 using EchoPhase.Models;
 using EchoPhase.Repositories;
 using EchoPhase.Interfaces;
@@ -12,108 +10,92 @@ using EchoPhase.Services.Security;
 
 namespace EchoPhase.Services
 {
-    public class UserService : IUserService
+    public class UserService : DataServiceBase<UserService, UserRepository, EchoPhase.Repositories.Options.UserOptions>, IUserService
 	{
 		private readonly PostgresContext _context;
-		private readonly UserRepository _userRepository;
 		private readonly UserManager<User> _userManager;	
-		private readonly RoleService _roleService;
 		private readonly IWebHostEnvironment _environment;
 		private readonly ICacheContext _cacheContext;
 
 		public UserService(
-				PostgresContext context, 
-				UserRepository userRepository, 
-				UserManager<User> userManager, 
-				RoleService roleService, 
-				IWebHostEnvironment environment,
-				ICacheContext cacheContext)
+			PostgresContext context, 
+			UserRepository repository, 
+			UserManager<User> userManager, 
+			IWebHostEnvironment environment,
+			ICacheContext cacheContext
+		) : base(repository)
 		{
 			_context = context;
-			_userRepository = userRepository;
 			_userManager = userManager;
-			_roleService = roleService;
 			_environment = environment;
 			_cacheContext = cacheContext;
 		}
 
-		public async Task<List<User>> GetUsersAsync()
+		public IEnumerable<User> Get(
+			EchoPhase.Repositories.Options.UserSearchOptions opts,
+			Func<IQueryable<User>, EchoPhase.Repositories.Options.UserSearchOptions, IQueryable<User>>? extraFilters = null
+		)
 		{
-			return await _userRepository.GetUsersAsync();
+			return _repository.Get(opts, extraFilters);
 		}
 
-		public async Task<List<User>> GetUsersAsync(Guid userId)
+		public IEnumerable<User> Get(
+			Action<EchoPhase.Repositories.Options.UserSearchOptions> configure,
+			Func<IQueryable<User>, EchoPhase.Repositories.Options.UserSearchOptions, IQueryable<User>>? extraFilters = null
+		)
 		{
-			return await _userRepository.GetUsersAsync(userId);
+			return _repository.Get(configure, extraFilters);
 		}
 
-		public async Task<User> GetUserAsync(Guid userId)
-		{
-			if (userId == Guid.Empty)
-				throw new ArgumentNullException("Empy GUID.");
-
-			User? user = await _userRepository.FindByIdAsync(userId);
-			if (user is null)
-				throw new NullReferenceException("User not found.");
-
-			return user;
-		}
-
-		public async Task<User> GetUserAsync(string userName)
-		{
-			User? user = await _userRepository.FindByUserNameAsync(userName);
-			if (user is null)
-				throw new NullReferenceException("User not found.");
-
-			return user;
-		}
-
-		public async Task<User> GetUserAsync(ClaimsPrincipal userPrincipal)
-		{
-			User? user = await _userManager.GetUserAsync(userPrincipal);
-			if (user is null)
-				throw new NullReferenceException("User not found.");
-
-			return user;
-		}
-
+		public async Task<User> GetAsync(ClaimsPrincipal userPrincipal) =>
+			await _userManager.GetUserAsync(userPrincipal) ??
+				throw new InvalidOperationException("User not found.");
 
 		public async Task<string> GetOrSetCodeAsync(User user)
 		{
 			TimeSpan duration = TimeSpan.FromMinutes(20);
 
-			while (true)
+			QrUserCache qrUserCache = await _cacheContext
+				.Entry<QrUserCache>(user.Id.ToString())
+				.GetOrSetAsync(
+					() => new QrUserCache { Code = GenerateRandomCode() }, 
+					duration);
+
+			QrCache qrCache = await _cacheContext.
+				Entry<QrCache>(qrUserCache.Code)
+				.GetAsync();
+
+			switch (qrCache.UserId)
 			{
-				QrUserCache qrUserCache = await _cacheContext
-					.Entry<QrUserCache>(user.Id.ToString())
-					.GetOrSetAsync(
-						() => new QrUserCache { Code = GenerateRandomCode() }, 
-						duration);
+				case var _ when qrCache.UserId == Guid.Empty:
+					await _cacheContext.
+						Entry<QrCache>(qrUserCache.Code)
+						.SetAsync(
+							new QrCache { UserId = user.Id }, 
+							duration);
+					return qrUserCache.Code;
 
-				QrCache qrCache = await _cacheContext.
-					Entry<QrCache>(qrUserCache.Code)
-					.GetAsync();
+				case var _ when qrCache.UserId == user.Id:
+					return qrUserCache.Code;
 
-				switch (qrCache.UserId)
-				{
-					case var _ when qrCache.UserId == Guid.Empty:
-						await _cacheContext.
-							Entry<QrCache>(qrUserCache.Code)
-							.SetAsync(
-								new QrCache { UserId = user.Id }, 
-								duration);
-						return qrUserCache.Code;
-
-					case var _ when qrCache.UserId == user.Id:
-						return qrUserCache.Code;
-
-					default:
-						await _cacheContext.
-							Entry<QrCache>(user.Id.ToString()).
-							RemoveAsync();
-						break;
-				}
+				default:
+					await _cacheContext.
+						Entry<QrCache>(user.Id.ToString()).
+						RemoveAsync();
+					throw new InvalidOperationException("Invalid cache state.");
 			}
+		}
+
+		public async Task<IDictionary<Guid, string>> GetOrSetCodesAsync(params IEnumerable<User> users)
+		{
+			IDictionary<Guid, string> codes = new Dictionary<Guid, string>();
+
+			foreach (var user in users)
+			{
+				codes[user.Id] = await GetOrSetCodeAsync(user);
+			}
+
+			return codes;
 		}
 
 		private string GenerateRandomCode()
@@ -124,26 +106,23 @@ namespace EchoPhase.Services
 				.Select(s => s[random.Next(s.Length)]).ToArray());
 		}
 
-		public async Task<Guid> GetUserIdFromCode(string code) =>
+		public async Task<Guid> GetIdFromCode(string code) =>
 			(await _cacheContext.Entry<QrCache>(code).GetAsync()).UserId;
 
-		public async Task<User> GetUserFromCode(string code) =>
-			await GetUserAsync(
-					await GetUserIdFromCode(code));
-
-		public async Task<IdentityResult> UpdateUserAsync(User user) =>
-			await _userManager.UpdateAsync(user);
+		public async Task<IDictionary<string, Guid>> GetIdsFromCodes(params IEnumerable<string> codes)
+		{
+			IDictionary<string, Guid> dict = new Dictionary<string, Guid>();
+			foreach (var code in codes)
+			{
+				Guid userId = await GetIdFromCode(code);
+				dict[code] = userId;
+			}
+			
+			return dict;
+		}
 
         public bool UserExists(Guid id) =>
             _context.Users.Any(e => e.Id == id);
-
-		public async Task<string> GetOrSetCodeAsync(Guid userId) =>
-			await GetOrSetCodeAsync(
-				await GetUserAsync(userId));
-
-		public async Task<string> GetOrSetCodeAsync(ClaimsPrincipal userPrincipal) =>
-			await this.GetOrSetCodeAsync(
-				await GetUserAsync(userPrincipal));
 
 		public string GetProfileImagePath(Guid userId, string filename, bool root = false)
 		{
@@ -158,25 +137,5 @@ namespace EchoPhase.Services
 				? Path.Combine(_environment.ContentRootPath, result)
 				: result;
 		}
-	}
-}
-
-namespace EchoPhase.Interfaces
-{
-	public interface IUserService
-	{
-		Task<List<User>> GetUsersAsync();
-		Task<List<User>> GetUsersAsync(Guid userId);
-		Task<User> GetUserAsync(ClaimsPrincipal userPrincipal);
-		Task<User> GetUserAsync(Guid userId);
-		Task<User> GetUserAsync(string UserName);
-		Task<string> GetOrSetCodeAsync(ClaimsPrincipal userPrincipal);
-		Task<string> GetOrSetCodeAsync(Guid userId);
-		Task<string> GetOrSetCodeAsync(User user);
-		Task<Guid> GetUserIdFromCode(string code);
-		Task<User> GetUserFromCode(string code);
-		Task<IdentityResult> UpdateUserAsync(User user);
-        bool UserExists(Guid id);
-		string GetProfileImagePath(Guid userId, string filename, bool root = false);
 	}
 }

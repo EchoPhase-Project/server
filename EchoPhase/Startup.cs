@@ -37,11 +37,14 @@ using EchoPhase.Hubs;
 using EchoPhase.Hubs.Managers;
 using EchoPhase.Roles;
 using EchoPhase.Models;
+using EchoPhase.Requirements;
 using EchoPhase.Helpers;
 using EchoPhase.Services;
+using EchoPhase.Services.Grpc;
 using EchoPhase.Services.Security;
 using EchoPhase.Services.Internal;
 using EchoPhase.Extensions;
+using EchoPhase.Handlers;
 using EchoPhase.Interfaces;
 using EchoPhase.Middlewares;
 using EchoPhase.Repositories;
@@ -113,6 +116,8 @@ namespace EchoPhase
 			//services.AddTwitchClient(Configuration.GetSection("Twitch"));
 			services.AddDiscordClient(Configuration.GetSection("Discord"));
 			services.AddAuthentication(Configuration.GetSection("Jwt"));
+			
+			services.AddSingleton<IAuthorizationHandler, PermissionsAuthorizationHandler>();
 
 			services.AddAuthorization(options =>
 			{
@@ -121,19 +126,19 @@ namespace EchoPhase
 					policy.RequireRole("Admin");
 				});
 
-				options.AddPolicy("AdminOrDevOnly", policy =>
+				options.AddPolicy("RequireAdminOrHigher", policy =>
 				{
 					policy.RequireRole("Admin", "Dev");
 				});
 
-				options.AddPolicy("StaffOrHigherOnly", policy =>
-				{
-					policy.RequireRole("Admin", "Dev", "Staff");
-				});
-
 				options.AddPolicy("ApiAccess", policy =>
 				{
-					policy.RequireRole("Admin", "Dev", "ApiDev");
+					policy.RequireRole("Admin", "Dev");
+				});
+
+				options.AddPolicy("TrustedOnly", policy =>
+				{
+					policy.RequireRole("Admin", "Dev", "Staff");
 				});
 
 				options.AddPolicy("Any", policy =>
@@ -145,6 +150,9 @@ namespace EchoPhase
 				{
 					policy.RequireAssertion(context => false);
 				});
+
+				options.AddPolicy("CanEdit", policy =>
+					policy.Requirements.Add(new PermissionsRequirement("CanEdit", "CanAdd")));
 
 				options.DefaultPolicy = new AuthorizationPolicyBuilder()
 					.AddAuthenticationSchemes(
@@ -178,13 +186,18 @@ namespace EchoPhase
 			services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 			services.AddSingleton<QrCodeService>();
+			services.AddSingleton<IIntentsService, IntentsService>();
+			services.AddSingleton<IPermissionsService, PermissionsService>();
 
 			services.AddScoped<UserRepository>();
 
-			services.AddRoles("Admin", "User", "Manager", "Support", "Staff");
+			services.AddRoles(Configuration.GetSection("Role"), "Admin", "User", "Manager", "Support", "Staff", "Dev");
+
+			services.AddAes(Configuration.GetSection("Aes"));
 
 			services.AddScoped<IUserService, UserService>();
 			services.AddScoped<IAuthService, AuthService>();
+			services.AddScoped<ProjectionHelper>();
 
 			services.AddScoped<IAntiforgeryService, AntiforgeryService>();
 			services.AddScoped<UserManager<User>, UserManager<User>>();
@@ -294,6 +307,7 @@ namespace EchoPhase
 			app.UseGrpcWeb();
 			app.UseCors();
 
+
             app.UseRequestLocalization(localizationOptions.Value);
 
 			app.UseAntiforgery();
@@ -305,6 +319,7 @@ namespace EchoPhase
 
             app.UseEndpoints(endpoints =>
             {
+				endpoints.MapGrpcService<DiscordTokenGrpcServiceImpl>().EnableGrpcWeb();
 				/*
 				endpoints.MapHealthChecks("/health", new HealthCheckOptions
 				{

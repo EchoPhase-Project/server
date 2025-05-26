@@ -24,6 +24,7 @@ using EchoPhase.Interfaces;
 using EchoPhase.Processors;
 using EchoPhase.DAL.Redis;
 using EchoPhase.DAL.Postgres;
+using EchoPhase.Services;
 using EchoPhase.Services.Events;
 using EchoPhase.Services.Security;
 using EchoPhase.Services.WebHooks;
@@ -74,6 +75,9 @@ namespace EchoPhase.Extensions
 				.ValidateOnStart();
 
 			services.AddSingleton<IValidateOptions<DiscordSettings>, DiscordSettingsValidator>();
+
+			services.AddScoped<DiscordTokenRepository>();
+			services.AddScoped<IDiscordTokenService, DiscordTokenService>();
 
 			var httpClientBuilder = services.AddHttpClient<DiscordClient>("Discord", (serviceProvider, client) =>
 					{
@@ -236,26 +240,33 @@ namespace EchoPhase.Extensions
 		{
 			services.AddAntiforgery(options => 
 			{
-				options.HeaderName = "X-CSRF-TOKEN";
-			});
-
-			services.AddAntiforgery(options =>
-			{
 				options.FormFieldName = "Antiforgery";
-				options.HeaderName = "X-CSRF-TOKEN-HEADERNAME";
+				options.HeaderName = "X-CSRF-TOKEN";
 				options.SuppressXFrameOptionsHeader = false;
 			});
 
 			return services;
 		}
 
-		public static IServiceCollection AddRoles(this IServiceCollection services, params string[] roles)
+		public static IServiceCollection AddRoles(this IServiceCollection services, IConfigurationSection configurationSection, params string[] roles)
 		{
-			services.AddScoped<RoleManager<UserRole>>();
-			services.AddScoped<RoleService>();
+			services.AddOptions<RoleSettings>()
+				.Bind(configurationSection)
+				.ValidateDataAnnotations()
+				.ValidateOnStart();
 
-			var scope = services.BuildServiceProvider().CreateScope();
-			var roleService = scope.ServiceProvider.GetRequiredService<RoleService>();
+			services.AddSingleton<IValidateOptions<RoleSettings>, RoleSettingsValidator>();
+
+			services.AddScoped<RoleManager<UserRole>>();
+			services.AddScoped<IRoleService, RoleService>();
+
+			var serviceProvider = services.BuildServiceProvider();
+			var settings = serviceProvider.GetRequiredService<IOptions<RoleSettings>>().Value;
+			if (!settings.CheckRoles)
+				return services;
+
+			var scope = serviceProvider.CreateScope();
+			var roleService = scope.ServiceProvider.GetRequiredService<IRoleService>();
 			foreach (var role in roles)
 			{
 				roleService.CreateRoleAsync(role).GetAwaiter().GetResult();
@@ -313,10 +324,9 @@ namespace EchoPhase.Extensions
 			services.ConfigureApplicationCookie(options => 
 				options.CopyFrom(authCookie));
 
-
 			services.AddAuthentication(options =>
 			{
-				options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;;
+				options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
 				options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
 				options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
 			})
@@ -339,46 +349,11 @@ namespace EchoPhase.Extensions
 						IssuerSigningKey = new SymmetricSecurityKey(key),
 						ClockSkew = TimeSpan.Zero
 					};
-
-					options.Events = new JwtBearerEvents
-					{
-						OnAuthenticationFailed = context =>
-						{
-							context.Response.StatusCode = 401;
-							context.Response.ContentType = "application/json";
-							var result = JsonSerializer.Serialize(new { message = "Authentication failed." });
-							return context.Response.WriteAsync(result);
-						},
-
-						OnMessageReceived = context =>
-						{
-							var token = context.Request.Headers["Authorization"].ToString().Split(' ').Last();
-
-							if (string.IsNullOrEmpty(token))
-							{
-								context.Fail("No token provided.");
-							}
-							else
-							{
-								context.Token = token;
-
-								var jwtTokenService = context.HttpContext.RequestServices.GetRequiredService<ITokenService>();
-
-								var principal = jwtTokenService.ValidateToken(context.Token);
-								if (principal == null)
-								{
-									context.Fail("Invalid token.");
-								}
-							}
-
-							return Task.CompletedTask;
-						}
-					};
 				})
 			.AddCookie(options => 
 				options.CopyFrom(authCookie));
 
-			services.AddScoped<ITokenService, JwtTokenService>();
+			services.AddScoped<IJwtTokenService, JwtTokenService>();
 			
 			return services;
 		}
@@ -395,6 +370,20 @@ namespace EchoPhase.Extensions
 			services.AddScoped<WebSocketProcessor>();
 			
 			services.AddScoped<IEventService, EventService>();
+
+			return services;
+		}
+
+		public static IServiceCollection AddAes(this IServiceCollection services, IConfigurationSection configurationSection)
+		{
+			services.AddOptions<AesSettings>()
+				.Bind(configurationSection)
+				.ValidateDataAnnotations()
+				.ValidateOnStart();
+
+			services.AddSingleton<IValidateOptions<AesSettings>, AesSettingsValidator>();
+
+			services.AddSingleton<AesService>();
 
 			return services;
 		}

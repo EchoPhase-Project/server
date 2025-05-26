@@ -1,10 +1,10 @@
 using EchoPhase.Interfaces;
-using EchoPhase.Helpers.Builders.Models;
+using EchoPhase.Helpers.Options;
 
 namespace EchoPhase.Helpers.Builders
 {
 	public abstract class DataBuilderBase<TBuilder> : IDataBuilder<TBuilder>
-    where TBuilder : DataBuilderBase<TBuilder>, new()
+		where TBuilder : DataBuilderBase<TBuilder>, new()
 	{
 		protected IBuildOptions _options = new BuildOptions();
 

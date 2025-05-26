@@ -2,8 +2,8 @@ namespace EchoPhase.Interfaces
 {
 	public interface IAntiforgeryService
 	{
-		bool SetAntiforgeryToken();
-		string? GetAntiforgeryToken();
-		Task<bool> ValidateAntiforgeryTokenAsync();
+		public bool SetAntiforgeryToken();
+		public string? GetAntiforgeryToken();
+		public Task<bool> ValidateAntiforgeryTokenAsync();
 	}
 }

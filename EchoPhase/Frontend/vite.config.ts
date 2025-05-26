@@ -1,9 +1,12 @@
 import { ViteDevServer, defineConfig } from 'vite';
 import { IncomingMessage, ServerResponse } from 'http';
+import solidPlugin from 'vite-plugin-solid';
 import solid from "vite-plugin-solid";
 import path from "path";
 import { visualizer } from "rollup-plugin-visualizer";
 import compress from "vite-plugin-compression";
+import protoGRPCPlugin from './vite-plugin-proto-grpc';
+import commonjs from '@rollup/plugin-commonjs';
 
 const ClientSideRouting = {
   name: "dynamic-router",
@@ -20,9 +23,12 @@ const ClientSideRouting = {
 export default defineConfig({
   plugins: [
     solid(), // Поддержка SolidJS
+	protoGRPCPlugin(),
+	solidPlugin(),
     visualizer({ filename: "dist/bundle-analysis.html" }), // Анализ бандла
     compress({ algorithm: "gzip" }), // Gzip-сжатие
 	ClientSideRouting,
+	commonjs({})
   ],
   resolve: {
     alias: {
@@ -44,10 +50,14 @@ export default defineConfig({
     hmr: true,
 	origin: 'http://localhost:5001/app',
   },
+  optimizeDeps: {
+    include: ['google-protobuf', 'grpc-web']
+  },
   root: path.resolve(__dirname),
   publicDir: path.resolve(__dirname, 'static'),
   base: "/app",
   build: {
+	target: 'esnext',
     outDir: "dist",
 	emptyOutDir: true,
     sourcemap: true, // Source maps

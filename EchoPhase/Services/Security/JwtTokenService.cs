@@ -4,30 +4,38 @@ using System.IdentityModel.Tokens.Jwt;
 
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
-using EchoPhase.DAL.Postgres;
 using EchoPhase.Models;
 using EchoPhase.Interfaces;
+using EchoPhase.Extensions;
+using EchoPhase.DAL.Postgres;
 using EchoPhase.Configurations.Models;
 
 namespace EchoPhase.Services.Security
 {
-	public class JwtTokenService : ITokenService
+	public class JwtTokenService : IJwtTokenService
 	{
 		private readonly PostgresContext _dbContext;
-		private readonly RoleService _roleService;
+		private readonly IRoleService _roleService;
+		private readonly IAuthService _authService;
+		private readonly AesService _aesService;
 		private readonly ILogger<JwtTokenService> _logger;
 		private readonly JwtSettings _settings;
 
 		public JwtTokenService(
 			PostgresContext dbContext, 
-			RoleService roleService, 
+			IRoleService roleService,
+			IAuthService authService,
+			AesService aesService, 
 			ILogger<JwtTokenService> logger,
 			IOptions<JwtSettings> settings
 		)
 		{
 			_dbContext = dbContext;
 			_roleService = roleService;
+			_authService = authService;
+			_aesService = aesService;
 			_logger = logger;
 			_settings = settings.Value;
 		}
@@ -61,7 +69,7 @@ namespace EchoPhase.Services.Security
 			_dbContext.JwtTokens.Add(new JwtToken
 			{
 				UserId = user.Id,
-				Token = tokenString,
+				Token = _aesService.Encrypt(tokenString),
 				ExpiryDate = tokenDescriptor.Expires.Value
 			});
 			_dbContext.SaveChanges();
@@ -92,31 +100,51 @@ namespace EchoPhase.Services.Security
 			try
 			{
 				var invalidatedToken = _dbContext.JwtTokens
-					.FirstOrDefault(it => it.Token == token && it.ExpiryDate < DateTime.UtcNow);
+					.FirstOrDefault(it => _aesService.Decrypt(it.Token) == token && it.ExpiryDate < DateTime.UtcNow);
 
-				if (invalidatedToken is null)
-					return tokenHandler.ValidateToken(token, tokenValidationParameters, out _);
+				if (invalidatedToken != null)
+					_logger?.LogWarning($"Token has expired.");
 
-				_logger?.LogWarning($"Token has expired.");
+				return tokenHandler.ValidateToken(token, tokenValidationParameters, out _);
 			}
 			catch (SecurityTokenException ex)
 			{
 				_logger?.LogWarning(ex, "Token validation failed.");
+				throw;
 			}
 			catch (Exception ex)
 			{
 				_logger?.LogError(ex, "An unexpected error occurred during token validation.");
+				throw;
 			}
+		}
 
-			return default;
+		public virtual void RevokeToken(ClaimsPrincipal user, string token)
+		{
+			var invalidatedToken = GetToken(token);
+
+			//if (invalidatedToken.UserId != user.GetUserId() && await _authService.IsInPolicyAsync(user))
+
+			invalidatedToken.ExpiryDate = DateTime.UtcNow;
+			_dbContext.SaveChanges();
+
+			_logger.LogInformation($"Token {token} is revoked.");
+		}
+
+		public virtual void ExtendToken(ClaimsPrincipal user, string token)
+		{
+			var invalidatedToken = GetToken(token);
+
+			invalidatedToken.ExpiryDate = DateTime.UtcNow.AddMinutes(_settings.ExpirationInMinutes);
+			_dbContext.SaveChanges();
+
+			_logger.LogInformation($"Token {token} is extended.");
 		}
 
 		private async Task<ClaimsIdentity> GenerateClaimsAsync(User user)
 		{
-			if (user is null)
-				throw new ArgumentNullException(nameof(user));
+			var claims = new ClaimsIdentity(JwtBearerDefaults.AuthenticationScheme);
 
-			var claims = new ClaimsIdentity();
 			if (user.Id != Guid.Empty)
 				claims.AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()));
 			if (user.UserName != null)
@@ -125,45 +153,20 @@ namespace EchoPhase.Services.Security
 			var roles = await _roleService.GetRolesAsync(user);
 			foreach (var role in roles)
 				claims.AddClaim(new Claim(ClaimTypes.Role, role));
+			claims.AddClaim(new Claim(ClaimTypes.Actor, "Hello"));
 
 			return claims;
 		}
 
-		public virtual void RevokeToken(string token)
-		{
-			if (token is null)
-				throw new ArgumentNullException(nameof(token));
-
-			var invalidatedToken = _dbContext.JwtTokens
-				.FirstOrDefault(it => it.Token == token);
-			
-			if (invalidatedToken is null)
-			{
-				_logger.LogError("Token does not exist.");
-				return;
-			}
-
-			invalidatedToken.ExpiryDate = DateTime.UtcNow;
-			_dbContext.SaveChanges();
-
-			_logger.LogInformation($"Token {token} is revoked.");
-		}
-
-		public virtual void ExtendToken(string token)
+		private JwtToken GetToken(string token)
 		{
 			var invalidatedToken = _dbContext.JwtTokens
-				.FirstOrDefault(it => it.Token == token);
+				.FirstOrDefault(it => _aesService.Decrypt(it.Token) == token);
 			
 			if (invalidatedToken is null)
-			{
-				_logger.LogError("Token does not exist.");
-				return;
-			}
+				throw new InvalidOperationException("Token does not exist.");
 
-			invalidatedToken.ExpiryDate = DateTime.UtcNow.AddMinutes(_settings.ExpirationInMinutes);
-			_dbContext.SaveChanges();
-
-			_logger.LogInformation($"Token {token} is extended.");
+			return invalidatedToken;
 		}
 	}
 }

@@ -33,7 +33,7 @@ namespace EchoPhase.Hubs
 				return;
 			}
 
-			User? sender = await _userService.GetUserAsync(Context.User);
+			User? sender = await _userService.GetAsync(Context.User);
 			if (sender is null)
 			{
 				Console.WriteLine("Can't find user.");
@@ -70,7 +70,7 @@ namespace EchoPhase.Hubs
 				return;
 			}
 
-			User? user = await _userService.GetUserAsync(Context.User);
+			User? user = await _userService.GetAsync(Context.User);
 			if (user is null)
 			{
 				Console.WriteLine("Can't find user.");
@@ -88,7 +88,7 @@ namespace EchoPhase.Hubs
 			if (Context.User == null)
 				return;
 
-			User? user = await _userService.GetUserAsync(Context.User);
+			User? user = await _userService.GetAsync(Context.User);
 			if (user is null)
 			{
 				Console.WriteLine("Can't find user.");

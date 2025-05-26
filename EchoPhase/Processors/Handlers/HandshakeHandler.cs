@@ -27,7 +27,7 @@ namespace EchoPhase.Processors.Handlers
 			try
 			{
 				var connection = await _connectionManager.GetConnectionAsync(webSocket);
-				connection.Intents = payload.Intents.HasValue ? (long)payload.Intents.Value : (long)IntentsFlags.All;
+				connection.Intents = payload.Intents.HasValue ? payload.Intents.Value : 0;
 
 				var response = new EventMessage
 				{

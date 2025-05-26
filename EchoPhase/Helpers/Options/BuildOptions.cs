@@ -1,6 +1,6 @@
 using EchoPhase.Interfaces;
 
-namespace EchoPhase.Helpers.Builders.Models
+namespace EchoPhase.Helpers.Options
 {
 	public class BuildOptions : IBuildOptions
 	{

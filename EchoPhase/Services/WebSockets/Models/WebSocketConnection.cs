@@ -1,7 +1,6 @@
 using System.Net.WebSockets;
 
 using EchoPhase.Attributes;
-using EchoPhase.Processors.Enums;
 
 namespace EchoPhase.Services.WebSockets.Models
 {
@@ -11,7 +10,7 @@ namespace EchoPhase.Services.WebSockets.Models
 		public HttpContext HttpContext { get; set; } = default!;
 
 		[AlwaysMerge]
-		public long Intents { get; set; } = (long)IntentsFlags.None;
+		public long Intents { get; set; } = 0;
 
 		public CancellationTokenSource HeartbeatCancellationTokenSource { get; set; } = new();
 	}

@@ -1,5 +1,4 @@
 using EchoPhase.Interfaces;
-using EchoPhase.Processors.Enums;
 using EchoPhase.Services.WebHooks;
 using EchoPhase.Services.WebSockets;
 
@@ -18,22 +17,25 @@ namespace EchoPhase.Services.Events
 			_webHookService = webHookService;
 		}
 
-		public async Task SendMessageToAllAsync<T>(T message, IntentsFlags intents, Guid? shardId = null)
+		public async Task SendMessageToAllAsync<T, TS>(T message, ISet<string> intents, TS? shardId = null)
+			where TS : struct
 		{
 			await _webSocketService.SendMessageToAllAsync(message, intents, shardId);
 			await _webHookService.SendMessageToAllAsync(message, intents);
 		}
 
-		public async Task SendMessageToUserAsync<T>(Guid userId, T message, IntentsFlags intents, Guid? shardId = null)
+		public async Task SendMessageToUsersAsync<T, TS>(ISet<Guid> userIds, T message, ISet<string> intents, TS? shardId = null)
+			where TS : struct
 		{
-			await _webSocketService.SendMessageToUserAsync(userId, message, intents, shardId);
-			await _webHookService.SendMessageToUserAsync(userId, message, intents);
+			await _webSocketService.SendMessageToUsersAsync(userIds, message, intents, shardId);
+			await _webHookService.SendMessageToUsersAsync(userIds, message, intents);
 		}
 
-		public async Task SendMessageToRoleAsync<T>(string role, T message, IntentsFlags intents, Guid? shardId = null)
+		public async Task SendMessageToRolesAsync<T, TS>(ISet<string> roles, T message, ISet<string> intents, TS? shardId = null)
+			where TS : struct
 		{
-			await _webSocketService.SendMessageToRoleAsync(role, message, intents, shardId);
-			await _webHookService.SendMessageToRoleAsync(role, message, intents);
+			await _webSocketService.SendMessageToRolesAsync(roles, message, intents, shardId);
+			await _webHookService.SendMessageToRolesAsync(roles, message, intents);
 		}
 	}
 }

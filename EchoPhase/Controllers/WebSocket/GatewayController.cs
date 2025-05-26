@@ -42,12 +42,12 @@ namespace EchoPhase.Controllers
 
         [HttpGet]
 		[Route("", Name = "WSGateway")]
-		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "AdminOrDevOnly")]
+		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "ApiAccess")]
 		public async Task<IActionResult> Gateway()
 		{
 			if (HttpContext.WebSockets.IsWebSocketRequest)
 			{
-					var user = await _userService.GetUserAsync(User);
+					var user = await _userService.GetAsync(User);
 
 					if (user is null)
 						return Unauthorized();

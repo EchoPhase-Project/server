@@ -1,20 +1,23 @@
 using System.Text;
 using System.Security.Cryptography;
 
+using Microsoft.Extensions.Options;
+
+using EchoPhase.Configurations.Models;
+
 namespace EchoPhase.Services.Security
 {
-	public class TokenCryptoService
+	public class AesService
 	{
+		private readonly AesSettings _aesSettings;
 		private readonly byte[] _key;
 		private readonly int _tagSize = 16;
 		private readonly int _nonceSize = 12;
 
-		public TokenCryptoService(byte[] key)
+		public AesService(IOptions<AesSettings> aesSettings)
 		{
-			if (key.Length != 32)
-				throw new ArgumentException("Key must be 256 bits (32 bytes).");
-
-			_key = key;
+			_aesSettings = aesSettings.Value;
+			_key = Convert.FromBase64String(_aesSettings.SecretKey);
 		}
 
 		public string Encrypt(string plainText)

@@ -1,23 +1,23 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json;
 
-using EchoPhase.Clients;
-using EchoPhase.Dtos;
 using EchoPhase.Interfaces;
 
 namespace EchoPhase.Controllers
 {
 	[ApiController]
 	[AllowAnonymous]
-	[Route("api/auth")]
+	[Route("api/v1/auth")]
 	public class AuthController : ControllerBase
 	{
 		private readonly IAuthService _authService;
 		private readonly IAntiforgeryService _antiforgeryService;
 
-		public AuthController(IAuthService authService, IAntiforgeryService antiforgeryService)
+		public AuthController(
+			IAuthService authService, 
+			IAntiforgeryService antiforgeryService
+		)
 		{
 			_authService = authService;
 			_antiforgeryService = antiforgeryService;
@@ -33,21 +33,17 @@ namespace EchoPhase.Controllers
 		}
 
 		[HttpPost("register")]
+		[ValidateAntiForgeryToken]
 		public async Task<IActionResult> Register([FromBody] RegisterDto dto)
 		{
-			//if (!await _antiforgeryService.ValidateAntiforgeryTokenAsync())
-			//	return BadRequest("Invalid CSRF token");
-
 			var result = await _authService.CreateUserAsync(dto.Name, dto.Username, dto.Password);
 			return result.Succeeded ? Ok() : BadRequest(result.Errors);
 		}
 
 		[HttpPost("login")]
+		[ValidateAntiForgeryToken]
 		public async Task<IActionResult> Login([FromBody] LoginDto dto)
 		{
-			//if (!await _antiforgeryService.ValidateAntiforgeryTokenAsync())
-			//	return BadRequest("Invalid CSRF token");
-
 			var result = await _authService.AuthenticateAsync(dto.Username, dto.Password);
 			return result.Succeeded ? Ok() : Unauthorized();
 		}

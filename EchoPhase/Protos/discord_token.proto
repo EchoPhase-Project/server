@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+option csharp_namespace = "EchoPhase.Grpc";
+package DiscordToken;
+
+// Модель токена
+message DiscordTokenGrpc {
+  string id = 1;
+  string user_id = 2;
+  string name = 3;
+  string token = 4;
+  string updated_at = 5;
+  string created_at = 6;
+}
+
+// Для фильтров в Get
+message DiscordTokenSearchOptionsGrpc {
+  repeated string ids = 1;
+  repeated string user_ids = 2;
+  repeated string names = 3;
+  repeated string tokens = 4;
+}
+
+// Список токенов
+message DiscordTokenListGrpc {
+  repeated DiscordTokenGrpc items = 1;
+}
+
+// Результат с ошибками и статусом операции (замена IDiscordTokenResult)
+message DiscordTokenResultGrpc {
+  repeated DiscordTokenGrpc items = 1;
+  repeated string errors = 2;
+  bool is_succeeded = 3;
+}
+
+// Для редактирования одного токена
+message EditRequestGrpc {
+  DiscordTokenGrpc target = 1;
+  DiscordTokenGrpc modify = 2;
+  repeated string override_fields = 3;
+}
+
+// Для редактирования нескольких токенов
+message EditBatchRequestGrpc {
+  repeated DiscordTokenGrpc targets = 1;
+  DiscordTokenGrpc modify = 2;
+  repeated string override_fields = 3;
+}
+
+// Сервис
+service DiscordTokenGrpcService {
+  // Получить по фильтрам (совпадает с Get)
+  rpc Get(DiscordTokenSearchOptionsGrpc) returns (DiscordTokenListGrpc);
+
+  // Альтернативный Get с конфигуратором — в gRPC нет лямбд, можно обойтись одним Get
+
+  // Создать один токен
+  rpc Create(DiscordTokenGrpc) returns (DiscordTokenGrpc);
+
+  // Создать несколько
+  rpc CreateBatch(DiscordTokenListGrpc) returns (DiscordTokenResultGrpc);
+
+  // Редактировать один
+  rpc Edit(EditRequestGrpc) returns (DiscordTokenGrpc);
+
+  // Редактировать несколько
+  rpc EditBatch(EditBatchRequestGrpc) returns (DiscordTokenResultGrpc);
+
+  // Удалить один
+  rpc Delete(DiscordTokenGrpc) returns (DiscordTokenGrpc);
+
+  // Удалить несколько
+  rpc DeleteBatch(DiscordTokenListGrpc) returns (DiscordTokenResultGrpc);
+}

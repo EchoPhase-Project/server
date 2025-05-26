@@ -32,6 +32,10 @@ const routes = [
 		component: lazy(() => import("./components/SpinTest"))
 	},
 	{
+		path: "/tokens",
+		component: lazy(() => import("./components/TokenList"))
+	},
+	{
 		path: "*404",
 		component: lazy(() => import("./components/NotFound"))
 	}

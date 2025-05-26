@@ -1,85 +1,92 @@
 using Microsoft.EntityFrameworkCore;
 
-using EchoPhase.DAL.Postgres;
-using EchoPhase.Enums;
-using EchoPhase.Processors.Enums;
 using EchoPhase.Models;
-using EchoPhase.Extensions;
 using EchoPhase.Interfaces;
+using EchoPhase.DAL.Postgres;
+using EchoPhase.Repositories.Options;
 
 namespace EchoPhase.Repositories
 {
-    public class WebHookRepository
+    public class WebHookRepository : RepositoryBase<WebHookRepository, WebHookOptions>, IWebHookRepository
 	{
 		private readonly PostgresContext _dbContext;
+		private readonly IIntentsService _intentsService;
 
-		public WebHookRepository(PostgresContext dbContext)
+		public WebHookRepository(
+			PostgresContext dbContext,
+			IIntentsService intentsService
+		) : base()
 		{
 			_dbContext = dbContext;
+			_intentsService = intentsService;
 		}
 
-		private IQueryable<WebHook> IncludeUserToQuery(IQueryable<WebHook> query) => query.Include(w => w.User);
-
-		public IEnumerable<WebHook> GetWebHooks(
-				long? intents = null, 
-				WebHookStatus? status = null, 
-				bool User = true)
+		public IEnumerable<WebHook> Get(
+			WebHookSearchOptions options,
+			Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
+		)
 		{
-			IQueryable<WebHook> webHookQuery = _dbContext.WebHooks;
+			var query = ApplySearchOptions<WebHook, WebHookSearchOptions>(
+				Build(), options, (query, opts) =>
+					{
+						query = ExtraFilters(query, opts);
 
-			if (User)
-				webHookQuery = IncludeUserToQuery(webHookQuery);
+						if (extraFilters != null)
+							query = extraFilters(query, opts);
+						
+						return query;
+					});
 
-			if (status != null)
-				webHookQuery = webHookQuery.Where(w => w.Status == status);
-
-			return ((intents is null) ? 
-					webHookQuery : 
-					webHookQuery
-						.AsEnumerable()
-						.Where(w => intents.HasIntents(w.Intents))
-					).OrderByDescending(w => w.CreatedAt).ToList();
+			return query;
 		}
 
-		public IEnumerable<WebHook> GetWebHooks(
-				IntentsFlags? intents = null, 
-				WebHookStatus? status = null,
-				bool User = true) =>
-			GetWebHooks((long?)intents, status, User);
-
-		public async Task<WebHook?> FindByIdAsync(Guid id, IntentsFlags intents = IntentsFlags.All, bool User = true)
+		public IEnumerable<WebHook> Get(
+			Action<WebHookSearchOptions> configure,
+			Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
+		)
 		{
-			IQueryable<WebHook> webHookQuery = _dbContext.WebHooks;
-
-			if (User)
-				webHookQuery = IncludeUserToQuery(webHookQuery);
-
-			return await webHookQuery
-						.FirstOrDefaultAsync(w => w.Id == id & intents.HasIntents(w.Intents));
+			var options = new WebHookSearchOptions();
+			configure(options);
+			return Get(options, extraFilters);
 		}
 
-		public IEnumerable<WebHook> FindByUser(Guid userId, IntentsFlags intents = IntentsFlags.All, bool User = true)
+		public override IQueryable<WebHook> Build()
 		{
-			IQueryable<WebHook> webHookQuery = _dbContext.WebHooks;
+			IQueryable<WebHook> query = _dbContext.WebHooks;
+			if (_options.IncludeUser)
+				query.Include(q => q.User);
 
-			if (User)
-				webHookQuery = IncludeUserToQuery(webHookQuery);
-
-			return webHookQuery
-						.AsEnumerable()
-						.Where(w => w.UserId == userId && intents.HasIntents(w.Intents))
-						.ToList();
+			return query;
 		}
 
-		public async Task<WebHook?> FindByUrlAsync(string url, IntentsFlags intents = IntentsFlags.All, bool User = true)
+		private IQueryable<WebHook> ExtraFilters(
+			IQueryable<WebHook> query,
+			WebHookSearchOptions opts
+		)
 		{
-			IQueryable<WebHook> webHookQuery = _dbContext.WebHooks;
+			if (opts.Ids is { Count: > 0 })
+				query = query
+					.Where(x => opts.Ids.Contains(x.Id));
 
-			if (User)
-				webHookQuery = IncludeUserToQuery(webHookQuery);
+			if (opts.UserIds is { Count: > 0 })
+				query = query
+					.Where(x => opts.UserIds.Contains(x.UserId));
 
-			return await webHookQuery
-						.FirstOrDefaultAsync(w => w.Url == url && intents.HasIntents(w.Intents));
+			if (opts.Names is { Count: > 0 })
+				query = query
+					.Where(x => opts.Names.Contains(x.Name));
+
+			if (opts.Urls is { Count: > 0 })
+				query = query
+					.Where(x => opts.Urls.Contains(x.Url));
+
+			if (opts.Intents is { Count: > 0 })
+				query = query
+					.AsEnumerable()
+					.Where(w => _intentsService.Has(w.Intents, opts.Intents))
+					.AsQueryable();
+
+			return query;
 		}
 	}
 }

@@ -19,8 +19,8 @@ namespace EchoPhase.Services
 		{
 			if (_httpContextAccessor.HttpContext is null)
 				return false;
-			var tokens = _antiforgery.GetAndStoreTokens(_httpContextAccessor.HttpContext);
-			_httpContextAccessor.HttpContext.Response.Headers["X-CSRF-TOKEN"] = tokens.RequestToken;
+			var token = _antiforgery.GetAndStoreTokens(_httpContextAccessor.HttpContext);
+			_httpContextAccessor.HttpContext.Response.Headers["X-CSRF-TOKEN"] = token.RequestToken;
 			return true;
 		}
 

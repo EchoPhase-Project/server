@@ -11,6 +11,10 @@ namespace EchoPhase.Runners
 	public class RoslynRunner
 	{
 		private readonly IServiceProvider _serviceProvider;
+		public readonly ISet<string> bannedIdentifiers = new HashSet<string>()
+			{ "System", "EchoPhase", "Microsoft", "DllImport", "Process", "File", "HttpClient", "Grpc" };
+		public readonly ISet<string> imports = new HashSet<string>()
+			{ "System.Math", "System.Text", "System.Text.Json", "System.Text.Json.Serialization", "System.Net.Mime" };
 
 		public RoslynRunner(
 			IServiceProvider serviceProvider
@@ -41,7 +45,7 @@ namespace EchoPhase.Runners
 					typeof(object).Assembly,
 					typeof(object).Assembly,
 					typeof(IScriptGlobals<TI>).Assembly)
-				.WithImports("System.Math");
+				.WithImports(imports);
 
 			Script clientScript = CSharpScript.Create(code, options, typeof(IScriptGlobals<TI>));
 			var scriptState = await clientScript.RunAsync(globals);
@@ -61,7 +65,6 @@ namespace EchoPhase.Runners
 			if (usings.Any())
 				throw new InvalidOperationException("Using directives are not allowed.");
 
-			var bannedIdentifiers = new[] { "System", "EchoPhase", "Microsoft", "DllImport", "Process", "File", "HttpClient" };
 			if (bannedIdentifiers.Any(b => code.Contains(b)))
 				throw new InvalidOperationException("Access to restricted API is denied.");
 		}

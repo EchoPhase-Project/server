@@ -22,8 +22,12 @@ namespace EchoPhase.DAL.Postgres
 		public DbSet<JwtToken> JwtTokens { get; set; } = default!;
 		public DbSet<WebHook> WebHooks { get; set; } = default!;
 
+		public DbSet<DiscordToken> DiscordTokens { get; set; } = default!;
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
+			builder.HasDefaultSchema(DefaultSchema);
+			
 			base.OnModelCreating(builder);
 
             builder.Entity<User>(entity =>
@@ -84,6 +88,24 @@ namespace EchoPhase.DAL.Postgres
 
 				entity.HasOne(t => t.User)
 					.WithMany(u => u.JwtTokens)
+					.HasForeignKey(t => t.UserId)
+					.OnDelete(DeleteBehavior.Cascade);
+
+				entity.Property(e => e.UpdatedAt)
+					.IsRequired();
+				entity.Property(e => e.CreatedAt)
+					.IsRequired();
+			});
+
+			builder.Entity<DiscordToken>(entity =>
+			{
+				entity.ToTable("DiscordTokens");
+                entity.HasKey(e => e.Id);
+				entity.HasIndex(it => it.Token)
+					.IsUnique();
+
+				entity.HasOne(t => t.User)
+					.WithMany(u => u.DiscordTokens)
 					.HasForeignKey(t => t.UserId)
 					.OnDelete(DeleteBehavior.Cascade);
 

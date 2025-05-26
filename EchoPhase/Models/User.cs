@@ -14,6 +14,7 @@ namespace EchoPhase.Models
 		public string? ProfileImageName { get; set; } = default;
 
 		public ICollection<JwtToken> JwtTokens { get; set; } = new List<JwtToken>();
+		public ICollection<DiscordToken> DiscordTokens { get; set; } = new List<DiscordToken>();
 
 		public ICollection<WebHook> WebHooks { get; set; } = new List<WebHook>();
 		

@@ -2,10 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 
-using EchoPhase.DAL.Redis;
 using EchoPhase.DAL.Postgres;
-using EchoPhase.Funcs;
-using EchoPhase.Roles;
 using EchoPhase.Models;
 using EchoPhase.Repositories;
 using EchoPhase.Interfaces;
@@ -17,33 +14,28 @@ namespace EchoPhase.Services.Security
 		private readonly PostgresContext _context;
 		private readonly UserRepository _userRepository;
 		private readonly UserManager<User> _userManager;	
-		private readonly RoleService _roleService;
+		private readonly IRoleService _roleService;
 		private readonly SignInManager<User> _signInManager;
-		private readonly ITokenService _jwtTokenService;
-		private readonly IAuthorizationService _authorizationService;
+		private readonly IAuthorizationService _authService;
 		private readonly IUserService _userService;
-		private readonly ICacheContext _cacheContext;
 
 		public AuthService(
-				PostgresContext context, 
-				UserRepository userRepository, 
-				UserManager<User> userManager, 
-				RoleService roleService, 
-				SignInManager<User> signInManager, 
-				ITokenService jwtTokenService, 
-				IAuthorizationService authorizationService, 
-				IUserService userService,
-				ICacheContext cacheContext)
+			PostgresContext context, 
+			UserRepository userRepository, 
+			UserManager<User> userManager, 
+			IRoleService roleService, 
+			SignInManager<User> signInManager, 
+			IAuthorizationService authService, 
+			IUserService userService
+		)
 		{
 			_context = context;
 			_userRepository = userRepository;
 			_userManager = userManager;
 			_roleService = roleService;
 			_signInManager = signInManager;
-			_jwtTokenService = jwtTokenService;
-			_authorizationService = authorizationService;
+			_authService = authService;
 			_userService = userService;
-			_cacheContext = cacheContext;
 		}
 
 		public async Task<IdentityResult> CreateUserAsync(string name, string username, string password)
@@ -56,101 +48,37 @@ namespace EchoPhase.Services.Security
 
 			if (result.Succeeded)
 			{
-				await _roleService.AssignRoleToUserAsync(user, "User");
+				await _roleService.AddToRolesAsync(user, "User");
 				var signInResult = await AuthenticateAsync(username, password);
 			}
 
 			return result;
 		}
 
-		public async Task<SignInResult> AuthenticateAsync(string username, string password)
+		public async Task<SignInResult> AuthenticateAsync(string username, string password) =>
+			await _signInManager.PasswordSignInAsync(username, password, false, lockoutOnFailure: false);
+
+		public async Task LogoutAsync() =>
+			await _signInManager.SignOutAsync();
+
+		public bool IsAuthenticated(ClaimsPrincipal user) =>
+			_signInManager.IsSignedIn(user);
+
+		public async Task<bool> IsInPoliciesAsync(ClaimsPrincipal userPrincipal, IEnumerable<string> policiesName)
 		{
-			return await _signInManager.PasswordSignInAsync(username, password, false, lockoutOnFailure: false);
+			foreach(var policyName in policiesName)
+				if (!(await IsInPolicyAsync(userPrincipal, policyName)))
+					return false;
+			return true;
 		}
 
-		public async Task<bool> LogoutAsync()
+		public async Task<bool> IsInPolicyAsync(ClaimsPrincipal userPrincipal, string policyName)
 		{
-			try
-			{
-				await _signInManager.SignOutAsync();
+			var result = await _authService.AuthorizeAsync(userPrincipal, policyName);
+			if (result.Succeeded)
 				return true;
-			}
-			catch
-			{
-				return false;
-			}
+
+			throw new Exception($"Failed to check policy {policyName}: {result.Failure}");
 		}
-
-		public bool IsAuthenticated(ClaimsPrincipal user)
-		{
-			return _signInManager.IsSignedIn(user);
-		}
-
-		public async Task<bool> IsInPolicyAsync(ClaimsPrincipal? userPrincipal, string policyName)
-		{
-			if (userPrincipal is null)
-				return false;
-
-			AuthorizationResult result = await _authorizationService.AuthorizeAsync(userPrincipal, policyName);
-			return result.Succeeded;
-		}
-
-		public async Task<bool> IsInRoleAsync(User user, string roleName)
-		{
-			bool result = await _roleService.IsInRoleAsync(user.Id, roleName);
-			return result;
-		}
-
-		public async Task<bool> IsInRoleAsync(ClaimsPrincipal userPrincipal, string roleName)
-		{
-			User? user = await _userService.GetUserAsync(userPrincipal);
-			if (user is null)
-				throw new NullReferenceException("User not found.");
-
-			return await IsInRoleAsync(user, roleName);
-		}
-
-		public async Task<bool> IsInRoleAsync(Guid userId, string roleName)
-		{
-			if (userId == Guid.Empty)
-				throw new ArgumentNullException("Empty GUID.");
-
-			User? user = await _userService.GetUserAsync(userId);
-			if (user is null)
-				throw new NullReferenceException("User not found.");
-
-			return await IsInRoleAsync(user, roleName);
-		}
-
-		public async Task<string> GenerateTokenAsync(User user) =>
-			await _jwtTokenService.GenerateTokenAsync(user);
-
-		public bool IsTokenValid(string token) =>
-			_jwtTokenService.ValidateToken(token) != null;
-
-		public void RevokeToken(string token) =>
-			_jwtTokenService.RevokeToken(token);
-
-		public void ExtendToken(string token) =>
-			_jwtTokenService.ExtendToken(token);
-	}
-}
-
-namespace EchoPhase.Interfaces
-{
-	public interface IAuthService
-	{
-		Task<IdentityResult> CreateUserAsync(string name, string username, string password);
-		Task<SignInResult> AuthenticateAsync(string username, string password);
-		Task<bool> LogoutAsync();
-		bool IsAuthenticated(ClaimsPrincipal user);
-		bool IsTokenValid(string token);
-		Task<bool> IsInPolicyAsync(ClaimsPrincipal userPrincipal, string policyName);
-		Task<bool> IsInRoleAsync(User user, string roleName);
-		Task<bool> IsInRoleAsync(ClaimsPrincipal userPrincipal, string roleName);
-		Task<bool> IsInRoleAsync(Guid userId, string roleName);
-		Task<string> GenerateTokenAsync(User user);
-		void RevokeToken(string token);
-		void ExtendToken(string token);
 	}
 }

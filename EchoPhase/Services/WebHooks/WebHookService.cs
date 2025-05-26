@@ -1,127 +1,146 @@
 using System.Text;
 using System.Text.Json;
+using System.Net.Mime;
+using System.Linq.Expressions;
 
-using EchoPhase.DAL.Postgres;
 using EchoPhase.Enums;
-using EchoPhase.Processors.Enums;
 using EchoPhase.Models;
-using EchoPhase.Exceptions;
 using EchoPhase.Extensions;
 using EchoPhase.Interfaces;
 using EchoPhase.Repositories;
-using EchoPhase.Services.Security;
+using EchoPhase.DAL.Postgres;
+using EchoPhase.Repositories.Options;
 
 namespace EchoPhase.Services.WebHooks
 {
-	public class WebHookService
+	public class WebHookService : DataServiceBase<WebHookService, WebHookRepository, WebHookOptions>
 	{
 		private readonly PostgresContext _context;
 		private readonly HttpClient _httpClient;
 		private readonly IUserService _userService;
-		private readonly WebHookRepository _webHookRepository;
-		private readonly IAuthService _authService;
+		private readonly IRoleService _roleService;
 
 		public WebHookService(
 			PostgresContext context, 
 			HttpClient httpClient,
 			IUserService userService,
-			WebHookRepository webHookRepository,
-			IAuthService authService
-		)
+			IRoleService roleService,
+			WebHookRepository repository
+		) : base(repository)
 		{
 			_context = context;
 			_httpClient = httpClient;
 			_userService = userService;
-			_webHookRepository = webHookRepository;
-			_authService = authService;
+			_roleService = roleService;
 		}
 
-		public async Task<WebHook> CreateAsync(Guid userId, string url, long intents)
+		public IEnumerable<WebHook> Get(
+			WebHookSearchOptions opts,
+			Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
+		)
 		{
-			if (string.IsNullOrWhiteSpace(url))
-				throw new ArgumentNullException("Provided URL is null or empty.");
+			return _repository.Get(opts, extraFilters);
+		}
 
-			var webHook = new WebHook
+		public IEnumerable<WebHook> Get(
+			Action<WebHookSearchOptions> configure,
+			Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
+		)
+		{
+			return _repository.Get(configure, extraFilters);
+		}
+
+		public async Task<IEnumerable<WebHook>> CreateAsync(params IEnumerable<WebHook> webhooks)
+		{
+			foreach (var webhook in webhooks)
 			{
-				UserId = userId,
-				Url = url,
-				Intents = intents,
-			};
-
-			_context.WebHooks.Add(webHook);
+				if (_userService.UserExists(webhook.UserId))
+					await _context.WebHooks.AddAsync(webhook);
+			}
 
 			await _context.SaveChangesAsync();
 
-			return webHook;
+			return webhooks;
 		}
 
-		public async Task<WebHook> EditAsync(Guid id, WebHook modifyData)
+		public async Task<WebHook> EditAsync(
+			WebHook webhook, 
+			WebHook modifyData, 
+			params Expression<Func<WebHook, object>>[] overrideFields
+		)
 		{
-			var webHook = await GetByWebHookIdAsync(id);
-
-			if (webHook is null)
-				throw new WebHookNotFoundException(id);
-
-			webHook.MergeFrom(modifyData, w => w.Url, w => w.Intents);
-			
-			_context.WebHooks.Update(webHook);
+			webhook.MergeFrom(modifyData, overrideFields);
+			_context.WebHooks.Update(webhook);
 
 			await _context.SaveChangesAsync();
 			
-			return webHook;
+			return webhook;
 		}
 
-		public async Task DeleteAsync(Guid id)
+		public async Task<IEnumerable<WebHook>> EditAsync(
+			IEnumerable<WebHook> webhooks, 
+			WebHook modifyData, 
+			params Expression<Func<WebHook, object>>[] overrideFields
+		)
 		{
-			var webHook = await GetByWebHookIdAsync(id);
+			var edited = new HashSet<WebHook>();
+			foreach (var webhook in webhooks)
+				edited.Add(await EditAsync(webhook, modifyData, overrideFields));
+			
+			return edited;
+		}
 
-			if (webHook is null)
-				throw new WebHookNotFoundException(id);
-
-			_context.WebHooks.Remove(webHook);
+		public async Task<IEnumerable<WebHook>> DeleteAsync(params IEnumerable<WebHook> webhooks)
+		{
+			foreach (var webhook in webhooks)
+				_context.WebHooks.Remove(webhook);
 
 			await _context.SaveChangesAsync();
+
+			return webhooks;
 		}
 
-		public async Task SendMessageToAllAsync<T>(T message, IntentsFlags intents, string ContentType = "application/json")
+		public async Task SendMessageToAllAsync<T>(T message, ISet<string> intents, string ContentType = MediaTypeNames.Application.Json)
 		{
-			var webhooks = GetWebHooks(intents)
-				.Where(w => w.Status == WebHookStatus.Enabled);
+			var webhooks = _repository.Get(opts =>
+			{
+				opts.Intents = intents;
+				opts.Status = WebHookStatus.Enabled;
+			});
 
 			var content = WrapMessage(message, Encoding.UTF8, ContentType);
 			await PostMessageToWebHooksAsync(content, webhooks);
 		}
 
-		public async Task SendMessageToUserAsync<T>(Guid userId, T message, IntentsFlags intents, string ContentType = "application/json")
+		public async Task SendMessageToUsersAsync<T>(ISet<Guid> userIds, T message, ISet<string> intents, string ContentType = MediaTypeNames.Application.Json)
 		{
-			var webhooks = GetByUserId(userId, intents)
-				.Where(w => w.Status == WebHookStatus.Enabled);
+			var webhooks = _repository.Get(opts =>
+			{
+				opts.UserIds = userIds;
+				opts.Intents = intents;
+				opts.Status = WebHookStatus.Enabled;
+			});
 
 			var content = WrapMessage(message, Encoding.UTF8, ContentType);
 			await PostMessageToWebHooksAsync(content, webhooks);
 		}
 
-		public async Task SendMessageToRoleAsync<T>(string role, T message, IntentsFlags intents, string ContentType = "application/json")
+		public async Task SendMessageToRolesAsync<T>(IEnumerable<string> roles, T message, ISet<string> intents, string ContentType = MediaTypeNames.Application.Json)
 		{
-			var allWebhooks = GetWebHooks(intents)
-				.Where(w => w.Status == WebHookStatus.Enabled);
+			var usersWithRole = await _roleService.GetUsersInRolesAsync(roles);
 
-			var webhooks = (await Task.WhenAll(
-				allWebhooks.Select(async w => new 
-				{
-					WebHook = w,
-					IsInRole = await _authService.IsInRoleAsync(w.UserId, role)
-				})))
-				.Where(x => x.IsInRole)
-				.Select(x => x.WebHook)
-				.ToList();
+			var webhooks = _repository.Get(opts =>
+			{
+				var userIds = usersWithRole.Select(u => u.Id).ToHashSet();
+
+				opts.UserIds = userIds;
+				opts.Intents = intents;
+				opts.Status = WebHookStatus.Enabled;
+			});
 
 			var content = WrapMessage(message, Encoding.UTF8, ContentType);
 			await PostMessageToWebHooksAsync(content, webhooks);
 		}
-
-		private string SerializeMessage<T>(T message) =>
-			message is string str ? str : JsonSerializer.Serialize(message);
 
 		private async Task PostMessageToWebHooksAsync(StringContent content, IEnumerable<WebHook> webhooks)
 		{
@@ -132,19 +151,7 @@ namespace EchoPhase.Services.WebHooks
 		private StringContent WrapMessage<T>(T message, Encoding encoding, string contentType) =>
 			new StringContent(SerializeMessage(message), encoding, contentType);
 
-		private IEnumerable<WebHook> GetWebHooks(long? intents, WebHookStatus? status = null, bool User = true) =>
-			_webHookRepository.GetWebHooks(intents, status, User);
-
-		private IEnumerable<WebHook> GetWebHooks(IntentsFlags? intents = null, WebHookStatus? status = null, bool User = true) =>
-			_webHookRepository.GetWebHooks(intents, status, User);
-
-		private async Task<WebHook?> GetByWebHookIdAsync(Guid id, IntentsFlags intents = IntentsFlags.All, bool User = true) =>
-			await _webHookRepository.FindByIdAsync(id, intents, User);
-
-		private IEnumerable<WebHook> GetByUserId(Guid userId, IntentsFlags intents = IntentsFlags.All, bool User = true) =>
-			_webHookRepository.FindByUser(userId, intents, User);
-
-		private async Task<WebHook?> GetByUrlAsync(string url, IntentsFlags intents = IntentsFlags.All, bool User = true) =>
-			await _webHookRepository.FindByUrlAsync(url, intents, User);
+		private string SerializeMessage<T>(T message) =>
+			message is string str ? str : JsonSerializer.Serialize(message);
 	}
 }

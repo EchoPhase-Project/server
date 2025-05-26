@@ -1,5 +1,4 @@
 using EchoPhase.Interfaces;
-using EchoPhase.Processors.Enums;
 
 namespace EchoPhase.Processors.Payloads
 {
@@ -17,13 +16,6 @@ namespace EchoPhase.Processors.Payloads
 			if (Intents < 0)
 			{
 				errorMessage = "Intents cannot be negative.";
-				return false;
-			}
-
-			var allowed = (long)IntentsFlags.All;
-			if ((Intents.Value & ~allowed) != 0)
-			{
-				errorMessage = "Invalid or unallowed intents.";
 				return false;
 			}
 
