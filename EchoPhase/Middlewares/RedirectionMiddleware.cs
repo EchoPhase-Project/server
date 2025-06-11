@@ -2,30 +2,30 @@ namespace EchoPhase.Middlewares
 {
     public class RedirectionMiddleware
     {
-		public static readonly Dictionary<int, string> StatusCodeToPath = new Dictionary<int, string>
-		{
-			{ 404, "/error/not-found" },
-			{ 403, "/error/access-denied" },
-			{ 500, "/error/server-error" },
-			{ 401, "/auth/login" }
-		};
+        public static readonly Dictionary<int, string> StatusCodeToPath = new Dictionary<int, string>
+        {
+            { 404, "/error/not-found" },
+            { 403, "/error/access-denied" },
+            { 500, "/error/server-error" },
+            { 401, "/auth/login" }
+        };
 
-		private static IEnumerable<string> staticFileExtensions = new[] 
-		{ 
-			".css", 
-			".js", 
-			".png", 
-			".jpg", 
-			".jpeg", 
-			".gif", 
-			".svg", 
-			".ico", 
-			".woff", 
-			".woff2", 
-			".ttf", 
-			".otf", 
-			".eot" 
-		};
+        private static IEnumerable<string> staticFileExtensions = new[]
+        {
+            ".css",
+            ".js",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".svg",
+            ".ico",
+            ".woff",
+            ".woff2",
+            ".ttf",
+            ".otf",
+            ".eot"
+        };
 
         private readonly RequestDelegate _next;
 
@@ -38,14 +38,14 @@ namespace EchoPhase.Middlewares
         {
             await _next(context);
 
-			if (context.Response.HasStarted)
-				return;
+            if (context.Response.HasStarted)
+                return;
 
-			var requestPath = context.Request.Path.Value ?? string.Empty;
-			bool isStaticFile = staticFileExtensions.Any(ext => requestPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+            var requestPath = context.Request.Path.Value ?? string.Empty;
+            bool isStaticFile = staticFileExtensions.Any(ext => requestPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
 
-			if (!isStaticFile && StatusCodeToPath.TryGetValue(context.Response.StatusCode, out string? redirectPath))
-				context.Response.Redirect(redirectPath);
+            if (!isStaticFile && StatusCodeToPath.TryGetValue(context.Response.StatusCode, out string? redirectPath))
+                context.Response.Redirect(redirectPath);
         }
     }
 

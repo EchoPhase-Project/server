@@ -1,8 +1,14 @@
 namespace EchoPhase.Interfaces
 {
-	public interface IBuildOptions
-	{
-		public bool IncludeProperties { get; set; }
-		public bool IncludeFields { get; set; }
-	}
+    public interface IBuildOptions
+    {
+        public bool IncludeProperties
+        {
+            get; set;
+        }
+        public bool IncludeFields
+        {
+            get; set;
+        }
+    }
 }

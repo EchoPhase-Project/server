@@ -1,41 +1,40 @@
 using System.Net.WebSockets;
-
-using EchoPhase.Models;
 using EchoPhase.Attributes;
+using EchoPhase.Models;
 using EchoPhase.Processors.Enums;
 using EchoPhase.Processors.Payloads;
 using EchoPhase.Services.WebSockets;
 
 namespace EchoPhase.Processors.Handlers
 {
-	[OpCodeHandler(OpCodes.Disconnect)]
-	public class DisconnectHandler : OpCodeHandlerBase<DisconnectPayload>
-	{
-		private readonly WebSocketService _webSocketService;
-		private readonly WebSocketConnectionManager _connectionManager;
+    [OpCodeHandler(OpCodes.Disconnect)]
+    public class DisconnectHandler : OpCodeHandlerBase<DisconnectPayload>
+    {
+        private readonly WebSocketService _webSocketService;
+        private readonly WebSocketConnectionManager _connectionManager;
 
-		public DisconnectHandler(IServiceProvider serviceProvider) 
+        public DisconnectHandler(IServiceProvider serviceProvider)
         : base(serviceProvider)
-		{
-			_webSocketService = GetService<WebSocketService>();
-			_connectionManager = GetService<WebSocketConnectionManager>();
-		}
+        {
+            _webSocketService = GetService<WebSocketService>();
+            _connectionManager = GetService<WebSocketConnectionManager>();
+        }
 
-		public override async Task HandleAsync(WebSocket webSocket, DisconnectPayload payload)
-		{
-			var userId = await _connectionManager.GetUserIdAsync(webSocket);
-			if (userId == Guid.Empty)
-				return;
+        public override async Task HandleAsync(WebSocket webSocket, DisconnectPayload payload)
+        {
+            var userId = await _connectionManager.GetUserIdAsync(webSocket);
+            if (userId == Guid.Empty)
+                return;
 
-			var response = new EventMessage
-			{
-				Op = OpCodes.DisconnectAck,
-				D = new DisconnectAckPayload(){}
-			};
+            var response = new EventMessage
+            {
+                Op = OpCodes.DisconnectAck,
+                D = new DisconnectAckPayload() { }
+            };
 
-			await _webSocketService.SendMessageToConnectionAsync(webSocket, response);
-			await _connectionManager.CloseConnectionAsync(userId, webSocket);
-		}
-	}
+            await _webSocketService.SendMessageToConnectionAsync(webSocket, response);
+            await _connectionManager.CloseConnectionAsync(userId, webSocket);
+        }
+    }
 }
 

@@ -1,7 +1,6 @@
-using Microsoft.AspNetCore.Mvc;
-
 using EchoPhase.Clients;
 using EchoPhase.Dtos;
+using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Controllers
 {

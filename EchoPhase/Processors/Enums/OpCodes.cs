@@ -2,35 +2,35 @@ using EchoPhase.Attributes;
 
 namespace EchoPhase.Processors.Enums
 {
-	public enum OpCodes
-	{
-		Handshake = 0,
+    public enum OpCodes
+    {
+        Handshake = 0,
 
-		[IgnoreOpCode]
-		HandshakeAck = 1,
-		
-		Disconnect = 2,
-		
-		[IgnoreOpCode]
-		DisconnectAck = 3,
+        [IgnoreOpCode]
+        HandshakeAck = 1,
 
-		Ping = 4,
+        Disconnect = 2,
 
-		[IgnoreOpCode]
-		Pong = 5,
-		
-		Adjust = 6,
-		
-		[IgnoreOpCode]
-		AdjustAck = 7,
+        [IgnoreOpCode]
+        DisconnectAck = 3,
 
-		[IgnoreOpCode]
-		Restricted = 8,
+        Ping = 4,
 
-		[IgnoreOpCode]
-		Error = 9,
+        [IgnoreOpCode]
+        Pong = 5,
 
-		[IgnoreOpCode]
-		Unknown = 0xffff,
-	}
+        Adjust = 6,
+
+        [IgnoreOpCode]
+        AdjustAck = 7,
+
+        [IgnoreOpCode]
+        Restricted = 8,
+
+        [IgnoreOpCode]
+        Error = 9,
+
+        [IgnoreOpCode]
+        Unknown = 0xffff,
+    }
 }

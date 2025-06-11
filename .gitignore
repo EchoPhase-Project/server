@@ -87,3 +87,10 @@ Logs/
 
 # Migrations
 Migrations/
+
+*.env
+*.crt
+*.key
+
+helm/
+k8s/

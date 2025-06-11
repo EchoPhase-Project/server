@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace EchoPhase.Dtos
 {
-	public class TwitchVipResponseDto
+    public class TwitchVipResponseDto
     {
         [JsonPropertyName("user_id")]
         public string UserId { get; set; } = string.Empty;

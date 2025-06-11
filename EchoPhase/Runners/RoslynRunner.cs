@@ -1,72 +1,62 @@
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
-using Microsoft.CodeAnalysis.Scripting;
-
 using EchoPhase.Interfaces;
 using EchoPhase.Runners.Models;
+using EchoPhase.Settings;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.Scripting;
+using Microsoft.Extensions.Options;
 
 namespace EchoPhase.Runners
 {
-	public class RoslynRunner
-	{
-		private readonly IServiceProvider _serviceProvider;
-		public readonly ISet<string> bannedIdentifiers = new HashSet<string>()
-			{ "System", "EchoPhase", "Microsoft", "DllImport", "Process", "File", "HttpClient", "Grpc" };
-		public readonly ISet<string> imports = new HashSet<string>()
-			{ "System.Math", "System.Text", "System.Text.Json", "System.Text.Json.Serialization", "System.Net.Mime" };
+    public class RoslynRunner
+    {
+        private readonly IServiceProvider _serviceProvider;
+        private readonly IRoslynSecurityValidator _validator;
+        private readonly RunnersSettings _settings;
 
-		public RoslynRunner(
-			IServiceProvider serviceProvider
-		)
-		{
-			_serviceProvider = serviceProvider;
-		}
+        private readonly ISet<string> _imports;
 
-		public async Task RunAsync<TI, T>(string code, TI payload)
-			where T : TI
-		{
-			IDiscordClient discordClient = GetService<IDiscordClient>();
-			ScriptContext context = new ScriptContext()
-			{
-				DiscordClient = discordClient
-			};
+        public RoslynRunner(
+            IServiceProvider serviceProvider,
+            IOptions<RunnersSettings> settings,
+            IRoslynSecurityValidator validator
+        )
+        {
+            _serviceProvider = serviceProvider;
+            _settings = settings.Value;
+            _validator = validator;
+            _imports = _settings.Roslyn.Import ?? new HashSet<string>
+            {
+                "System", "System.Text", "System.Text.Json"
+            };
+        }
 
-			ScriptGlobals<TI> globals = new ScriptGlobals<TI>() 
-			{
-				Payload = payload, 
-				Context = context 
-			};
+        public async Task RunAsync<TI, T>(string code, TI payload) where T : TI
+        {
+            var diagnostics = _validator.Validate(code).ToArray();
+            if (diagnostics.Length > 0)
+                throw new InvalidOperationException("Script validation failed:\n" + string.Join("\n", diagnostics));
 
-			ValidateScript(code);
+            var context = new ScriptContext
+            {
+                DiscordClient = GetService<IDiscordClient>()
+            };
+            var globals = new ScriptGlobals<TI> { Payload = payload, Context = context };
 
-			var options = ScriptOptions.Default
-				.WithReferences(
-					typeof(object).Assembly,
-					typeof(object).Assembly,
-					typeof(IScriptGlobals<TI>).Assembly)
-				.WithImports(imports);
+            var references = AppDomain.CurrentDomain
+                .GetAssemblies()
+                .Where(a => a.IsDynamic == false)
+                .Select(a => MetadataReference.CreateFromFile(a.Location));
 
-			Script clientScript = CSharpScript.Create(code, options, typeof(IScriptGlobals<TI>));
-			var scriptState = await clientScript.RunAsync(globals);
-		}
+            var options = ScriptOptions.Default
+                .WithReferences(references)
+                .WithImports(_imports);
 
-		protected T GetService<T>() where T : notnull
-		{
-			return _serviceProvider.GetRequiredService<T>();
-		}
+            var clientScript = CSharpScript.Create(code, options, typeof(IScriptGlobals<TI>));
+            await clientScript.RunAsync(globals);
+        }
 
-		private void ValidateScript(string code)
-		{
-			var tree = CSharpSyntaxTree.ParseText(code);
-			var root = tree.GetRoot();
-
-			var usings = root.DescendantNodes().OfType<UsingDirectiveSyntax>();
-			if (usings.Any())
-				throw new InvalidOperationException("Using directives are not allowed.");
-
-			if (bannedIdentifiers.Any(b => code.Contains(b)))
-				throw new InvalidOperationException("Access to restricted API is denied.");
-		}
-	}
+        private T GetService<T>() where T : notnull =>
+            _serviceProvider.GetRequiredService<T>();
+    }
 }

@@ -1,55 +1,26 @@
-using System.Text;
-using System.Globalization;
-using System.Text.Json;
-
-using Microsoft.OpenApi.Models;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Localization;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-
-using Microsoft.Net.Http.Headers;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Localization;
-using Microsoft.AspNetCore.StaticFiles;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-
-using HealthChecks.System; 
-using HealthChecks.UI.Client;
-using HealthChecks.NpgSql;
-
-using ParkSquare.AspNetCore.Sitemap;
-using Swashbuckle.AspNetCore.Swagger;
-
-using Grpc.AspNetCore;
-using Grpc.AspNetCore.Web;
-
-using EchoPhase.DAL.Postgres;
-using EchoPhase.Hubs;
-using EchoPhase.Hubs.Managers;
-using EchoPhase.Roles;
-using EchoPhase.Models;
-using EchoPhase.Requirements;
-using EchoPhase.Helpers;
-using EchoPhase.Services;
-using EchoPhase.Services.Grpc;
-using EchoPhase.Services.Security;
-using EchoPhase.Services.Internal;
 using EchoPhase.Extensions;
 using EchoPhase.Handlers;
+using EchoPhase.Helpers;
+using EchoPhase.Hubs;
+using EchoPhase.Hubs.Managers;
 using EchoPhase.Interfaces;
 using EchoPhase.Middlewares;
+using EchoPhase.Models;
 using EchoPhase.Repositories;
-using EchoPhase.Processors.Handlers;
+using EchoPhase.Requirements;
 using EchoPhase.RouteConstraints;
+using EchoPhase.Services;
+using EchoPhase.Services.Grpc;
+using EchoPhase.Services.Internal;
+using EchoPhase.Services.Security;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Options;
+using Microsoft.OpenApi.Models;
+using ParkSquare.AspNetCore.Sitemap;
 
 namespace EchoPhase
 {
@@ -60,118 +31,118 @@ namespace EchoPhase
             Configuration = configuration;
         }
 
-        public IConfiguration Configuration { get; }
-        
+        public IConfiguration Configuration
+        {
+            get;
+        }
+
         public void ConfigureServices(IServiceCollection services)
         {
-			services.AddSitemap();
+            services.AddSitemap();
 
-			services.AddLogging(builder =>
-			{
-				builder.ClearProviders();
-				builder.SetMinimumLevel(LogLevel.Debug);
-				builder.AddConsole();
-				builder.AddDebug();
-				builder.AddFile("Logs/logs-{Date}.txt");
-			});
+            services.AddLogging(builder =>
+            {
+                builder.ClearProviders();
+                builder.SetMinimumLevel(LogLevel.Debug);
+                builder.AddConsole();
+                builder.AddDebug();
+                builder.AddFile("Logs/logs-{Date}.txt");
+            });
 
-			services.Configure<RouteOptions>(options =>
-			{
-				options.ConstraintMap.Add("ulong", typeof(ULongRouteConstraint));
-			});
+            services.Configure<RouteOptions>(options =>
+            {
+                options.ConstraintMap.Add("ulong", typeof(ULongRouteConstraint));
+            });
 
-			TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
-			services.AddSingleton(timeZone);
+            TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
+            services.AddSingleton(timeZone);
 
-			services.AddSwaggerGen(o =>
-			{
-				o.SwaggerDoc("v1", new OpenApiInfo
-				{
-					Version = "v1",
-					Title = "EchoPhase API",
-					Description = "API v1",
-					TermsOfService = new Uri("https://example.com/terms"),
-					Contact = new OpenApiContact
-					{
-						Name = "Labo Daniil",
-						Email = "extremal.user@gmail.com",
-						Url = new Uri("https://github.com/CodeHeister"),
-					},
-					License = new OpenApiLicense
-					{
-						Name = "Use under LICX",
-						Url = new Uri("https://example.com/license"),
-					}
-				});
-			});
+            services.AddSwaggerGen(o =>
+            {
+                o.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Version = "v1",
+                    Title = "EchoPhase API",
+                    Description = "API v1",
+                    TermsOfService = new Uri("https://example.com/terms"),
+                    Contact = new OpenApiContact
+                    {
+                        Name = "Labo Daniil",
+                        Email = "extremal.user@gmail.com",
+                        Url = new Uri("https://github.com/CodeHeister"),
+                    },
+                    License = new OpenApiLicense
+                    {
+                        Name = "Use under LICX",
+                        Url = new Uri("https://example.com/license"),
+                    }
+                });
+            });
 
-			services.AddHttpContextAccessor();
+            services.AddHttpContextAccessor();
 
-			services.AddDbContext<PostgresContext>(options =>
-				options
-					.UseNpgsql(Configuration.GetConnectionString("DefaultConnection"),
-						o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
-			services.AddRedisCache(Configuration.GetSection("Redis"));
-			//services.AddTwitchClient(Configuration.GetSection("Twitch"));
-			services.AddDiscordClient(Configuration.GetSection("Discord"));
-			services.AddAuthentication(Configuration.GetSection("Jwt"));
-			
-			services.AddSingleton<IAuthorizationHandler, PermissionsAuthorizationHandler>();
+            services.AddPostgres(Configuration.GetSection("Postgres"));
+            services.AddRedisCache(Configuration.GetSection("Redis"));
+            //services.AddTwitchClient(Configuration.GetSection("Twitch"));
+            services.AddDiscordClient(Configuration.GetSection("Discord"));
+            services.AddAuthentication(Configuration.GetSection("Jwt"));
 
-			services.AddAuthorization(options =>
-			{
-				options.AddPolicy("AdminOnly", policy =>
-				{
-					policy.RequireRole("Admin");
-				});
+            services.AddSingleton<IAuthorizationHandler, PermissionsAuthorizationHandler>();
 
-				options.AddPolicy("RequireAdminOrHigher", policy =>
-				{
-					policy.RequireRole("Admin", "Dev");
-				});
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("AdminOnly", policy =>
+                {
+                    policy.RequireRole("Admin");
+                });
 
-				options.AddPolicy("ApiAccess", policy =>
-				{
-					policy.RequireRole("Admin", "Dev");
-				});
+                options.AddPolicy("RequireAdminOrHigher", policy =>
+                {
+                    policy.RequireRole("Admin", "Dev");
+                });
 
-				options.AddPolicy("TrustedOnly", policy =>
-				{
-					policy.RequireRole("Admin", "Dev", "Staff");
-				});
+                options.AddPolicy("ApiAccess", policy =>
+                {
+                    policy.RequireRole("Admin", "Dev");
+                });
 
-				options.AddPolicy("Any", policy =>
-				{
-					policy.RequireAuthenticatedUser();
-				});
+                options.AddPolicy("TrustedOnly", policy =>
+                {
+                    policy.RequireRole("Admin", "Dev", "Staff");
+                });
 
-				options.AddPolicy("NoAccess", policy =>
-				{
-					policy.RequireAssertion(context => false);
-				});
+                options.AddPolicy("Any", policy =>
+                {
+                    policy.RequireAuthenticatedUser();
+                });
 
-				options.AddPolicy("CanEdit", policy =>
-					policy.Requirements.Add(new PermissionsRequirement("CanEdit", "CanAdd")));
+                options.AddPolicy("NoAccess", policy =>
+                {
+                    policy.RequireAssertion(context => false);
+                });
 
-				options.DefaultPolicy = new AuthorizationPolicyBuilder()
-					.AddAuthenticationSchemes(
-							IdentityConstants.ApplicationScheme, 
-							JwtBearerDefaults.AuthenticationScheme)
-					.RequireAuthenticatedUser()
-					.Build();
-			});
+                options.AddPolicy("CanEdit", policy =>
+                    policy.Requirements.Add(new PermissionsRequirement("CanEdit", "CanAdd")));
 
-			services.AddPreparedMvc();
-			services.AddCorsPolicies();
-			services.AddAntiforgeryOptions();
-			services.AddLocalizationOptions();
+                options.DefaultPolicy = new AuthorizationPolicyBuilder()
+                    .AddAuthenticationSchemes(
+                            IdentityConstants.ApplicationScheme,
+                            JwtBearerDefaults.AuthenticationScheme)
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
 
-			services.AddHttpsRedirection(options =>
-			{
-				options.RedirectStatusCode = StatusCodes.Status307TemporaryRedirect;
-				options.HttpsPort = 5001;
-			});
+            services.AddPreparedMvc();
+            services.AddCorsPolicies();
+            services.AddAntiforgeryOptions();
+            services.AddLocalizationOptions();
+
+            services.AddHttpsRedirection(options =>
+            {
+                options.RedirectStatusCode = StatusCodes.Status307TemporaryRedirect;
+                options.HttpsPort = 5001;
+            });
 
             services.AddSignalR(options =>
             {
@@ -179,47 +150,52 @@ namespace EchoPhase
                 options.MaximumReceiveMessageSize = 102400000;
             });
 
-			services.AddSingleton<IStringLocalizerFactory, ResourceManagerStringLocalizerFactory>();
-			services.AddSingleton<IUserConnectionManager, UserConnectionManager>();
+            services.AddSingleton<IStringLocalizerFactory, ResourceManagerStringLocalizerFactory>();
+            services.AddSingleton<IUserConnectionManager, UserConnectionManager>();
 
-			services.AddSingleton<FileHelper>();
-			services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+            services.AddSingleton<FileHelper>();
+            services.AddSingleton<ProjectionHelper>();
 
-			services.AddSingleton<QrCodeService>();
-			services.AddSingleton<IIntentsService, IntentsService>();
-			services.AddSingleton<IPermissionsService, PermissionsService>();
+            services.AddAes(Configuration.GetSection("Aes"));
+            services.AddPasswordHasher(Configuration.GetSection("Argon2"));
 
-			services.AddScoped<UserRepository>();
+            services.AddSingleton<QrCodeService>();
+            services.AddSingleton<IIntentsService, IntentsService>();
+            services.AddSingleton<IPermissionsService, PermissionsService>();
 
-			services.AddRoles(Configuration.GetSection("Role"), "Admin", "User", "Manager", "Support", "Staff", "Dev");
+            services.AddScoped<UserRepository>();
 
-			services.AddAes(Configuration.GetSection("Aes"));
+            services.AddRoles(
+                Configuration.GetSection("Role"),
+                "Admin", "User", "Manager", "Support", "Staff", "Dev"
+            );
 
-			services.AddScoped<IUserService, UserService>();
-			services.AddScoped<IAuthService, AuthService>();
-			services.AddScoped<ProjectionHelper>();
+            services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IAuthService, AuthService>();
 
-			services.AddScoped<IAntiforgeryService, AntiforgeryService>();
-			services.AddScoped<UserManager<User>, UserManager<User>>();
-			services.AddScoped<SignInManager<User>, SignInManager<User>>();
+            services.AddScoped<IAntiforgeryService, AntiforgeryService>();
+            services.AddScoped<UserManager<User>, UserManager<User>>();
+            services.AddScoped<SignInManager<User>, SignInManager<User>>();
 
-			services.AddHostedService<ShutdownService>();
+            services.AddRunners(Configuration.GetSection("Runners"));
 
-			services.AddEventService();
+            services.AddHostedService<ShutdownService>();
 
-			services.AddGrpc();
+            services.AddEventService();
 
-			/*
+            services.AddGrpc();
+
+            /*
 			services.AddHealthChecks()
 				.AddNpgSql(Configuration.GetConnectionString("DefaultConnection"),
-						name: "PostgreSQL", 
+						name: "PostgreSQL",
 						failureStatus: HealthStatus.Unhealthy)
-				.AddRedis(Configuration["Redis:ConnectionString"], 
-						name: "Redis", 
+				.AddRedis(Configuration["Redis:ConnectionString"],
+						name: "Redis",
 						failureStatus: HealthStatus.Unhealthy)
-				.AddDiskStorageHealthCheck(options => 
-						options.AddDrive(Path.GetPathRoot(AppContext.BaseDirectory), 
-						minimumFreeMegabytes: 1000), 
+				.AddDiskStorageHealthCheck(options =>
+						options.AddDrive(Path.GetPathRoot(AppContext.BaseDirectory),
+						minimumFreeMegabytes: 1000),
                         name: "Disk Storage",
 						failureStatus: HealthStatus.Degraded);
 
@@ -229,9 +205,7 @@ namespace EchoPhase
 				setup.SetEvaluationTimeInSeconds(60);
 			}).AddInMemoryStorage();
 			*/
-
-			services.AddSingleton<OpCodeHandlerResolver>();
-		}
+        }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IOptions<RequestLocalizationOptions> localizationOptions, ILoggerFactory loggerFactory)
         {
@@ -239,12 +213,12 @@ namespace EchoPhase
             {
                 app.UseDeveloperExceptionPage();
 
-				app.UseSwagger();
-				app.UseSwaggerUI(o =>
-				{
-					o.SwaggerEndpoint("/swagger/v1/swagger.json", "API V1");
-					o.RoutePrefix = string.Empty;
-				});
+                app.UseSwagger();
+                app.UseSwaggerUI(o =>
+                {
+                    o.SwaggerEndpoint("/swagger/v1/swagger.json", "API V1");
+                    o.RoutePrefix = string.Empty;
+                });
             }
             else
             {
@@ -252,75 +226,88 @@ namespace EchoPhase
                 app.UseHsts();
             }
 
-			app.Use(async (context, next) =>
-			{
-				context.Response.Headers.Append("Content-Security-Policy",
-					"default-src 'self'; " +
-					"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; " + 
-					"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unicons.iconscout.com; " + 
-					"img-src 'self' blob: https://upload.wikimedia.org ; " + 
-					"font-src 'self' https://fonts.gstatic.com https://unicons.iconscout.com; " + 
-					"connect-src 'self' https://api.cdnjs.com; " +
-					"upgrade-insecure-requests; " +
-					"block-all-mixed-content");
-				await next();
-			});
+            app.Use(async (context, next) =>
+            {
+                context.Response.Headers.Append("Content-Security-Policy",
+                    "default-src 'self'; " +
+                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; " +
+                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unicons.iconscout.com; " +
+                    "img-src 'self' blob: https://upload.wikimedia.org ; " +
+                    "font-src 'self' https://fonts.gstatic.com https://unicons.iconscout.com; " +
+                    "connect-src 'self' https://api.cdnjs.com; " +
+                    "upgrade-insecure-requests; " +
+                    "block-all-mixed-content");
+                await next();
+            });
 
             app.UseRequestLoggingMiddleware();
 
             // app.UseHttpsRedirection();
 
-			app.UseDefaultFiles();
-			app.UseStaticFiles();
+            app.UseDefaultFiles();
+            app.UseStaticFiles();
 
             app.UseStaticFiles(new StaticFileOptions
-			{
-				OnPrepareResponse = ctx =>
-				{
-					ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=86400");
-				},
-				ServeUnknownFileTypes = true,
-				DefaultContentType = "application/octet-stream",
-				ContentTypeProvider = new FileExtensionContentTypeProvider
-				{
-					Mappings = 
-					{ 
-						[".js"] = "application/javascript",
-						[".json"] = "application/json",
-						[".wasm"] = "application/wasm"
-					}
-				}
-			});
-
-			app.UseStaticFiles(new StaticFileOptions
-			{
-				FileProvider = new PhysicalFileProvider(
-					Path.Combine(env.ContentRootPath, "Frontend", "dist")),
-				RequestPath = "/app"
-			});
+            {
+                OnPrepareResponse = ctx =>
+                {
+                    ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=86400");
+                },
+                DefaultContentType = "application/octet-stream",
+                ContentTypeProvider = new FileExtensionContentTypeProvider
+                {
+                    Mappings =
+                    {
+                        [".js"] = "application/javascript",
+                        [".mjs"] = "application/javascript",
+                        [".json"] = "application/json",
+                        [".wasm"] = "application/wasm",
+                        [".css"] = "text/css",
+                        [".html"] = "text/html",
+                        [".htm"] = "text/html",
+                        [".svg"] = "image/svg+xml",
+                        [".png"] = "image/png",
+                        [".jpg"] = "image/jpeg",
+                        [".jpeg"] = "image/jpeg",
+                        [".gif"] = "image/gif",
+                        [".webp"] = "image/webp",
+                        [".ico"] = "image/x-icon",
+                        [".ttf"] = "font/ttf",
+                        [".otf"] = "font/otf",
+                        [".woff"] = "font/woff",
+                        [".woff2"] = "font/woff2",
+                        [".eot"] = "application/vnd.ms-fontobject",
+                        [".mp4"] = "video/mp4",
+                        [".webm"] = "video/webm",
+                        [".mp3"] = "audio/mpeg",
+                        [".ogg"] = "audio/ogg",
+                        [".txt"] = "text/plain",
+                        [".xml"] = "application/xml",
+                        [".map"] = "application/json"
+                    }
+                }
+            });
 
             app.UseRedirectionMiddleware();
 
             app.UseRouting();
-			app.UseCookiePolicy();
+            app.UseCookiePolicy();
 
-			app.UseGrpcWeb();
-			app.UseCors();
-
+            app.UseCors();
 
             app.UseRequestLocalization(localizationOptions.Value);
 
-			app.UseAntiforgery();
+            app.UseAntiforgery();
 
             app.UseAuthentication();
             app.UseAuthorization();
 
-			app.UseWebSockets();
+            app.UseWebSockets();
 
             app.UseEndpoints(endpoints =>
             {
-				endpoints.MapGrpcService<DiscordTokenGrpcServiceImpl>().EnableGrpcWeb();
-				/*
+                endpoints.MapGrpcService<DiscordTokenGrpcServiceImpl>();
+                /*
 				endpoints.MapHealthChecks("/health", new HealthCheckOptions
 				{
 					Predicate = _ => true,
@@ -337,26 +324,25 @@ namespace EchoPhase
 					.RequireAuthorization("AdminOrDevOnly");
 				*/
 
-				endpoints.MapControllers()
-					.RequireAuthorization();
+                endpoints.MapControllers()
+                    .RequireAuthorization();
 
-				endpoints.MapHub<EventHub>("/eventHub")
-					.RequireAuthorization();
+                endpoints.MapHub<EventHub>("/eventHub")
+                    .RequireAuthorization();
 
-				/*
-				endpoints.MapGrpcService<GrpcDataService>()
-					.EnableGrpcWeb()
-					.RequireCors("AllowAllGrpc")
-					.RequireAuthorization();
-					*/
+                endpoints.MapFallback(async context =>
+                    {
+                        if (context.Request.Method != HttpMethods.Get ||
+                            Path.HasExtension(context.Request.Path))
+                        {
+                            context.Response.StatusCode = StatusCodes.Status404NotFound;
+                            return;
+                        }
 
-				endpoints.Map("/app/{*path:nonfile}", async context =>
-                {
-                    context.Response.ContentType = "text/html";
-                    await context.Response.SendFileAsync(Path.Combine(env.ContentRootPath, "Frontend", "dist", "index.html"));
-                });
-					//.RequireAuthorization("AdminOrDevOnly");
-			});
+                        context.Response.ContentType = "text/html";
+                        await context.Response.SendFileAsync(Path.Combine(env.WebRootPath, "index.html"));
+                    });
+            });
 
             app.UseSitemap();
         }

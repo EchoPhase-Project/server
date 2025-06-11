@@ -1,7 +1,10 @@
 namespace EchoPhase.Interfaces
 {
-	public interface IScriptContext
-	{
-		public IDiscordClient DiscordClient { get; }
-	}
+    public interface IScriptContext
+    {
+        public IDiscordClient DiscordClient
+        {
+            get;
+        }
+    }
 }

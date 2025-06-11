@@ -1,8 +1,8 @@
-using EchoPhase.Configurations.Models;
+using EchoPhase.Settings;
 
 namespace EchoPhase.Validators
 {
-	public class AppSettingsValidator : ValidatorBase<AppSettings>
-	{
-	}
+    public class AppSettingsValidator : ValidatorBase<AppSettings>
+    {
+    }
 }

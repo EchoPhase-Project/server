@@ -1,6 +1,5 @@
-using Wasmtime;
-
 using EchoPhase.Interfaces;
+using Wasmtime;
 
 public class WasmRunner : ITriggerRunner, IDisposable
 {
@@ -13,11 +12,11 @@ public class WasmRunner : ITriggerRunner, IDisposable
 
     public WasmRunner(string wasmPath, string functionName = "handle")
     {
-		if (String.IsNullOrWhiteSpace(wasmPath))
-			throw new ArgumentNullException("Missing WASM path.");
+        if (String.IsNullOrWhiteSpace(wasmPath))
+            throw new ArgumentNullException("Missing WASM path.");
 
-		if (String.IsNullOrWhiteSpace(functionName))
-			throw new ArgumentNullException("Blank function name.");
+        if (String.IsNullOrWhiteSpace(functionName))
+            throw new ArgumentNullException("Blank function name.");
 
         if (!File.Exists(wasmPath))
             throw new FileNotFoundException("WASM module not found.", wasmPath);
@@ -29,10 +28,10 @@ public class WasmRunner : ITriggerRunner, IDisposable
 
         _linker.DefineWasi();
         _store.SetWasiConfiguration(
-			new WasiConfiguration()
-				.WithInheritedStandardOutput()
-				.WithInheritedStandardError()
-		);
+            new WasiConfiguration()
+                .WithInheritedStandardOutput()
+                .WithInheritedStandardError()
+        );
 
         _instance = _linker.Instantiate(_store, _module);
         _function = _instance.GetFunction(functionName)
@@ -48,10 +47,10 @@ public class WasmRunner : ITriggerRunner, IDisposable
         if (_function.WrapFunc<string, string>() is not Func<string, string> func)
             throw new InvalidOperationException("Failed to wrap WASM function as (string) -> string.");
 
-		var result = await Task.FromResult(func(inputStr));
+        var result = await Task.FromResult(func(inputStr));
 
-		if (String.IsNullOrWhiteSpace(result))
-			throw new NullReferenceException("No result from WASM module.");
+        if (String.IsNullOrWhiteSpace(result))
+            throw new NullReferenceException("No result from WASM module.");
 
         return result;
     }

@@ -1,11 +1,8 @@
-using System.Threading.Tasks;
-using Grpc.Core;
 using EchoPhase.Grpc;
 using EchoPhase.Interfaces;
 using EchoPhase.Models;
 using EchoPhase.Repositories.Options;
-using System.Linq;
-using System.Collections.Generic;
+using Grpc.Core;
 
 namespace EchoPhase.Services.Grpc
 {
@@ -94,20 +91,20 @@ namespace EchoPhase.Services.Grpc
         }
 
         // EditBatch
-		public override async Task<DiscordTokenResultGrpc> EditBatch(EditBatchRequestGrpc request, ServerCallContext context)
-		{
-			var targets = request.Targets.Select(FromProto);
-			var modify = FromProto(request.Modify);
+        public override async Task<DiscordTokenResultGrpc> EditBatch(EditBatchRequestGrpc request, ServerCallContext context)
+        {
+            var targets = request.Targets.Select(FromProto);
+            var modify = FromProto(request.Modify);
 
-			var result = await _service.EditAsync(targets, modify);
+            var result = await _service.EditAsync(targets, modify);
 
-			var reply = new DiscordTokenResultGrpc();
-			reply.Items.AddRange(result.Affected.Select(ToProto));
-			reply.Errors.AddRange(result.Errors);
-			reply.IsSucceeded = result.IsSucceeded;
+            var reply = new DiscordTokenResultGrpc();
+            reply.Items.AddRange(result.Affected.Select(ToProto));
+            reply.Errors.AddRange(result.Errors);
+            reply.IsSucceeded = result.IsSucceeded;
 
-			return reply;
-		}
+            return reply;
+        }
 
         // Delete один
         public override async Task<DiscordTokenGrpc> Delete(DiscordTokenGrpc request, ServerCallContext context)

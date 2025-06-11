@@ -10,7 +10,8 @@ namespace EchoPhase.Attributes
 
         public CheckModelForNullAttribute() : this(arguments =>
             arguments.Values.Any(value => value == null))
-        { }
+        {
+        }
 
         public CheckModelForNullAttribute(Func<IDictionary<string, object?>, bool> checkCondition) =>
             _validate = checkCondition;

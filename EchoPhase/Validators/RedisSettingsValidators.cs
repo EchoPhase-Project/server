@@ -1,8 +1,8 @@
-using EchoPhase.Configurations.Models;
+using EchoPhase.Settings;
 
 namespace EchoPhase.Validators
 {
-	public class RedisSettingsValidator : ValidatorBase<RedisSettings>
-	{
-	}
+    public class RedisSettingsValidator : ValidatorBase<RedisSettings>
+    {
+    }
 }

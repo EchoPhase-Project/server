@@ -1,55 +1,54 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
 using System.ComponentModel.DataAnnotations;
-
 using EchoPhase.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Controllers
 {
-	[ApiController]
-	[AllowAnonymous]
-	[Route("api/v1/auth")]
-	public class AuthController : ControllerBase
-	{
-		private readonly IAuthService _authService;
-		private readonly IAntiforgeryService _antiforgeryService;
+    [ApiController]
+    [AllowAnonymous]
+    [Route("api/v1/auth")]
+    public class AuthController : ControllerBase
+    {
+        private readonly IAuthService _authService;
+        private readonly IAntiforgeryService _antiforgeryService;
 
-		public AuthController(
-			IAuthService authService, 
-			IAntiforgeryService antiforgeryService
-		)
-		{
-			_authService = authService;
-			_antiforgeryService = antiforgeryService;
-		}
+        public AuthController(
+            IAuthService authService,
+            IAntiforgeryService antiforgeryService
+        )
+        {
+            _authService = authService;
+            _antiforgeryService = antiforgeryService;
+        }
 
-		[HttpGet("csrf")]
-		public IActionResult GetToken()
-		{
-			if (_antiforgeryService.SetAntiforgeryToken())
-				return Ok(new { message = "Token set" });
+        [HttpGet("csrf")]
+        public IActionResult GetToken()
+        {
+            if (_antiforgeryService.SetAntiforgeryToken())
+                return Ok(new { message = "Token set" });
 
-			return BadRequest();
-		}
+            return BadRequest();
+        }
 
-		[HttpPost("register")]
-		[ValidateAntiForgeryToken]
-		public async Task<IActionResult> Register([FromBody] RegisterDto dto)
-		{
-			var result = await _authService.CreateUserAsync(dto.Name, dto.Username, dto.Password);
-			return result.Succeeded ? Ok() : BadRequest(result.Errors);
-		}
+        [HttpPost("register")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Register([FromBody] RegisterDto dto)
+        {
+            var result = await _authService.CreateUserAsync(dto.Name, dto.Username, dto.Password);
+            return result.Succeeded ? Ok() : BadRequest(result.Errors);
+        }
 
-		[HttpPost("login")]
-		[ValidateAntiForgeryToken]
-		public async Task<IActionResult> Login([FromBody] LoginDto dto)
-		{
-			var result = await _authService.AuthenticateAsync(dto.Username, dto.Password);
-			return result.Succeeded ? Ok() : Unauthorized();
-		}
-	}
+        [HttpPost("login")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Login([FromBody] LoginDto dto)
+        {
+            var result = await _authService.AuthenticateAsync(dto.Username, dto.Password);
+            return result.Succeeded ? Ok() : Unauthorized();
+        }
+    }
 
-	public class LoginDto
+    public class LoginDto
     {
         [Required]
         [MinLength(3)]

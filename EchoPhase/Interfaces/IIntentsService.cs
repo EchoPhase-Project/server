@@ -1,6 +1,6 @@
 namespace EchoPhase.Interfaces
 {
-	public interface IIntentsService : IBitMaskService
-	{
-	}
+    public interface IIntentsService : IBitMaskService
+    {
+    }
 }
