@@ -122,6 +122,9 @@ namespace EchoPhase.Services
         public bool UserExists(Guid id) =>
             _context.Users.Any(e => e.Id == id);
 
+        public bool UserExists(string username) =>
+            _context.Users.Any(e => e.UserName == username);
+
         public string GetProfileImagePath(Guid userId, string filename, bool root = false)
         {
             if (userId == Guid.Empty)

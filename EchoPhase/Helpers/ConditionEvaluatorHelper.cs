@@ -6,18 +6,43 @@ using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Helpers
 {
+    /// <summary>
+    /// Provides utility methods for evaluating conditional expressions using dynamic variables.
+    /// </summary>
     public static class ConditionEvaluatorHelper
     {
+        /// <summary>
+        /// Regular expression to parse simple conditional expressions of the form:
+        /// <c>&lt;left&gt; &lt;operator&gt; &lt;right&gt;</c>, where operator is one of
+        /// <c>==</c>, <c>!=</c>, <c>&gt;=</c>, <c>&lt;=</c>, <c>&gt;</c>, or <c>&lt;</c>.
+        /// </summary>
         private static readonly Regex ConditionRegex = new Regex(@"(\S+)\s*(==|!=|>=|<=|>|<)\s*(\S+)", RegexOptions.Compiled);
 
         /// <summary>
-        /// Evaluates the condition string against the given variables.
-        /// Condition format example: "x > 7", "hello == y", "a <= b"
-        /// Supports variable-to-variable, variable-to-constant, and constant-to-variable comparisons.
+        /// Evaluates a simple conditional expression using the provided variables.
         /// </summary>
-        /// <param name="condition">Condition string</param>
-        /// <param name="variables">Dictionary of variable names to values</param>
-        /// <returns>True if condition passes, false otherwise</returns>
+        /// <param name="condition">
+        /// A string representing the condition to evaluate. It must follow the format:
+        /// <c>&lt;left&gt; &lt;operator&gt; &lt;right&gt;</c>, e.g. <c>age &gt; 18</c> or <c>"status" == "active"</c>.
+        /// </param>
+        /// <param name="variables">
+        /// A dictionary containing variable names and their corresponding values, used for resolving tokens in the condition.
+        /// </param>
+        /// <returns>
+        /// <c>true</c> if the condition evaluates to true; otherwise, <c>false</c>.
+        /// </returns>
+        /// <exception cref="ArgumentException">
+        /// Thrown if the condition is empty or does not match the expected format.
+        /// </exception>
+        /// <exception cref="KeyNotFoundException">
+        /// Thrown if a referenced variable is not found in the dictionary.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown if the operator is not supported or operands cannot be compared.
+        /// </exception>
+        /// <exception cref="NullReferenceException">
+        /// Thrown if a null value is encountered during token resolution.
+        /// </exception>
         public static bool Evaluate(string condition, IDictionary<string, object> variables)
         {
             if (string.IsNullOrWhiteSpace(condition))
@@ -38,8 +63,32 @@ namespace EchoPhase.Helpers
         }
 
         /// <summary>
-        /// Resolves token to either a variable value or a parsed constant.
+        /// Resolves a string token to its corresponding value using a dictionary of variables.
+        /// Supports constants, quoted strings, nested property/field access, and JSON structures.
         /// </summary>
+        /// <param name="token">
+        /// The token to resolve. It can be:
+        /// <list type="bullet">
+        /// <item><description>A quoted string (e.g., <c>"hello"</c> or <c>'world'</c>)</description></item>
+        /// <item><description>A constant (e.g., <c>123</c>, <c>true</c>, <c>3.14</c>)</description></item>
+        /// <item><description>A variable or nested path (e.g., <c>user.name</c>)</description></item>
+        /// </list>
+        /// </param>
+        /// <param name="variables">A dictionary containing root-level variable names and their values.</param>
+        /// <returns>
+        /// The resolved value. This may be a primitive type, object property, field value,
+        /// or a converted value from <see cref="JsonElement"/> or <see cref="JToken"/>.
+        /// </returns>
+        /// <exception cref="ArgumentException">Thrown if the token is empty or invalid.</exception>
+        /// <exception cref="KeyNotFoundException">
+        /// Thrown if the root variable or a nested property/field cannot be found.
+        /// </exception>
+        /// <exception cref="NullReferenceException">
+        /// Thrown if a null value is encountered during nested property/field access.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown if trying to access a property on a non-object <see cref="JsonElement"/> or <see cref="JToken"/>.
+        /// </exception>
         private static object ResolveToken(string token, IDictionary<string, object> variables)
         {
             if ((token.StartsWith("\"") && token.EndsWith("\"")) ||
@@ -65,7 +114,6 @@ namespace EchoPhase.Helpers
                 if (current == null)
                     throw new NullReferenceException($"Null encountered while accessing '{propName}'.");
 
-                // JsonElement
                 if (current is JsonElement jsonElement)
                 {
                     if (jsonElement.ValueKind != JsonValueKind.Object)
@@ -78,22 +126,20 @@ namespace EchoPhase.Helpers
                     continue;
                 }
 
-                // JToken
                 if (current is JToken jtoken)
                 {
                     if (jtoken.Type != JTokenType.Object)
                         throw new InvalidOperationException($"Cannot get property '{propName}' from non-object JSON token.");
 
-                    jtoken = jtoken[propName];
+                    JToken? propToken = jtoken[propName];
 
-                    if (jtoken == null)
+                    if (propToken is null)
                         throw new KeyNotFoundException($"Property '{propName}' not found in JSON token.");
 
-                    current = jtoken;
+                    current = propToken;
                     continue;
                 }
 
-                // Обычный объект — обращаемся через Reflection
                 var type = current.GetType();
                 var property = type.GetProperty(propName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                 if (property != null)
@@ -112,15 +158,30 @@ namespace EchoPhase.Helpers
                 throw new KeyNotFoundException($"Property or field '{propName}' not found on type '{type.Name}'.");
             }
 
-            // После обхода всех частей возвращаем результат
             if (current is JsonElement je)
                 return JsonElementToClrValue(je);
             if (current is JToken jt)
                 return JTokenToClrValue(jt);
+            if (current is null)
+                throw new NullReferenceException($"Result is null.");
 
             return current;
         }
 
+        /// <summary>
+        /// Converts a <see cref="JsonElement"/> to a corresponding CLR value.
+        /// </summary>
+        /// <param name="element">The <see cref="JsonElement"/> to convert.</param>
+        /// <returns>
+        /// A CLR value based on the element's <see cref="JsonValueKind"/>:
+        /// <list type="bullet">
+        /// <item><description><see cref="string"/> for <c>JsonValueKind.String</c></description></item>
+        /// <item><description><see cref="int"/> if the number fits in <see cref="int"/>; otherwise <see cref="double"/> for <c>JsonValueKind.Number</c></description></item>
+        /// <item><description><see cref="bool"/> for <c>JsonValueKind.True</c> and <c>JsonValueKind.False</c></description></item>
+        /// <item><description><c>null</c> for <c>JsonValueKind.Null</c></description></item>
+        /// <item><description>Raw JSON string via <see cref="JsonElement.GetRawText"/> for unsupported kinds</description></item>
+        /// </list>
+        /// </returns>
         private static object JsonElementToClrValue(JsonElement element)
         {
             return element.ValueKind switch
@@ -130,10 +191,25 @@ namespace EchoPhase.Helpers
                 JsonValueKind.True => true,
                 JsonValueKind.False => false,
                 JsonValueKind.Null => null!,
-                _ => element.GetRawText() // Для объектов и массивов возвращаем JSON строку
+                _ => element.GetRawText()
             };
         }
 
+        /// <summary>
+        /// Converts a <see cref="JToken"/> to a corresponding CLR value.
+        /// </summary>
+        /// <param name="token">The <see cref="JToken"/> to convert.</param>
+        /// <returns>
+        /// A CLR value corresponding to the token's type:
+        /// <list type="bullet">
+        /// <item><description><see cref="string"/> for <c>JTokenType.String</c></description></item>
+        /// <item><description><see cref="int"/> for <c>JTokenType.Integer</c></description></item>
+        /// <item><description><see cref="double"/> for <c>JTokenType.Float</c></description></item>
+        /// <item><description><see cref="bool"/> for <c>JTokenType.Boolean</c></description></item>
+        /// <item><description><c>null</c> for <c>JTokenType.Null</c></description></item>
+        /// <item><description><see cref="string"/> (via <c>ToString()</c>) for other token types</description></item>
+        /// </list>
+        /// </returns>
         private static object JTokenToClrValue(JToken token)
         {
             return token.Type switch
@@ -148,8 +224,17 @@ namespace EchoPhase.Helpers
         }
 
         /// <summary>
-        /// Tries to parse token as a primitive constant (int, bool, double).
+        /// Attempts to parse the given string as a constant of type <c>int</c>, <c>double</c>, or <c>bool</c>.
         /// </summary>
+        /// <param name="token">The input string that may represent a constant value.</param>
+        /// <param name="value">
+        /// When this method returns, contains the parsed value as an <c>int</c>, <c>double</c>, or <c>bool</c>
+        /// if the parsing was successful; otherwise, <c>null</c>.
+        /// </param>
+        /// <returns>
+        /// <c>true</c> if the string was successfully parsed as one of the supported constant types;
+        /// otherwise, <c>false</c>.
+        /// </returns>
         private static bool TryParseConstant(string token, out object value)
         {
             if (int.TryParse(token, out int intVal))
@@ -173,9 +258,24 @@ namespace EchoPhase.Helpers
         }
 
         /// <summary>
-        /// Compares two operands with given operator.
-        /// Operands should be of same type or convertible.
+        /// Compares two operands using the specified comparison operator.
         /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <param name="op">
+        /// The comparison operator. Supported values are:
+        /// <c>"=="</c>, <c>"!="</c>, <c>"&gt;"</c>, <c>"&lt;"</c>, <c>"&gt;="</c>, <c>"&lt;="</c>.
+        /// </param>
+        /// <returns>
+        /// <c>true</c> if the comparison evaluates to true; otherwise, <c>false</c>.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">Thrown if either operand is null.</exception>
+        /// <exception cref="InvalidCastException">
+        /// Thrown if operands cannot be converted to a common comparable type.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown if operands are of incompatible types or if the operator is unknown.
+        /// </exception>
         private static bool CompareOperands(object left, object right, string op)
         {
             if (left == null || right == null)
@@ -249,6 +349,14 @@ namespace EchoPhase.Helpers
             };
         }
 
+        /// <summary>
+        /// Determines whether the specified <see cref="Type"/> is a primitive type,
+        /// a string, or a decimal.
+        /// </summary>
+        /// <param name="type">The type to check.</param>
+        /// <returns>
+        /// <c>true</c> if the type is a primitive, string, or decimal; otherwise, <c>false</c>.
+        /// </returns>
         private static bool IsPrimitiveOrString(Type type)
         {
             return type.IsPrimitive || type == typeof(string) || type == typeof(decimal);

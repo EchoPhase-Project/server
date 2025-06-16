@@ -9,26 +9,57 @@ using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Helpers
 {
+    /// <summary>
+    /// Provides functionality to project an object into a simplified structure such as a dictionary or ExpandoObject.
+    /// Supports inclusion of specific fields, nested paths, and attributes-based filtering.
+    /// </summary>
     public class ProjectionHelper
     {
         private ProjectionOptions _options = new();
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ProjectionHelper"/> class with default options.
+        /// </summary>
         public ProjectionHelper()
         {
         }
 
+        /// <summary>
+        /// Sets the projection options to the specified instance.
+        /// </summary>
+        /// <param name="options">An instance of <see cref="ProjectionOptions"/> to use for projection.</param>
+        /// <returns>The current <see cref="ProjectionHelper"/> instance.</returns>
         public ProjectionHelper WithOptions(ProjectionOptions options)
         {
             _options = options;
             return this;
         }
 
+        /// <summary>
+        /// Configures the current projection options using the provided delegate.
+        /// </summary>
+        /// <param name="configure">An action that modifies the <see cref="ProjectionOptions"/> instance.</param>
+        /// <returns>The current <see cref="ProjectionHelper"/> instance.</returns>
         public ProjectionHelper WithOptions(Action<ProjectionOptions> configure)
         {
             configure(_options);
             return this;
         }
 
+        /// <summary>
+        /// Projects the specified source object into a simplified representation,
+        /// including only the specified properties or those marked with <see cref="ExposeAttribute"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the source object.</typeparam>
+        /// <param name="source">The source object to project.</param>
+        /// <param name="includeProperties">
+        /// An optional list of expressions specifying which properties to include.
+        /// If empty, all properties are included unless <see cref="ProjectionOptions.IncludeOnlyExpose"/> is set.
+        /// </param>
+        /// <returns>
+        /// A simplified representation of the object, either as <see cref="ExpandoObject"/>
+        /// or <see cref="Dictionary{String, Object}"/>, depending on <see cref="ProjectionOptions.UseExpando"/>.
+        /// </returns>
         public object Project<T>(
             T source,
             params Expression<Func<T, object?>>[] includeProperties)
@@ -109,14 +140,12 @@ namespace EchoPhase.Helpers
                         int idx = 0;
                         foreach (var item in jsonElem.EnumerateArray())
                         {
-                            // Для массива нет ключа, передаём null в includePaths или строим пути по индексу
                             list.Add(ConvertToObject(item, null, depth + 1, recursion));
                             idx++;
                         }
                         return list;
 
                     default:
-                        // Простые типы
                         return GetJsonSimpleValue(jsonElem);
                 }
             }
@@ -270,7 +299,7 @@ namespace EchoPhase.Helpers
             return (sub == null || sub.Count == 0) ? null : sub;
         }
 
-        protected static bool IsSimple(Type type)
+        private static bool IsSimple(Type type)
         {
             return
                 type.IsPrimitive ||
@@ -283,7 +312,7 @@ namespace EchoPhase.Helpers
                 type == typeof(TimeSpan);
         }
 
-        static object? GetJsonSimpleValue(JsonElement elem)
+        private static object? GetJsonSimpleValue(JsonElement elem)
         {
             switch (elem.ValueKind)
             {

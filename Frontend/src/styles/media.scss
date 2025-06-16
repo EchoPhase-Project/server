@@ -1,0 +1,12 @@
+@mixin media($args...) {
+    $query: '';
+
+    @each $arg in $args {
+        $op: if($query != '', ' and ', '');
+        $query: $query + $op + '(' + $arg + ')';
+    }
+
+    @media only screen and #{$query} {
+        @content;
+    }
+}

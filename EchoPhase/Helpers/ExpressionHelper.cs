@@ -4,20 +4,30 @@ using Z.Expressions;
 
 namespace EchoPhase.Helpers
 {
+    /// <summary>
+    /// Provides helper methods for parsing, evaluating, and processing expressions with variable support.
+    /// </summary>
     public static class ExpressionHelper
     {
         /// <summary>
-        /// Полная обработка строки с выражениями и переменными: {{}} → {}, {var} → значение, ((expr)) → (), (expr) → результат
+        /// Processes the input string by replacing variables and evaluating expressions enclosed in parentheses.
+        /// Supports nested parentheses and skips evaluation of function calls.
         /// </summary>
+        /// <param name="input">The input string potentially containing variables and expressions.</param>
+        /// <param name="variables">
+        /// A dictionary of variable names and their corresponding values used for substitution and evaluation.
+        /// </param>
+        /// <returns>
+        /// The processed string with variables replaced and expressions evaluated.
+        /// Returns <c>null</c> if the input is <c>null</c>.
+        /// </returns>
         public static string ProcessStringWithExpressions(string input, IDictionary<string, object> variables)
         {
             if (input == null)
                 return null!;
 
-            // Экранирование двойных скобок {{...}} -> {...}
             input = ReplaceVariables(input, variables);
 
-            // 1. Заменяем ((...)) на временные токены
             var doubleParensRegex = new Regex(@"\(\(([^()]+)\)\)");
             var placeholders = new Dictionary<string, string>();
             int placeholderIndex = 0;
@@ -26,11 +36,10 @@ namespace EchoPhase.Helpers
             {
                 string inner = m.Groups[1].Value;
                 string placeholder = $"__D_EXPR_{placeholderIndex++}__";
-                placeholders[placeholder] = $"({inner})"; // сохранить в виде (..)
+                placeholders[placeholder] = $"({inner})";
                 return placeholder;
             });
 
-            // 2. Обрабатываем выражения в одинарных скобках (..)
             string pattern = @"(?<=^|\s)\((?>[^(){};]+|(?<open>\()|(?<-open>\)))*(?(open)(?!))\)(?=\s|$)";
             var funcCallRegex = new Regex(@"\b\w+\s*\(");
             int maxIterations = 10;
@@ -46,9 +55,8 @@ namespace EchoPhase.Helpers
 
                 input = Regex.Replace(input, pattern, m =>
                 {
-                    string expr = m.Value.Substring(1, m.Value.Length - 2); // убрать внешние скобки
+                    string expr = m.Value.Substring(1, m.Value.Length - 2);
 
-                    // Пропуск вызовов функций
                     if (funcCallRegex.IsMatch(expr))
                         return m.Value;
 
@@ -57,10 +65,9 @@ namespace EchoPhase.Helpers
                 });
 
                 if (input == previous)
-                    break; // ничего не изменилось — предотвращаем застревание
+                    break;
             }
 
-            // 3. Восстанавливаем ((...)) как (...) без вычисления
             foreach (var kvp in placeholders)
             {
                 input = input.Replace(kvp.Key, kvp.Value);
@@ -69,12 +76,21 @@ namespace EchoPhase.Helpers
             return input;
         }
 
+        /// <summary>
+        /// Evaluates a given expression string after replacing variables with their values.
+        /// </summary>
+        /// <param name="expr">The expression string to evaluate.</param>
+        /// <param name="variables">A dictionary containing variable names and their values for substitution.</param>
+        /// <returns>
+        /// The result of evaluating the expression, or <c>null</c> if the evaluation yields no result.
+        /// </returns>
+        /// <exception cref="Exception">
+        /// Throws a new exception if evaluation fails, containing details about the original error and the expression.
+        /// </exception>
         public static object? EvaluateExpressionWithVariables(string expr, IDictionary<string, object> variables)
         {
-            // 1. Заменяем переменные вида {var} на их значения, включая вложенные свойства и экранирование
             string exprWithValues = ReplaceVariables(expr, variables);
 
-            // 2. Вычисляем выражение с помощью Eval
             try
             {
                 return Eval.Execute(exprWithValues, variables);
@@ -85,6 +101,17 @@ namespace EchoPhase.Helpers
             }
         }
 
+        /// <summary>
+        /// Evaluates an expression with variables and converts the result to a boolean value.
+        /// </summary>
+        /// <param name="expression">The expression string to evaluate.</param>
+        /// <param name="variables">A dictionary of variable names and their corresponding values.</param>
+        /// <returns>
+        /// The boolean result of the evaluated expression. Returns <c>false</c> if the result is <c>null</c>.
+        /// </returns>
+        /// <exception cref="InvalidCastException">
+        /// Thrown if the evaluated result cannot be converted to a boolean.
+        /// </exception>
         public static bool EvaluateConditionWithVariables(string expression, IDictionary<string, object> variables)
         {
             var result = EvaluateExpressionWithVariables(expression, variables);
@@ -105,8 +132,18 @@ namespace EchoPhase.Helpers
         }
 
         /// <summary>
-        /// Заменяет переменные вида {var} в тексте, включая вложенные свойства, поддерживает {{ и }} как экранирование
+        /// Replaces variable placeholders in the input text with their corresponding values from the variables dictionary.
+        /// Variable placeholders are denoted by single curly braces, e.g. <c>{variableName}</c>.
+        /// Double curly braces <c>{{</c> and <c>}}</c> are preserved as literal braces in the output.
         /// </summary>
+        /// <param name="text">The input string containing variable placeholders.</param>
+        /// <param name="variables">A dictionary containing variable names and their values for replacement.</param>
+        /// <returns>
+        /// A string with all recognized variable placeholders replaced by their values.
+        /// </returns>
+        /// <exception cref="KeyNotFoundException">
+        /// Thrown if a variable referenced in the text is not found in the dictionary.
+        /// </exception>
         public static string ReplaceVariables(string text, IDictionary<string, object> variables)
         {
             string tempToken = Guid.NewGuid().ToString();
@@ -149,8 +186,18 @@ namespace EchoPhase.Helpers
         }
 
         /// <summary>
-        /// Рекурсивно разрешает переменную с поддержкой вложенных свойств через точку.
+        /// Resolves a variable path within the given variables dictionary, supporting nested properties using dot notation.
         /// </summary>
+        /// <param name="variables">A dictionary of variable names and their corresponding values.</param>
+        /// <param name="path">
+        /// The variable path to resolve, which may include nested properties separated by dots (e.g., "user.name").
+        /// </param>
+        /// <returns>
+        /// The resolved object value at the specified path, or <c>null</c> if the path is empty or points to a null JSON token.
+        /// </returns>
+        /// <exception cref="KeyNotFoundException">
+        /// Thrown if the root variable or any nested property in the path is not found.
+        /// </exception>
         public static object? ResolveVariablePath(IDictionary<string, object> variables, string path)
         {
             if (string.IsNullOrWhiteSpace(path))

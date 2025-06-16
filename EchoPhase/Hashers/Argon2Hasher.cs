@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using EchoPhase.Extensions;
+using EchoPhase.Interfaces;
 using EchoPhase.Models;
 using EchoPhase.Settings;
+using EchoPhase.Services.Security;
 using Isopoh.Cryptography.Argon2;
 using Isopoh.Cryptography.SecureArray;
 using Microsoft.AspNetCore.Identity;
@@ -14,12 +16,16 @@ namespace EchoPhase.Hashers
     {
         private readonly int _threads = (1 + Environment.ProcessorCount) / 2;
 
-        private readonly byte[] _key;
         private readonly Argon2Config _config;
+        private readonly Argon2Settings _settings;
 
-        public Argon2Hasher(IOptions<Argon2Settings> settings)
+        public Argon2Hasher(
+            IOptions<Argon2Settings> settings,
+            IKeysService keysService,
+            AesService aesService
+        )
         {
-            _key = Convert.FromBase64String(settings.Value.Secret);
+            _settings = settings.Value;
 
             _config = new Argon2Config
             {
@@ -30,7 +36,14 @@ namespace EchoPhase.Hashers
                 Lanes = 4,
                 Threads = _threads > 4 ? 4 : _threads,
                 HashLength = 32,
-                Secret = _key
+                Secret = Convert.FromBase64String(
+                    aesService.Decrypt(
+                        keysService.GetOrSet(
+                            _settings.Key,
+                            () => aesService.Encrypt(KeysService.GenerateRandomBase64())
+                        )
+                    )
+                )
             };
         }
 

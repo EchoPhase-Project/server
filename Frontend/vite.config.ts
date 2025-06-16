@@ -1,12 +1,11 @@
 import { ViteDevServer, defineConfig } from 'vite';
 import { IncomingMessage, ServerResponse } from 'http';
-import solidPlugin from 'vite-plugin-solid';
-import solid from 'vite-plugin-solid';
-import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
+import solidPlugin from 'vite-plugin-solid';
 import compress from 'vite-plugin-compression';
-import protoGRPCPlugin from './vite-plugin-proto-grpc';
 import commonjs from '@rollup/plugin-commonjs';
+import path from 'path';
+import runBeforeBuildPlugin from './plugins/vite-plugin-run-before-build';
 
 const ClientSideRouting = {
     name: 'dynamic-router',
@@ -24,34 +23,49 @@ const ClientSideRouting = {
 
 export default defineConfig({
     plugins: [
-        solid(),
         solidPlugin(),
         visualizer({ filename: 'dist/bundle-analysis.html' }),
         compress({ algorithm: 'gzip' }),
         ClientSideRouting,
         commonjs({}),
+        runBeforeBuildPlugin({
+            command: 'npm',
+            args: ['run', 'gen:lib'],
+        }),
+        runBeforeBuildPlugin({
+            command: 'npm',
+            args: ['run', 'format'],
+        }),
     ],
     resolve: {
         alias: {
             '@': path.resolve(__dirname, 'src'),
-            '@lib': path.resolve(__dirname, 'src/lib'),
-            '@proto': path.resolve(__dirname, 'src/lib/grpc-clients/proto'),
+            '@lib': path.resolve(__dirname, 'src', 'lib'),
+            '@forms': path.resolve(__dirname, 'src', 'forms'),
+            '@styles': path.resolve(__dirname, 'src', 'styles'),
+            '@static': path.resolve(__dirname, 'src', 'static'),
+            '@shaders': path.resolve(__dirname, 'src', 'shaders'),
         },
         extensions: ['.js', '.jsx', '.ts', '.tsx', '.scss', '.css'],
     },
     css: {
         preprocessorOptions: {
             scss: {
-                additionalData: `@import "@/styles/global.scss";`,
+                additionalData: [
+                    `@use "@styles/variables.scss" as vars;`,
+                    `@use "@styles/media.scss" as comp;`,
+                    `@use "@styles/utils.scss" as utils;`,
+                    `@use "@styles/prefixes.scss" as prefixes;`,
+                ].join('\n'),
             },
         },
     },
     server: {
-        port: 5002,
+        port: 3000,
         open: true,
         strictPort: true,
         hmr: true,
-        origin: 'http://localhost:5001/app',
+        // origin: 'http://localhost:8080',
     },
     optimizeDeps: {
         include: ['google-protobuf', 'grpc-web', '@microsoft/signalr'],
@@ -67,7 +81,7 @@ export default defineConfig({
         cssCodeSplit: true,
         minify: 'terser',
         commonjsOptions: {
-          include: [/node_modules/],
+            include: [/node_modules/],
         },
         rollupOptions: {
             input: {

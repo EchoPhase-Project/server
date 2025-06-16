@@ -1,0 +1,233 @@
+@import url('https://fonts.googleapis.com/css?family=Poppins:400,500,600,700,800,900');
+
+@font-face {
+    font-family: 'Inter';
+    src: url('@static/fonts/inter.ttf');
+    font-display: swap;
+}
+
+body,
+html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    background-color: var(--bg) !important;
+}
+
+body {
+    font-family: var(--font-primary), var(--font-secondary), sans-serif;
+    font-weight: 300;
+    line-height: 1.7;
+    color: var(--text-primary);
+    overflow-x: hidden;
+    @include prefixes.prefix(font-smoothing, antialiased, webkit);
+    @include prefixes.prefix(font-smoothing, grayscale, moz-osx);
+    transition:
+        background-color 0.3s,
+        color 0.3s;
+    text-rendering: optimizeLegibility;
+
+    @include comp.media('max-width: 600px') {
+        font-size: 0.7rem;
+    }
+
+    @include comp.media('min-width: 600px') {
+        font-size: 0.75rem;
+    }
+
+    @include comp.media('min-width: 768px') {
+        font-size: 0.8rem;
+    }
+
+    @include comp.media('min-width: 992px') {
+        font-size: 0.9rem;
+    }
+
+    @include comp.media('min-width: 1200px') {
+        font-size: 0.95rem;
+    }
+}
+
+a {
+    color: var(--link-color);
+    text-decoration: none;
+    cursor: pointer;
+    @include prefixes.prefix(
+        transition,
+        color var(--transition-speed) linear,
+        webkit
+    );
+
+    &:hover {
+        color: var(--link-color-dark);
+        text-decoration: none;
+    }
+}
+
+.left {
+    @include comp.media('min-width: 768px') {
+        padding: 0 1em 0 5em;
+    }
+}
+
+.right {
+    @include comp.media('min-width: 768px') {
+        padding: 0 5em 0 1em;
+    }
+}
+
+main {
+    display: flex;
+    flex-direction: column;
+    padding: 0 6.5em;
+    gap: 2em;
+    width: 100%;
+    max-width: 85em;
+    padding: 1em 0em;
+    margin-right: auto;
+    margin-left: auto;
+    box-sizing: border-box;
+    @include comp.media('max-width: 768px') {
+        margin-bottom: 5em;
+    }
+}
+
+.button {
+    display: inline-flex;
+    font-size: 0.95em;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-align: center;
+    text-transform: uppercase;
+    @include prefixes.prefix(
+        transition,
+        'color, background-color, box-shadow',
+        webkit
+    );
+    @include prefixes.prefix(
+        transition-duration,
+        var(--transition-speed),
+        webkit
+    );
+    @include prefixes.prefix(transition-timing-function, linear, webkit);
+    @include prefixes.prefix(align-items, center, webkit, moz, ms, o);
+    @include prefixes.prefix(justify-items, center, webkit, moz, ms, o);
+    @include prefixes.prefix(flex-pack, justify, webkit, ms);
+    border: none;
+    border-radius: 0.3em;
+    color: var(--button-fg-primary);
+    background-color: var(--button-bg-primary);
+    box-shadow: 0 0 24px 0 rgba(var(--button-bg-primary-rgb), 0.2);
+    white-space: nowrap;
+    vertical-align: middle;
+    padding: 0.375em 0.75em;
+    line-height: 1.5;
+
+    &:active,
+    &:focus {
+        color: var(--button-fg-primary);
+        background-color: var(--button-bg-primary);
+    }
+
+    &:hover,
+    &:disabled {
+        color: var(--button-bg-primary);
+        background-color: var(--button-fg-primary);
+    }
+
+    &:active,
+    &:focus,
+    &:hover,
+    &:disabled {
+        box-shadow: 0 8px 24px 0 rgba(var(--button-fg-primary-rgb), 0.2);
+    }
+
+    &:not(:disabled):not(.disabled) {
+        cursor: pointer;
+    }
+}
+
+select {
+    appearance: none;
+    border: 0;
+    outline: 0;
+    font: inherit;
+    font-size: 0.85em;
+    padding: 0.75em 4em 0.75em 0.75em;
+    background:
+        url('@static/arrow.svg') no-repeat right 0.8em center / 1.4em,
+        linear-gradient(
+            to left,
+            rgba(var(--text-primary-rgb), 0.3) 3em,
+            rgba(var(--text-primary-rgb), 0.2) 3em
+        );
+    color: var(--text-primary);
+    border-radius: 1em;
+    box-shadow: 0 0 1em 0 rgba(var(--shadow-color-rgb), 0.2);
+    cursor: pointer;
+
+    &::-ms-expand {
+        display: none;
+    }
+
+    &:focus {
+        outline: none;
+    }
+
+    option {
+        color: inherit;
+        background-color: rgba(var(--bg-rgb), 0.8);
+    }
+}
+
+header {
+    position: relative;
+    padding: 0.75em;
+    display: flex;
+    justify-content: flex-end;
+    align-items: stretch;
+    max-height: 1.5em;
+    max-height: 3em;
+    gap: 1em;
+}
+
+.full-height {
+    min-height: 100vh;
+}
+
+.noselect {
+    @include prefixes.prefix(touch-callout, none, webkit);
+    @include prefixes.any-prefix(user-select, none);
+}
+
+.hidden {
+    display: none;
+}
+
+.disabled {
+    pointer-events: none;
+}
+
+::-webkit-scrollbar {
+    width: 1.4em;
+}
+
+::-webkit-scrollbar-track {
+    background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--text-primary);
+    border-radius: 1em;
+    border: 6px solid transparent;
+    background-clip: content-box;
+
+    &:hover {
+        background-color: var(--text-primary-hover);
+    }
+}
+
+.placeholder {
+    text-align: center;
+}

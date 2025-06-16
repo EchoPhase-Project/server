@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Text;
 using EchoPhase.Clients;
@@ -10,7 +11,6 @@ using EchoPhase.Models;
 using EchoPhase.Processors;
 using EchoPhase.Processors.Handlers;
 using EchoPhase.Repositories;
-using EchoPhase.Roles;
 using EchoPhase.Runners;
 using EchoPhase.Runners.Handlers;
 using EchoPhase.Services;
@@ -21,6 +21,7 @@ using EchoPhase.Services.WebSockets;
 using EchoPhase.Settings;
 using EchoPhase.Validators;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc.Razor;
@@ -29,6 +30,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Polly;
 using Polly.Extensions.Http;
+using StackExchange.Redis;
 
 namespace EchoPhase.Extensions
 {
@@ -123,11 +125,11 @@ namespace EchoPhase.Extensions
         {
             services.Configure<PostgresSettings>(options =>
             {
-                var pgHost = Environment.GetEnvironmentVariable("PG_HOST");
-                var pgPort = Environment.GetEnvironmentVariable("PG_PORT");
-                var pgPw = Environment.GetEnvironmentVariable("PG_PASSWORD");
-                var pgUser = Environment.GetEnvironmentVariable("PG_USER");
-                var pgDb = Environment.GetEnvironmentVariable("PG_DB");
+                var pgHost = Environment.GetEnvironmentVariable("POSTGRES_HOST");
+                var pgPort = Environment.GetEnvironmentVariable("POSTGRES_PORT");
+                var pgPw = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD");
+                var pgUser = Environment.GetEnvironmentVariable("POSTGRES_USER");
+                var pgDb = Environment.GetEnvironmentVariable("POSTGRES_DB");
 
                 if (!string.IsNullOrEmpty(pgHost) &&
                     !string.IsNullOrEmpty(pgPort) &&
@@ -195,19 +197,31 @@ namespace EchoPhase.Extensions
 
             services.AddSingleton<IValidateOptions<RedisSettings>, RedisSettingsValidator>();
 
+            var serviceProvider = services.BuildServiceProvider();
+            var settings = serviceProvider
+                .GetRequiredService<IOptions<RedisSettings>>().Value;
+
             services.AddStackExchangeRedisCache(options =>
             {
-                var serviceProvider = services.BuildServiceProvider();
-                var settings = serviceProvider
-                    .GetRequiredService<IOptions<RedisSettings>>().Value;
-
                 options.Configuration = settings.ConnectionString;
                 options.InstanceName = settings.InstanceName;
             });
 
+            var redis = ConnectionMultiplexer.Connect(settings.ConnectionString);
+
+            services.AddSingleton<IConnectionMultiplexer>(redis);
+
+            string entryAssemblyName = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name ?? "EchoPhase";
+
+            services.AddDataProtection()
+                .PersistKeysToStackExchangeRedis(redis, "DataProtection-Keys")
+                .SetApplicationName(entryAssemblyName);
+
             services.AddSingleton<ICacheContext, RedisContext>();
+            services.AddTransient<IKeysService, KeysService>();
 
             services.AddDistributedMemoryCache();
+
 
             return services;
         }
@@ -216,7 +230,7 @@ namespace EchoPhase.Extensions
         {
             services.Configure<RazorViewEngineOptions>(o =>
             {
-                // {2} is area, {1} is controller,{0} is the action    
+                // {2} is area, {1} is controller,{0} is the action
                 o.ViewLocationFormats.Clear();
                 o.ViewLocationFormats.Add("/Controllers/{1}/Views/{0}" + RazorViewEngine.ViewExtension);
                 o.ViewLocationFormats.Add("/Controllers/Shared/{0}" + RazorViewEngine.ViewExtension);
@@ -298,61 +312,36 @@ namespace EchoPhase.Extensions
         {
             services.AddAntiforgery(options =>
             {
-                options.FormFieldName = "Antiforgery";
-                options.HeaderName = "X-CSRF-TOKEN";
+                options.FormFieldName = AntiforgeryService.CsrfFormName;
+                options.Cookie.Name = AntiforgeryService.CsrfCookieName;
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // change to Always
+                options.Cookie.SameSite = SameSiteMode.Strict;
+                options.HeaderName = AntiforgeryService.CsrfHeaderName;
                 options.SuppressXFrameOptionsHeader = false;
             });
+
+            services.AddScoped<IAntiforgeryService, AntiforgeryService>();
 
             return services;
         }
 
-        public static IServiceCollection AddRoles(this IServiceCollection services, IConfigurationSection configurationSection, params string[] roles)
+        public static IServiceCollection AddRoles(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.Configure<RoleSettings>(options =>
-            {
-                var envVar = Environment.GetEnvironmentVariable("ECHOPHASE_CHECK_ROLES");
-
-                if (bool.TryParse(envVar, out var fromEnv))
-                {
-                    options.CheckRoles = fromEnv;
-                }
-            });
-
-            services.AddOptions<RoleSettings>()
-                .Bind(configurationSection)
-                .ValidateDataAnnotations()
-                .ValidateOnStart();
-
-            services.AddSingleton<IValidateOptions<RoleSettings>, RoleSettingsValidator>();
-
             services.AddScoped<RoleManager<UserRole>>();
             services.AddScoped<IRoleService, RoleService>();
-
-            var serviceProvider = services.BuildServiceProvider();
-            var settings = serviceProvider.GetRequiredService<IOptions<RoleSettings>>().Value;
-            if (!settings.CheckRoles)
-                return services;
-
-            using (var scope = serviceProvider.CreateScope())
-            {
-                var roleService = scope.ServiceProvider.GetRequiredService<IRoleService>();
-                foreach (var role in roles)
-                {
-                    roleService.CreateRoleAsync(role).GetAwaiter().GetResult();
-                }
-            }
 
             return services;
         }
 
         public static IServiceCollection AddAuthentication(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.AddOptions<JwtSettings>()
+            services.AddOptions<AuthenticationSettings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<JwtSettings>, JwtSettingsValidator>();
+            services.AddSingleton<IValidateOptions<AuthenticationSettings>, AuthenticationSettingsValidator>();
 
             services.AddIdentity<User, UserRole>(options =>
             {
@@ -404,9 +393,12 @@ namespace EchoPhase.Extensions
                 {
                     var serviceProvider = services.BuildServiceProvider();
                     var settings = serviceProvider
-                        .GetRequiredService<IOptions<JwtSettings>>().Value;
+                        .GetRequiredService<IOptions<AuthenticationSettings>>().Value.Schemes.Bearer;
 
-                    var key = Encoding.ASCII.GetBytes(settings.Secret);
+                    var keysService = serviceProvider
+                        .GetRequiredService<IKeysService>();
+
+                    var key = Encoding.ASCII.GetBytes(keysService.GetOrSet(settings.Key));
 
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
@@ -414,10 +406,12 @@ namespace EchoPhase.Extensions
                         ValidateAudience = true,
                         ValidateLifetime = true,
                         ValidateIssuerSigningKey = true,
-                        ValidIssuer = settings.Issuer,
-                        ValidAudience = settings.Audience,
+                        ValidIssuer = settings.ValidIssuer,
+                        ValidAudiences = settings.ValidAudiences,
                         IssuerSigningKey = new SymmetricSecurityKey(key),
-                        ClockSkew = TimeSpan.Zero
+                        ClockSkew = TimeSpan.Zero,
+                        NameClaimType = JwtRegisteredClaimNames.Name,
+                        RoleClaimType = JwtTokenService.RoleClaim
                     };
                 })
             .AddCookie(options =>

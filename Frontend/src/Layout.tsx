@@ -1,38 +1,22 @@
-import { A } from '@solidjs/router';
-import { FiHome } from 'solid-icons/fi';
-import { IoBeerOutline, IoLink, IoLogIn } from 'solid-icons/io';
+import { Component, Show } from 'solid-js';
 import type { ParentProps } from 'solid-js';
+import { useNav, NavBuilder } from '@lib/nav';
+import { Header } from '@/components/Header';
+import '@styles/global.scss';
+import '@styles/navbar.scss';
 
-const Layout = (props: ParentProps) => (
-    <div>
-        <nav>
-            <A href="/" style={{ margin: '10px' }}>
-                <FiHome
-                    style={{ 'font-size': '24px', 'margin-right': '5px' }}
-                />
-                Home
-            </A>
-            <A href="/about" style={{ margin: '10px' }}>
-                <IoBeerOutline
-                    style={{ 'font-size': '24px', 'margin-right': '5px' }}
-                />
-                About
-            </A>
-            <A href="/login" style={{ margin: '10px' }}>
-                <IoLogIn
-                    style={{ 'font-size': '24px', 'margin-right': '5px' }}
-                />
-                Login
-            </A>
-            <A href="/register" style={{ margin: '10px' }}>
-                <IoLink
-                    style={{ 'font-size': '24px', 'margin-right': '5px' }}
-                />
-                Register
-            </A>
-        </nav>
-        {props.children}
-    </div>
-);
+const Layout: Component<ParentProps> = (props) => {
+    const { navLinks } = useNav();
+
+    return (
+        <div class="container">
+            <Show when={navLinks().length > 0}>
+                <NavBuilder links={navLinks()} />
+            </Show>
+            <Header />
+            <main>{props.children}</main>
+        </div>
+    );
+};
 
 export default Layout;

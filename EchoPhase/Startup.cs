@@ -1,3 +1,4 @@
+using System.Reflection;
 using EchoPhase.Extensions;
 using EchoPhase.Handlers;
 using EchoPhase.Helpers;
@@ -9,6 +10,7 @@ using EchoPhase.Models;
 using EchoPhase.Repositories;
 using EchoPhase.Requirements;
 using EchoPhase.RouteConstraints;
+using EchoPhase.Commands;
 using EchoPhase.Services;
 using EchoPhase.Services.Grpc;
 using EchoPhase.Services.Internal;
@@ -24,18 +26,32 @@ using ParkSquare.AspNetCore.Sitemap;
 
 namespace EchoPhase
 {
+    /// <summary>
+    /// Configures the application's services and dependencies.
+    /// </summary>
     public class Startup
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Startup"/> class with the specified configuration.
+        /// </summary>
+        /// <param name="configuration">Application configuration properties.</param>
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
         }
 
+        /// <summary>
+        /// Gets the application configuration properties.
+        /// </summary>
         public IConfiguration Configuration
         {
             get;
         }
 
+        /// <summary>
+        /// Configures the services collection for dependency injection.
+        /// </summary>
+        /// <param name="services">The service collection to configure.</param>
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddSitemap();
@@ -54,17 +70,20 @@ namespace EchoPhase
                 options.ConstraintMap.Add("ulong", typeof(ULongRouteConstraint));
             });
 
-            TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
+            TimeZoneInfo timeZone = TimeZoneInfo.Local;
             services.AddSingleton(timeZone);
 
             services.AddSwaggerGen(o =>
             {
+                var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+                var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+                o.IncludeXmlComments(xmlPath);
                 o.SwaggerDoc("v1", new OpenApiInfo
                 {
                     Version = "v1",
                     Title = "EchoPhase API",
                     Description = "API v1",
-                    TermsOfService = new Uri("https://example.com/terms"),
+                    TermsOfService = new Uri("https://echophase/terms"),
                     Contact = new OpenApiContact
                     {
                         Name = "Labo Daniil",
@@ -73,22 +92,64 @@ namespace EchoPhase
                     },
                     License = new OpenApiLicense
                     {
-                        Name = "Use under LICX",
-                        Url = new Uri("https://example.com/license"),
+                        Name = "BSD 3-Clause",
+                        Url = new Uri("https://opensource.org/licenses/BSD-3-Clause"),
                     }
                 });
             });
 
             services.AddHttpContextAccessor();
 
+            services.AddPreparedMvc();
+            services.AddCorsPolicies();
+            services.AddAntiforgeryOptions();
+            services.AddLocalizationOptions();
+
+            services.AddSignalR(options =>
+            {
+                options.EnableDetailedErrors = true;
+                options.MaximumReceiveMessageSize = 102400000;
+            });
+
+            services.AddSingleton<IStringLocalizerFactory, ResourceManagerStringLocalizerFactory>();
+            services.AddSingleton<IUserConnectionManager, UserConnectionManager>();
+
+            services.AddSingleton<FileHelper>();
+            services.AddSingleton<ProjectionHelper>();
+
+            services.AddAes(Configuration.GetSection("Aes"));
+            services.AddPasswordHasher(Configuration.GetSection("Argon2"));
+
+            services.AddSingleton<QrCodeService>();
+            services.AddSingleton<IIntentsService, IntentsService>();
+            services.AddSingleton<IPermissionsService, PermissionsService>();
+
+            services.AddScoped<UserRepository>();
+
+            services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IAuthService, AuthService>();
+
+            services.AddScoped<UserManager<User>, UserManager<User>>();
+            services.AddScoped<SignInManager<User>, SignInManager<User>>();
+
+            services.AddRunners(Configuration.GetSection("Runners"));
+
+            services.AddHostedService<ShutdownService>();
+
+            services.AddEventService();
+
+            services.AddGrpc();
 
             services.AddPostgres(Configuration.GetSection("Postgres"));
             services.AddRedisCache(Configuration.GetSection("Redis"));
-            //services.AddTwitchClient(Configuration.GetSection("Twitch"));
-            services.AddDiscordClient(Configuration.GetSection("Discord"));
-            services.AddAuthentication(Configuration.GetSection("Jwt"));
+            services.AddAuthentication(Configuration.GetSection("Authentication"));
+
+            services.AddRoles(Configuration.GetSection("Role"));
 
             services.AddSingleton<IAuthorizationHandler, PermissionsAuthorizationHandler>();
+            services.AddScoped<MigrationCommand>();
+            services.AddScoped<AddToRolesCommand>();
+            services.AddScoped<CreateUserCommand>();
 
             services.AddAuthorization(options =>
             {
@@ -133,57 +194,8 @@ namespace EchoPhase
                     .Build();
             });
 
-            services.AddPreparedMvc();
-            services.AddCorsPolicies();
-            services.AddAntiforgeryOptions();
-            services.AddLocalizationOptions();
-
-            services.AddHttpsRedirection(options =>
-            {
-                options.RedirectStatusCode = StatusCodes.Status307TemporaryRedirect;
-                options.HttpsPort = 5001;
-            });
-
-            services.AddSignalR(options =>
-            {
-                options.EnableDetailedErrors = true;
-                options.MaximumReceiveMessageSize = 102400000;
-            });
-
-            services.AddSingleton<IStringLocalizerFactory, ResourceManagerStringLocalizerFactory>();
-            services.AddSingleton<IUserConnectionManager, UserConnectionManager>();
-
-            services.AddSingleton<FileHelper>();
-            services.AddSingleton<ProjectionHelper>();
-
-            services.AddAes(Configuration.GetSection("Aes"));
-            services.AddPasswordHasher(Configuration.GetSection("Argon2"));
-
-            services.AddSingleton<QrCodeService>();
-            services.AddSingleton<IIntentsService, IntentsService>();
-            services.AddSingleton<IPermissionsService, PermissionsService>();
-
-            services.AddScoped<UserRepository>();
-
-            services.AddRoles(
-                Configuration.GetSection("Role"),
-                "Admin", "User", "Manager", "Support", "Staff", "Dev"
-            );
-
-            services.AddScoped<IUserService, UserService>();
-            services.AddScoped<IAuthService, AuthService>();
-
-            services.AddScoped<IAntiforgeryService, AntiforgeryService>();
-            services.AddScoped<UserManager<User>, UserManager<User>>();
-            services.AddScoped<SignInManager<User>, SignInManager<User>>();
-
-            services.AddRunners(Configuration.GetSection("Runners"));
-
-            services.AddHostedService<ShutdownService>();
-
-            services.AddEventService();
-
-            services.AddGrpc();
+            //services.AddTwitchClient(Configuration.GetSection("Twitch"));
+            services.AddDiscordClient(Configuration.GetSection("Discord"));
 
             /*
 			services.AddHealthChecks()
@@ -207,6 +219,13 @@ namespace EchoPhase
 			*/
         }
 
+        /// <summary>
+        /// Configures the HTTP request pipeline.
+        /// </summary>
+        /// <param name="app">The application builder to configure the middleware pipeline.</param>
+        /// <param name="env">The hosting environment information.</param>
+        /// <param name="localizationOptions">The request localization options.</param>
+        /// <param name="loggerFactory">The logger factory for creating loggers.</param>
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IOptions<RequestLocalizationOptions> localizationOptions, ILoggerFactory loggerFactory)
         {
             if (env.IsDevelopment())
@@ -217,8 +236,10 @@ namespace EchoPhase
                 app.UseSwaggerUI(o =>
                 {
                     o.SwaggerEndpoint("/swagger/v1/swagger.json", "API V1");
-                    o.RoutePrefix = string.Empty;
+                    o.RoutePrefix = "swagger";
                 });
+
+                app.UseRequestLoggingMiddleware();
             }
             else
             {
@@ -240,9 +261,7 @@ namespace EchoPhase
                 await next();
             });
 
-            app.UseRequestLoggingMiddleware();
-
-            // app.UseHttpsRedirection();
+            app.UseMiddleware<GzipStaticFileMiddleware>();
 
             app.UseDefaultFiles();
             app.UseStaticFiles();
@@ -288,8 +307,6 @@ namespace EchoPhase
                 }
             });
 
-            app.UseRedirectionMiddleware();
-
             app.UseRouting();
             app.UseCookiePolicy();
 
@@ -331,17 +348,26 @@ namespace EchoPhase
                     .RequireAuthorization();
 
                 endpoints.MapFallback(async context =>
+                {
+                    if (context.Request.Method != HttpMethods.Get ||
+                        Path.HasExtension(context.Request.Path))
                     {
-                        if (context.Request.Method != HttpMethods.Get ||
-                            Path.HasExtension(context.Request.Path))
-                        {
-                            context.Response.StatusCode = StatusCodes.Status404NotFound;
-                            return;
-                        }
+                        context.Response.StatusCode = StatusCodes.Status404NotFound;
+                        return;
+                    }
 
-                        context.Response.ContentType = "text/html";
-                        await context.Response.SendFileAsync(Path.Combine(env.WebRootPath, "index.html"));
-                    });
+                    var filePath = Path.Combine(env.WebRootPath ?? string.Empty, "index.html");
+
+                    if (!File.Exists(filePath))
+                    {
+                        context.Response.StatusCode = StatusCodes.Status404NotFound;
+                        await context.Response.WriteAsync("index.html file not found.");
+                        return;
+                    }
+
+                    context.Response.ContentType = "text/html";
+                    await context.Response.SendFileAsync(filePath);
+                });
             });
 
             app.UseSitemap();

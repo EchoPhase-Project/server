@@ -1,5 +1,6 @@
 import { Component, lazy } from 'solid-js';
 import { Router } from '@solidjs/router';
+import { NavProvider } from '@lib/nav';
 
 interface RouterComponentProps {
     base?: string;
@@ -16,12 +17,8 @@ const routes = [
         component: lazy(() => import('./components/About')),
     },
     {
-        path: '/login',
-        component: lazy(() => import('./components/Login')),
-    },
-    {
-        path: '/register',
-        component: lazy(() => import('./components/Register')),
+        path: '/auth',
+        component: lazy(() => import('./components/Auth')),
     },
     {
         path: '/drag',
@@ -38,9 +35,11 @@ const routes = [
 ];
 
 const RouterComponent = (props: RouterComponentProps) => (
-    <Router base={props.base} root={props.root}>
-        {routes}
-    </Router>
+    <NavProvider>
+        <Router base={props.base} root={props.root}>
+            {routes}
+        </Router>
+    </NavProvider>
 );
 
 export default RouterComponent;

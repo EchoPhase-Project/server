@@ -1,6 +1,5 @@
 using EchoPhase.Interfaces;
 using EchoPhase.Models;
-using EchoPhase.Roles;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 

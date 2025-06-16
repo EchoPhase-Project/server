@@ -7,33 +7,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
 	<SpaRoot>Frontend</SpaRoot>
 	<Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <ResolveStaticWebAssetsInputsDependsOn>RemoveIdentityAssets</ResolveStaticWebAssetsInputsDependsOn>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
-  <!--
-  <Target Name="BuildFrontend" AfterTargets="BeforePublish">
-	  <Message Text="Building frontend..." importance="high" />
-		<Exec Command="npm install" WorkingDirectory="$(SpaRoot)" />
-		<Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
-  </Target>
 
-	<ItemGroup>
-	  <None Update="Configurations\**\*.pem">
-		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		<CopyToPublishDirectory>Always</CopyToPublishDirectory>
-		<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-	  </None>
-	</ItemGroup>
-	<Target Name="PublishWithFrontend" AfterTargets="ComputeFilesToPublish">
-		<ItemGroup>
-			<DistFiles Include="$(SpaRoot)\dist\**" />
-			<ResolvedFileToPublish Include="@(DistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
-				<RelativePath>%(DistFiles.Identity)</RelativePath>
-				<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-				<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-			</ResolvedFileToPublish>
-		</ItemGroup>
-	</Target>
-  -->
+<Target Name="RemoveIdentityAssets">
+    <ItemGroup>
+        <StaticWebAsset Remove="@(StaticWebAsset)" Condition="%(SourceId) == 'Microsoft.AspNetCore.Identity.UI'" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="14.0.0" />
@@ -56,6 +40,7 @@
     <PackageReference Include="Isopoh.Cryptography.Argon2" Version="2.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.Cors" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="9.0.6" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.HealthChecks" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.0.2" />
@@ -88,6 +73,9 @@
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="Serilog.Extensions.Logging.File" Version="3.0.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.8" />
+    <PackageReference Include="Spectre.Console.Cli" Version="0.50.0" />
+    <PackageReference Include="Spectre.Console.Cli.Extensions.DependencyInjection" Version="0.9.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.8.41" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     <PackageReference Include="System.Drawing.Common" Version="7.0.0" />
     <PackageReference Include="wasmtime" Version="22.0.0" />

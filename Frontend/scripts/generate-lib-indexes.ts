@@ -5,23 +5,43 @@ function toPascalCase(str: string) {
     return str.replace(/(^\w|-\w)/g, (m) => m.replace('-', '').toUpperCase());
 }
 
+const ROOT_DIR = path.resolve(__dirname, '../src/lib');
+const excludedRelativePaths = new Set<string>([
+    'i18n/locales',
+    '__tests__',
+    '.DS_Store',
+]);
+
+function isExcluded(fullPath: string): boolean {
+    const relative = path.relative(ROOT_DIR, fullPath);
+    for (const excluded of excludedRelativePaths) {
+        if (relative === excluded || relative.startsWith(`${excluded}/`)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function generateIndex(dir: string) {
     const entries = fs.readdirSync(dir);
     const files: string[] = [];
     const folders: string[] = [];
 
     for (const entry of entries) {
-        if (entry === 'index.ts') continue;
-
         const fullPath = path.join(dir, entry);
-        if (fs.statSync(fullPath).isDirectory()) {
+        if (isExcluded(fullPath)) continue;
+
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
             folders.push(entry);
-        } else if (entry.endsWith('.ts') || entry.endsWith('.tsx')) {
+        } else if (
+            (entry.endsWith('.ts') || entry.endsWith('.tsx')) &&
+            !entry.endsWith('.d.ts')
+        ) {
             files.push(entry);
         }
     }
 
-    // Рекурсивно генерируем index.ts для вложенных папок
     for (const folder of folders) {
         generateIndex(path.join(dir, folder));
     }
@@ -52,6 +72,4 @@ function generateIndex(dir: string) {
     fs.writeFileSync(path.join(dir, 'index.ts'), content);
 }
 
-// Запускаем для src/lib
-const LIB_PATH = path.resolve(__dirname, '../src/lib');
-generateIndex(LIB_PATH);
+generateIndex(ROOT_DIR);

@@ -82,12 +82,12 @@ namespace EchoPhase.Repositories
             /*
 			if (_options.IncludeWebHooks && opts.WebHookUrls is { Count: > 0 })
 				query = query
-					.Where(x => 
-						x.WebHooks.Any(c => 
+					.Where(x =>
+						x.WebHooks.Any(c =>
 							opts.WebHookUrls.Contains(c.Url)));
 					.AsEnumerable()
 					.Select<User, User>(x => {
-						x.WebHooks = x.WebHooks.Where(c => 
+						x.WebHooks = x.WebHooks.Where(c =>
 							opts.WebHookUrls.Contains(c.Url)).ToList();
 						return x;
 					}).AsQueryable();

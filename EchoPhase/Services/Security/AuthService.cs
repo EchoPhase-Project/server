@@ -37,8 +37,18 @@ namespace EchoPhase.Services.Security
             _userService = userService;
         }
 
-        public async Task<IdentityResult> CreateUserAsync(string name, string username, string password)
+        public async Task<IdentityResult> CreateUserAsync(string name, string username, string password, params string[] roles)
         {
+            if (_userService.UserExists(username))
+            {
+                var error = new IdentityError
+                {
+                    Code = "UserExists",
+                    Description = $"User '{username}' already exists"
+                };
+                return IdentityResult.Failed(error);
+            }
+
             var user = new User(name)
             {
                 UserName = username
@@ -46,17 +56,25 @@ namespace EchoPhase.Services.Security
 
             var result = await _userManager.CreateAsync(user, password);
 
-            if (result.Succeeded)
-            {
-                await _roleService.AddToRolesAsync(user, "User");
-                var signInResult = await AuthenticateAsync(username, password);
-            }
+            if (!result.Succeeded)
+                return result;
+
+            await _roleService.AddToRolesAsync(user, roles);
 
             return result;
         }
 
+        public async Task<IdentityResult> DeleteUserAsync(User user) =>
+            await _userManager.DeleteAsync(user);
+
         public async Task<SignInResult> AuthenticateAsync(string username, string password) =>
-            await _signInManager.PasswordSignInAsync(username, password, false, lockoutOnFailure: false);
+            await _signInManager.PasswordSignInAsync(username, password, false, lockoutOnFailure: true);
+
+        public async Task ResetAccessFailedCountAsync(User user) =>
+            await _userManager.ResetAccessFailedCountAsync(user);
+
+        public async Task UnlockUserAsync(User user) =>
+            await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow);
 
         public async Task LogoutAsync() =>
             await _signInManager.SignOutAsync();

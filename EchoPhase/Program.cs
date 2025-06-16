@@ -1,20 +1,17 @@
-using EchoPhase.DAL.Postgres;
-using Microsoft.EntityFrameworkCore;
+using EchoPhase.Extensions;
 
 namespace EchoPhase
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var host = CreateHostBuilder(args).Build();
-            if (args.Contains("migrate"))
-            {
-                using var scope = host.Services.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<PostgresContext>();
-                db.Database.Migrate();
+
+            var result = await host.CheckArgsAsync(args);
+
+            if (result != 0)
                 return;
-            }
 
             host.Run();
         }

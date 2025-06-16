@@ -18,7 +18,11 @@ namespace EchoPhase.Services.Security
         private readonly IAuthService _authService;
         private readonly AesService _aesService;
         private readonly ILogger<JwtTokenService> _logger;
-        private readonly JwtSettings _settings;
+        private readonly BearerSettings _settings;
+
+        private byte[] _key;
+
+        public const string RoleClaim = "role";
 
         public JwtTokenService(
             PostgresContext dbContext,
@@ -26,7 +30,8 @@ namespace EchoPhase.Services.Security
             IAuthService authService,
             AesService aesService,
             ILogger<JwtTokenService> logger,
-            IOptions<JwtSettings> settings
+            IOptions<AuthenticationSettings> settings,
+            IKeysService keysService
         )
         {
             _dbContext = dbContext;
@@ -34,7 +39,15 @@ namespace EchoPhase.Services.Security
             _authService = authService;
             _aesService = aesService;
             _logger = logger;
-            _settings = settings.Value;
+            _settings = settings.Value.Schemes.Bearer;
+            _key = Convert.FromBase64String(
+                aesService.Decrypt(
+                    keysService.GetOrSet(
+                        _settings.Key,
+                        () => aesService.Encrypt(KeysService.GenerateRandomBase64())
+                    )
+                )
+            );
         }
 
         public virtual async Task<string> GenerateTokenAsync(User user)
@@ -49,7 +62,6 @@ namespace EchoPhase.Services.Security
                 return checkToken.Token;
 
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_settings.Secret);
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
@@ -57,7 +69,7 @@ namespace EchoPhase.Services.Security
                 Expires = DateTime.UtcNow.AddMinutes(_settings.ExpirationInMinutes),
                 Issuer = _settings.Issuer,
                 Audience = _settings.Audience,
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(_key), SecurityAlgorithms.HmacSha256Signature)
             };
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
@@ -80,16 +92,15 @@ namespace EchoPhase.Services.Security
                 throw new ArgumentNullException(nameof(token));
 
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_settings.Secret);
 
             var tokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(key),
+                IssuerSigningKey = new SymmetricSecurityKey(_key),
                 ValidateIssuer = true,
-                ValidIssuer = _settings.Issuer,
+                ValidIssuer = _settings.ValidIssuer,
                 ValidateAudience = true,
-                ValidAudience = _settings.Audience,
+                ValidAudiences = _settings.ValidAudiences,
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.Zero
             };
@@ -143,14 +154,13 @@ namespace EchoPhase.Services.Security
             var claims = new ClaimsIdentity(JwtBearerDefaults.AuthenticationScheme);
 
             if (user.Id != Guid.Empty)
-                claims.AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()));
+                claims.AddClaim(new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()));
             if (user.UserName != null)
-                claims.AddClaim(new Claim(ClaimTypes.Name, user.UserName));
+                claims.AddClaim(new Claim(JwtRegisteredClaimNames.Name, user.UserName));
 
             var roles = await _roleService.GetRolesAsync(user);
             foreach (var role in roles)
-                claims.AddClaim(new Claim(ClaimTypes.Role, role));
-            claims.AddClaim(new Claim(ClaimTypes.Actor, "Hello"));
+                claims.AddClaim(new Claim(RoleClaim, role));
 
             return claims;
         }

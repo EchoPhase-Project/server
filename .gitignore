@@ -1,5 +1,3 @@
-*.log
-
 # Visual Studio temporary files
 .vs/
 
@@ -55,10 +53,10 @@ ehthumbs.db
 # VS Code
 .vscode/
 
-# Ignore build output and logs
-bin/
-obj/
+# Ignore build output
 dist/
+
+# Ignore logs
 *.log
 
 # Ignore NuGet packages
@@ -69,28 +67,10 @@ packages/
 # Ignore Rider specific files
 *.sln.iml
 
-# Ignore node_modules directory if using npm for frontend packages
-node_modules/
-
 # Ignore backup and session files for vim
 *.tmp
 *.vim
 
-# Ignore private settings
-secrets.json
-
-# Ignore Logs
-Logs/
-
-# Ignore certificates
-*.pem
-
-# Migrations
-Migrations/
-
-*.env
-*.crt
-*.key
-
+# Development test dirs
 helm/
 k8s/

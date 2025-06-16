@@ -1,7 +1,7 @@
 FROM node:latest AS node-build
-WORKDIR /src/Frontend
+WORKDIR /src
 
-COPY Frontend/package*.json ./
+COPY Frontend/package*.json .
 RUN npm install
 
 COPY Frontend/ .
@@ -13,12 +13,13 @@ WORKDIR /src
 COPY EchoPhase/EchoPhase.csproj .
 RUN dotnet restore
 
-COPY EchoPhase/ .
-COPY --from=node-build /src/Frontend/dist/ ./wwwroot
+COPY EchoPhase .
+COPY --from=node-build /src/dist ./wwwroot
 RUN dotnet publish -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
-COPY --from=dotnet-build /app/ .
+
+COPY --from=dotnet-build /app .
 
 ENTRYPOINT ["dotnet", "EchoPhase.dll"]
