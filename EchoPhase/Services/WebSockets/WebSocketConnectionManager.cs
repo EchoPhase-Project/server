@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using EchoPhase.DAL.Redis.Models;
+using EchoPhase.DAL.Redis.Interfaces;
 using EchoPhase.Exceptions;
 using EchoPhase.Interfaces;
 using EchoPhase.Services.WebSockets.Models;
@@ -16,12 +17,14 @@ namespace EchoPhase.Services.WebSockets
         private static readonly ConcurrentQueue<string> _removalQueue = new();
 
         private readonly ICacheContext _cacheContext;
+        private readonly ILogger<WebSocketConnectionManager> _logger;
 
         public WebSocketConnectionManager(
-            ICacheContext CacheContext
-        )
+            ICacheContext CacheContext,
+            ILogger<WebSocketConnectionManager> logger)
         {
             _cacheContext = CacheContext;
+            _logger = logger;
         }
 
         public void AddConnection(Guid userId, WebSocket webSocket, HttpContext context)
@@ -89,38 +92,43 @@ namespace EchoPhase.Services.WebSockets
             var cts = new CancellationTokenSource(closeTimeout);
             try
             {
-                var closeTask = connection.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Connection closed by server", CancellationToken.None);
-                var delayTask = Task.Delay(Timeout.Infinite, cts.Token);
+                if (connection.WebSocket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                {
+                    var closeTask = connection.WebSocket.CloseAsync(
+                        WebSocketCloseStatus.NormalClosure,
+                        "Connection closed by server",
+                        cts.Token
+                    );
 
-                await Task.WhenAny(closeTask, delayTask);
+                    var delayTask = Task.Delay(Timeout.Infinite, cts.Token);
+                    await Task.WhenAny(closeTask, delayTask);
 
-                if (!closeTask.IsCompleted)
+                    if (!closeTask.IsCompleted)
+                        connection.WebSocket.Abort();
+                }
+                else
+                {
                     connection.WebSocket.Abort();
+                }
 
-                await _cacheContext.
-                    Entry<WebSocketCache>(connection.WebSocket.GetHashCode().ToString()).
-                    RemoveAsync();
-
-                connection.WebSocket.Dispose();
+                await _cacheContext
+                    .Entry<WebSocketCache>(connection.Id.ToString())
+                    .RemoveAsync();
             }
-            catch (WebSocketException)
+            catch (WebSocketException ex)
             {
-                throw;
+                _logger.LogWarning(ex, $"WebSocket error while closing connection with id {connection.Id}.");
             }
             finally
             {
-                connection.HeartbeatCancellationTokenSource.Cancel();
-                connection.HeartbeatCancellationTokenSource.Dispose();
+                connection.Dispose();
 
                 var userId = await GetUserIdAsync(connection);
                 if (_connections.TryGetValue(userId, out var connections))
                 {
                     connections.Remove(connection);
-
                     if (connections.Count == 0)
-                    {
                         _connections.TryRemove(userId, out _);
-                    }
                 }
             }
         }
@@ -130,45 +138,42 @@ namespace EchoPhase.Services.WebSockets
             if (_connections.TryGetValue(userId, out var connections))
             {
                 var connection = connections.FirstOrDefault(conn => conn.WebSocket == webSocket);
-                if (connection is null)
-                    return;
-
-                await CloseConnectionAsync(connection);
+                if (connection is not null)
+                    await CloseConnectionAsync(connection);
             }
         }
 
-        public async Task CloseConnectionsAsync(Guid userId)
+        public Task CloseConnectionsAsync(Guid userId)
         {
             if (_connections.TryGetValue(userId, out var connections))
-            {
-                var tasks = connections.ToList().Select(connection => CloseConnectionAsync(connection));
-                await Task.WhenAll(tasks);
-            }
+                return CloseConnectionsInternalAsync(connections);
+
+            return Task.CompletedTask;
         }
 
-        public async Task CloseConnectionsAsync()
+        public Task CloseConnectionsAsync()
         {
-            var tasks = _connections.Keys.ToList().Select(userId => CloseConnectionsAsync(userId));
+            var allConnections = _connections.Values.SelectMany(c => c);
+            return CloseConnectionsInternalAsync(allConnections);
+        }
+
+        private async Task CloseConnectionsInternalAsync(IEnumerable<WebSocketConnection> connections)
+        {
+            var tasks = connections.Select(CloseConnectionAsync);
             await Task.WhenAll(tasks);
         }
 
         public void AbortConnections()
         {
-            foreach (var userId in _connections.Keys)
+            foreach (var (userId, connections) in _connections)
             {
-                if (_connections.TryGetValue(userId, out var connections))
+                foreach (var connection in connections)
                 {
-                    foreach (var connection in connections)
-                    {
-                        connection.WebSocket.Abort();
-                    }
+                    connection.Dispose();
                 }
             }
-            RemoveConnections();
-        }
-
-        private void RemoveConnections() =>
             _connections.Clear();
+        }
 
         private void StartHeartbeatTask(Guid userId, WebSocketConnection connection)
         {

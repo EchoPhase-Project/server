@@ -40,7 +40,7 @@ namespace EchoPhase.Controllers
 
         [HttpGet]
         [Route("", Name = "WSGateway")]
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "ApiAccess")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "DevOrHigher")]
         public async Task<IActionResult> Gateway()
         {
             if (HttpContext.WebSockets.IsWebSocketRequest)

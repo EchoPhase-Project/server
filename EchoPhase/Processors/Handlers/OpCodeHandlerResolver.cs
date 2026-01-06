@@ -40,7 +40,7 @@ namespace EchoPhase.Processors.Handlers
                     throw new InvalidOperationException($"Handler '{type.FullName}' missing default constructor.");
 
                 var factory = () =>
-                    (IOpCodeHandler)ActivatorUtilities.CreateInstance(_scope.ServiceProvider, type)!;
+                    (IOpCodeHandler)ActivatorUtilities.CreateInstance(_scope.ServiceProvider, type);
 
                 _handlers[attribute.OpCode] = factory;
             }
@@ -48,7 +48,7 @@ namespace EchoPhase.Processors.Handlers
 
         public IOpCodeHandler GetHandler(OpCodes opCode)
         {
-            if (!opCode.IsValid())
+            if (!Enum.IsDefined(typeof(OpCodes), opCode))
                 throw new NotSupportedException($"Unsupported OpCode {opCode} value.");
 
             if (opCode.IsIgnored())

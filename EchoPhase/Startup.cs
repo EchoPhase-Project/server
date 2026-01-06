@@ -1,27 +1,24 @@
 using System.Reflection;
 using EchoPhase.Extensions;
-using EchoPhase.Handlers;
 using EchoPhase.Helpers;
 using EchoPhase.Hubs;
 using EchoPhase.Hubs.Managers;
 using EchoPhase.Interfaces;
 using EchoPhase.Middlewares;
-using EchoPhase.Models;
-using EchoPhase.Repositories;
-using EchoPhase.Requirements;
+using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.RouteConstraints;
-using EchoPhase.Commands;
+using EchoPhase.Security;
 using EchoPhase.Services;
-using EchoPhase.Services.Grpc;
+using EchoPhase.Services.Bitmasks;
 using EchoPhase.Services.Internal;
-using EchoPhase.Services.Security;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using ParkSquare.AspNetCore.Sitemap;
 
 namespace EchoPhase
@@ -118,11 +115,11 @@ namespace EchoPhase
             services.AddSingleton<ProjectionHelper>();
 
             services.AddAes(Configuration.GetSection("Aes"));
+            services.AddCrypto25519(Configuration.GetSection("Crypto25519"));
             services.AddPasswordHasher(Configuration.GetSection("Argon2"));
 
             services.AddSingleton<QrCodeService>();
-            services.AddSingleton<IIntentsService, IntentsService>();
-            services.AddSingleton<IPermissionsService, PermissionsService>();
+            services.AddSingleton<IIntentsBitMaskService, IntentsBitMaskService>();
 
             services.AddScoped<UserRepository>();
 
@@ -132,70 +129,32 @@ namespace EchoPhase
             services.AddScoped<UserManager<User>, UserManager<User>>();
             services.AddScoped<SignInManager<User>, SignInManager<User>>();
 
+            services.AddExpressionEval();
+            services.AddProfiler();
+
             services.AddRunners(Configuration.GetSection("Runners"));
 
             services.AddHostedService<ShutdownService>();
+            services.AddSingleton<TaskSchedulerService>();
 
             services.AddEventService();
 
             services.AddGrpc();
 
             services.AddPostgres(Configuration.GetSection("Postgres"));
+            services.AddScylla(Configuration.GetSection("Scylla"));
             services.AddRedisCache(Configuration.GetSection("Redis"));
             services.AddAuthentication(Configuration.GetSection("Authentication"));
 
             services.AddRoles(Configuration.GetSection("Role"));
 
-            services.AddSingleton<IAuthorizationHandler, PermissionsAuthorizationHandler>();
-            services.AddScoped<MigrationCommand>();
-            services.AddScoped<AddToRolesCommand>();
-            services.AddScoped<CreateUserCommand>();
-
-            services.AddAuthorization(options =>
-            {
-                options.AddPolicy("AdminOnly", policy =>
-                {
-                    policy.RequireRole("Admin");
-                });
-
-                options.AddPolicy("RequireAdminOrHigher", policy =>
-                {
-                    policy.RequireRole("Admin", "Dev");
-                });
-
-                options.AddPolicy("ApiAccess", policy =>
-                {
-                    policy.RequireRole("Admin", "Dev");
-                });
-
-                options.AddPolicy("TrustedOnly", policy =>
-                {
-                    policy.RequireRole("Admin", "Dev", "Staff");
-                });
-
-                options.AddPolicy("Any", policy =>
-                {
-                    policy.RequireAuthenticatedUser();
-                });
-
-                options.AddPolicy("NoAccess", policy =>
-                {
-                    policy.RequireAssertion(context => false);
-                });
-
-                options.AddPolicy("CanEdit", policy =>
-                    policy.Requirements.Add(new PermissionsRequirement("CanEdit", "CanAdd")));
-
-                options.DefaultPolicy = new AuthorizationPolicyBuilder()
-                    .AddAuthenticationSchemes(
-                            IdentityConstants.ApplicationScheme,
-                            JwtBearerDefaults.AuthenticationScheme)
-                    .RequireAuthenticatedUser()
-                    .Build();
-            });
+            services.AddPolicies();
 
             //services.AddTwitchClient(Configuration.GetSection("Twitch"));
             services.AddDiscordClient(Configuration.GetSection("Discord"));
+
+			services.AddHealthChecks()
+                .AddCheck("self", () => HealthCheckResult.Healthy());
 
             /*
 			services.AddHealthChecks()
@@ -261,8 +220,6 @@ namespace EchoPhase
                 await next();
             });
 
-            app.UseMiddleware<GzipStaticFileMiddleware>();
-
             app.UseDefaultFiles();
             app.UseStaticFiles();
 
@@ -310,7 +267,7 @@ namespace EchoPhase
             app.UseRouting();
             app.UseCookiePolicy();
 
-            app.UseCors();
+            //app.UseCors();
 
             app.UseRequestLocalization(localizationOptions.Value);
 
@@ -323,7 +280,11 @@ namespace EchoPhase
 
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapGrpcService<DiscordTokenGrpcServiceImpl>();
+                endpoints.MapHealthChecks("/health/live", new HealthCheckOptions
+                {
+                    Predicate = check => check.Name == "self"
+                });
+
                 /*
 				endpoints.MapHealthChecks("/health", new HealthCheckOptions
 				{

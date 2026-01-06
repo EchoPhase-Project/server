@@ -1,11 +1,11 @@
-using Spectre.Console.Cli;
 using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace EchoPhase.Commands.Settings
 {
     public class RolesCommandSettings : RoleCommandSettings
     {
-        [CommandArgument(0, "<Roles>")]
+        [CommandArgument(0, "[ROLES]")]
         public string[] Roles { get; set; } = Array.Empty<string>();
 
         public override ValidationResult Validate()
@@ -15,7 +15,7 @@ namespace EchoPhase.Commands.Settings
                 return baseResult;
 
             if (Roles == null || Roles.Length == 0)
-                return ValidationResult.Error("At least one tole is required.");
+                return ValidationResult.Error("At least one role is required.");
 
             foreach (var role in Roles)
                 if (string.IsNullOrWhiteSpace(role))

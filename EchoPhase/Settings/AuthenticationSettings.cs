@@ -4,7 +4,7 @@ namespace EchoPhase.Settings
 {
     public class AuthenticationSettings : IValidatable
     {
-        public SchemesSettings Schemes { get; set; }= new();
+        public SchemesSettings Schemes { get; set; } = new();
 
         public bool IsValid(out string errorMessage)
         {

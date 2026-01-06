@@ -1,9 +1,16 @@
 namespace EchoPhase.Interfaces
 {
-    public interface IRepositoryBase<TR, TO>
+    public interface IRepositoryBase<TO>
     {
-        public TR WithOptions(TO options);
-        public TR WithOptions(Action<TO> configure);
-        public IQueryable Build();
+        void WithOptions(TO options);
+        void WithOptions(Action<TO> configure);
+        IQueryable Build();
+    }
+
+    public interface IRepositoryBase
+    {
+        void WithOptions(object options);
+        void WithOptions(Action<object> configure);
+        IQueryable Build();
     }
 }

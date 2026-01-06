@@ -1,6 +1,5 @@
 using System.Net.WebSockets;
 using EchoPhase.Attributes;
-using EchoPhase.Models;
 using EchoPhase.Processors.Enums;
 using EchoPhase.Processors.Payloads;
 using EchoPhase.Services.WebSockets;
@@ -24,11 +23,7 @@ namespace EchoPhase.Processors.Handlers
         {
             await _connectionManager.RefreshConnectionAsync(webSocket);
 
-            var response = new EventMessage
-            {
-                Op = OpCodes.Pong,
-                D = new PongPayload() { }
-            };
+            var response = EventMessage.Create(OpCodes.Pong);
 
             await _webSocketService.SendMessageToConnectionAsync(webSocket, response);
         }

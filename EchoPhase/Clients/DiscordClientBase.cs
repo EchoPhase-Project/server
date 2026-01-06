@@ -18,6 +18,11 @@ namespace EchoPhase.Clients
             _logger = logger;
         }
 
+        public void WithAuth(string token)
+        {
+            base.WithAuth("Bot", token);
+        }
+
         protected async Task<IDiscordApiResponse<TR>> SendAsync<TQ, TB, TR>(
             string uri,
             HttpMethod method,

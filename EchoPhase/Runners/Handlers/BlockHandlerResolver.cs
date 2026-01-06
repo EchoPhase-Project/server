@@ -37,7 +37,7 @@ namespace EchoPhase.Runners.Handlers
                     throw new InvalidOperationException($"Handler '{type.FullName}' missing default constructor.");
 
                 var factory = () =>
-                    (IBlockHandler)ActivatorUtilities.CreateInstance(_scope.ServiceProvider, type)!;
+                    (IBlockHandler)ActivatorUtilities.CreateInstance(_scope.ServiceProvider, type);
 
                 _handlers[attribute.Type] = factory;
             }

@@ -1,7 +1,6 @@
 using System.Net.WebSockets;
 using System.Text.Json;
 using EchoPhase.Interfaces;
-using EchoPhase.Models;
 using EchoPhase.Processors.Enums;
 using EchoPhase.Processors.Payloads;
 using EchoPhase.Services.WebSockets;
@@ -55,44 +54,49 @@ namespace EchoPhase.Processors.Handlers
 
         private async Task BeforeHandleAsync(WebSocket webSocket, TPayload payload)
         {
-            await ValidatePayloadAsync(webSocket, payload);
-
-            await HandleAsync(webSocket, payload);
+            if (await ValidatePayloadAsync(webSocket, payload))
+                await HandleAsync(webSocket, payload);
         }
 
         public abstract Task HandleAsync(WebSocket webSocket, TPayload payload);
 
-        private async Task ValidatePayloadAsync(WebSocket webSocket, TPayload payload)
+        private async Task<bool> ValidatePayloadAsync(WebSocket webSocket, TPayload payload)
         {
             if (payload is null)
-                throw new ArgumentNullException("Missing payload exception.");
+            {
+                await SendErrorAsync(webSocket, ErrorCodes.InvalidPayload, "Missing payload.");
+                return false;
+            }
 
-            await ValidatePayloadAsync(webSocket, (object)payload);
+            return await ValidatePayloadAsync(webSocket, (object)payload);
         }
 
-        private async Task ValidatePayloadAsync(WebSocket webSocket, object payload)
+        private async Task<bool> ValidatePayloadAsync(WebSocket webSocket, object payload)
         {
             if (payload is not IPayload validatablePayload)
-                throw new InvalidOperationException("Payload is not validatable.");
-
-            string errorMessage = string.Empty;
-
-            if (validatablePayload.IsValid(out errorMessage))
-                return;
-
-            EventMessage response = new EventMessage()
             {
-                Op = OpCodes.Error,
-                D = new ErrorPayload()
-                {
-                    Code = ErrorCodes.InvalidMessage,
-                    Message = errorMessage
-                }
-            };
+                await SendErrorAsync(webSocket, ErrorCodes.InvalidPayload, "Payload is not validatable.");
+                return false;
+            }
 
-            await _webSocketService.SendMessageToConnectionAsync(webSocket, response);
+            if (!validatablePayload.IsValid(out var errorMessage))
+            {
+                await SendErrorAsync(webSocket, ErrorCodes.InvalidPayload, errorMessage);
+                return false;
+            }
 
-            throw new InvalidOperationException(errorMessage);
+            return true;
+        }
+
+        private async Task SendErrorAsync(WebSocket socket, ErrorCodes code, string msg)
+        {
+            var error = EventMessage<ErrorPayload>.Create(OpCodes.Error, e =>
+            {
+                e.Code = code;
+                e.Message = msg;
+            });
+
+            await _webSocketService.SendMessageToConnectionAsync(socket, error);
         }
     }
 }

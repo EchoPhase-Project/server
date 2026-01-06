@@ -1,26 +1,34 @@
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
-using System.Text;
 using EchoPhase.Clients;
+using EchoPhase.Constants;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Redis;
-using EchoPhase.Hashers;
+using EchoPhase.DAL.Redis.Interfaces;
+using EchoPhase.DAL.Scylla;
+using EchoPhase.Enums;
+using EchoPhase.Factories;
+using EchoPhase.Handlers;
+using EchoPhase.Security.Hashers;
 using EchoPhase.Interfaces;
-using EchoPhase.Models;
+using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Processors;
 using EchoPhase.Processors.Handlers;
-using EchoPhase.Repositories;
+using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Runners;
 using EchoPhase.Runners.Handlers;
+using EchoPhase.Security;
 using EchoPhase.Services;
+using EchoPhase.Services.Bitmasks;
 using EchoPhase.Services.Events;
-using EchoPhase.Services.Security;
 using EchoPhase.Services.WebHooks;
 using EchoPhase.Services.WebSockets;
 using EchoPhase.Settings;
 using EchoPhase.Validators;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
@@ -31,6 +39,10 @@ using Microsoft.IdentityModel.Tokens;
 using Polly;
 using Polly.Extensions.Http;
 using StackExchange.Redis;
+using EchoPhase.Analytics;
+using EchoPhase.Expressions.Lexers;
+using EchoPhase.Expressions.Parsers;
+using EchoPhase.Expressions.Tokens;
 
 namespace EchoPhase.Extensions
 {
@@ -52,8 +64,6 @@ namespace EchoPhase.Extensions
 
                 client.BaseAddress = new Uri("https://api.twitch.tv/helix/");
 
-                client.DefaultRequestHeaders.Add("Client-Id", settings.ClientId);
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", settings.AccessToken);
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             })
                 .SetHandlerLifetime(TimeSpan.FromMinutes(5))
@@ -85,7 +95,6 @@ namespace EchoPhase.Extensions
 
                         client.BaseAddress = new Uri("https://discord.com/api/v10/");
 
-                        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", settings.Token);
                         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                     })
                 .SetHandlerLifetime(TimeSpan.FromMinutes(5))
@@ -156,6 +165,40 @@ namespace EchoPhase.Extensions
                 options
                     .UseNpgsql(settings.ConnectionString,
                         o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+
+            return services;
+        }
+
+        public static IServiceCollection AddScylla(this IServiceCollection services, IConfigurationSection configurationSection)
+        {
+            services.Configure<ScyllaSettings>(options =>
+            {
+                var contactPoint = Environment.GetEnvironmentVariable("SCYLLA_CONTACT_POINT");
+                var keyspace = Environment.GetEnvironmentVariable("SCYLLA_KEYSPACE");
+                var username = Environment.GetEnvironmentVariable("SCYLLA_USERNAME");
+                var password = Environment.GetEnvironmentVariable("SCYLLA_PASSWORD");
+
+                if (!string.IsNullOrWhiteSpace(contactPoint))
+                    options.ContactPoint = contactPoint;
+
+                if (!string.IsNullOrWhiteSpace(keyspace))
+                    options.Keyspace = keyspace;
+
+                if (!string.IsNullOrWhiteSpace(username))
+                    options.Username = username;
+
+                if (!string.IsNullOrWhiteSpace(password))
+                    options.Password = password;
+            });
+
+            services.AddOptions<ScyllaSettings>()
+                .Bind(configurationSection)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<ScyllaSettings>, ScyllaSettingsValidator>();
+
+            services.AddScoped<ScyllaContext>();
 
             return services;
         }
@@ -398,7 +441,13 @@ namespace EchoPhase.Extensions
                     var keysService = serviceProvider
                         .GetRequiredService<IKeysService>();
 
-                    var key = Encoding.ASCII.GetBytes(keysService.GetOrSet(settings.Key));
+                    var result = keysService.GetOrSet(settings.Key);
+
+                    result.OnFailure(err =>
+                        throw new InvalidOperationException(err.Value));
+
+                    if (!result.TryGetValue(out var key))
+                        throw new InvalidOperationException($"Missing '{settings.Key}' key.");
 
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
@@ -411,13 +460,14 @@ namespace EchoPhase.Extensions
                         IssuerSigningKey = new SymmetricSecurityKey(key),
                         ClockSkew = TimeSpan.Zero,
                         NameClaimType = JwtRegisteredClaimNames.Name,
-                        RoleClaimType = JwtTokenService.RoleClaim
+                        RoleClaimType = RoleService.RoleClaim
                     };
                 })
             .AddCookie(options =>
                 options.CopyFrom(authCookie));
 
             services.AddScoped<IJwtTokenService, JwtTokenService>();
+            services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 
             return services;
         }
@@ -482,6 +532,116 @@ namespace EchoPhase.Extensions
 
             services.AddSingleton<BlockHandlerResolver>();
             services.AddTransient<BlocksRunner>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddPolicies(this IServiceCollection services)
+        {
+            services.AddSingleton<IRolesBitMaskService, RolesBitMaskService>();
+            services.AddSingleton<IIntentsBitMaskService, IntentsBitMaskService>();
+            services.AddSingleton<IPermissionsBitMaskService, PermissionsBitMaskService>();
+
+            services.AddSingleton<IRolesFactory, RolesFactory>();
+            services.AddSingleton<IPermissionsFactory, PermissionsFactory>();
+
+            services.AddSingleton<IAuthorizationHandler, PermissionsAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, RolesAuthorizationHandler>();
+
+            services.AddAuthorization(options =>
+            {
+                var provider = services.BuildServiceProvider();
+                var permissionFactory = provider.GetRequiredService<IPermissionsFactory>();
+                var roleFactory = provider.GetRequiredService<IRolesFactory>();
+
+                options.AddPolicy("AdminOnly", policy =>
+                {
+                    var req = roleFactory.Requirement(
+                        Roles.Admin
+                    );
+
+                    policy.Requirements.Add(req);
+                });
+
+                options.AddPolicy("DevOrHigher", policy =>
+                {
+                    var req = roleFactory.Requirement(
+                        Roles.Admin, Roles.Dev
+                    );
+
+                    policy.Requirements.Add(req);
+                });
+
+                options.AddPolicy("TrustedOnly", policy =>
+                {
+                    var req = roleFactory.Requirement(
+                        Roles.Admin, Roles.Dev, Roles.Staff
+                    );
+
+                    policy.Requirements.Add(req);
+                });
+
+                options.AddPolicy("Any", policy =>
+                {
+                    policy.RequireAuthenticatedUser();
+                });
+
+                options.AddPolicy("NoAccess", policy =>
+                {
+                    policy.RequireAssertion(context => false);
+                });
+
+                options.AddPolicy("CanEdit", policy =>
+                {
+                    var req = permissionFactory.Requirement(
+                        (Resources.User, new[] { Permissions.Add, Permissions.Edit }),
+                        (Resources.WebSocket, new[] { Permissions.Connect, Permissions.Execute }),
+                        (Resources.Tokens, new[] { Permissions.Import, Permissions.Export })
+                    );
+
+                    policy.Requirements.Add(req);
+                });
+
+                options.DefaultPolicy = new AuthorizationPolicyBuilder()
+                    .AddAuthenticationSchemes(
+                            IdentityConstants.ApplicationScheme,
+                            JwtBearerDefaults.AuthenticationScheme)
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
+
+            return services;
+        }
+
+        public static IServiceCollection AddCrypto25519(this IServiceCollection services, IConfigurationSection configurationSection)
+        {
+            services.AddOptions<Crypto25519Settings>()
+                .Bind(configurationSection)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<Crypto25519Settings>, Crypto25519SettingsValidator>();
+
+            services.AddSingleton<ICrypto25519Service, Crypto25519Service>();
+            return services;
+        }
+
+        public static IServiceCollection AddExpressionEval(this IServiceCollection services)
+        {
+            services.AddScoped<ILexer<Token>, Lexer>();
+            services.AddScoped<ILexer<TemplateToken>, TemplateLexer>();
+            services.AddScoped<IParser<Token>, Parser>();
+            services.AddScoped<IParser<TemplateToken>, TemplateParser>();
+            services.AddScoped<ILexer<PathToken>, PathLexer>();
+            services.AddScoped<IPathParser<PathToken>, PathParser>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddProfiler(this IServiceCollection services)
+        {
+            services.AddScoped<IProfiler, StackProfiler>();
+            services.AddSingleton<IProfilerProvider, ProfilerProvider>();
 
             return services;
         }

@@ -1,21 +1,25 @@
+using EchoPhase.Attributes;
 using EchoPhase.Interfaces;
+using EchoPhase.Processors.Enums;
 
 namespace EchoPhase.Processors.Payloads
 {
+    [OpCodePayload(OpCodes.Adjust)]
     public class AdjustPayload : IPayload
     {
-        public long Intents
+        public string Intents { get; set; } = string.Empty;
+
+        public AdjustPayload()
         {
-            get; set;
         }
 
         public bool IsValid(out string errorMessage)
         {
             errorMessage = string.Empty;
 
-            if (Intents < 0)
+            if (string.IsNullOrWhiteSpace(Intents))
             {
-                errorMessage = "Intents cannot be negative.";
+                errorMessage = "Intents cannot be empty.";
                 return false;
             }
 

@@ -1,33 +1,32 @@
 using System.Linq.Expressions;
-using EchoPhase.Models;
-using EchoPhase.Repositories.Options;
-using EchoPhase.Services;
+using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.DAL.Postgres.Repositories;
+using EchoPhase.DAL.Postgres.Repositories.Options;
 
 namespace EchoPhase.Interfaces
 {
-    public interface IDiscordTokenService : IDataService<DiscordTokenService, DiscordTokenOptions>
+    public interface IDiscordTokenService : IDataServiceBase<DiscordTokenRepository>
     {
-        public IEnumerable<DiscordToken> Get(
+        IEnumerable<DiscordToken> Get(
             DiscordTokenSearchOptions opts,
             Func<IQueryable<DiscordToken>, DiscordTokenSearchOptions, IQueryable<DiscordToken>>? extraFilters = null
         );
-        public IEnumerable<DiscordToken> Get(
+        IEnumerable<DiscordToken> Get(
             Action<DiscordTokenSearchOptions> configure,
             Func<IQueryable<DiscordToken>, DiscordTokenSearchOptions, IQueryable<DiscordToken>>? extraFilters = null
         );
-        public Task<DiscordToken> CreateAsync(DiscordToken token);
-        public Task<IDiscordTokenResult> CreateAsync(params IEnumerable<DiscordToken> tokens);
-        public Task<DiscordToken> EditAsync(
+        Task<IServiceResult> CreateAsync(DiscordToken token);
+        Task<IServiceResult<DiscordToken>> CreateAsync(Action<DiscordToken> configure);
+        Task<IServiceResult<DiscordToken>> EditAsync(
             DiscordToken token,
             DiscordToken modifyData,
             params Expression<Func<DiscordToken, object>>[] overrideFields
         );
-        public Task<IDiscordTokenResult> EditAsync(
-            IEnumerable<DiscordToken> tokens,
-            DiscordToken modifyData,
-            params Expression<Func<DiscordToken, object>>[] overrideFields
-        );
-        public Task<DiscordToken> DeleteAsync(DiscordToken token);
-        public Task<IDiscordTokenResult> DeleteAsync(params IEnumerable<DiscordToken> tokens);
+        Task<IServiceResult<DiscordToken>> EditAsync(
+             DiscordToken token,
+             Action<DiscordToken> configure,
+             params Expression<Func<DiscordToken, object>>[] overrideFields
+         );
+        Task<IServiceResult> DeleteAsync(DiscordToken token);
     }
 }

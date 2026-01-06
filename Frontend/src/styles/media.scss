@@ -1,12 +1,19 @@
+@use 'sass:string';
+
 @mixin media($args...) {
-    $query: '';
+  $query: '';
 
-    @each $arg in $args {
-        $op: if($query != '', ' and ', '');
-        $query: $query + $op + '(' + $arg + ')';
-    }
+  @each $arg in $args {
+    $op: if($query != '', ' and ', '');
+    $wrapped: if(
+      string.index($arg, ':') and not string.index($arg, '('),
+      '(' + $arg + ')',
+      $arg
+    );
+    $query: $query + $op + $wrapped;
+  }
 
-    @media only screen and #{$query} {
-        @content;
-    }
+  @media #{$query} {
+    @content;
+  }
 }

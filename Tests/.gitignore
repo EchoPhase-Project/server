@@ -1,0 +1,18 @@
+# Ignore logs and Migrations
+Logs/
+
+# Ignore compiles
+bin/
+obj/
+
+# Ignore all certificates
+*.pem
+*.crt
+*.key
+
+# Ignore all env files
+*.env
+.env.*
+
+# Ignore secrets settings
+secrets.json

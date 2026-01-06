@@ -1,0 +1,14 @@
+{
+  "auth": {
+    "login": "Войти",
+    "signup": "Регистрация"
+  },
+  "form": {
+    "username": "Имя пользователя",
+    "password": "Пароль",
+    "fullname": "Полное имя",
+    "submit": "Отправить"
+  },
+  "unauthorized": "Неавторизован",
+  "select_language": "Выберите язык"
+}

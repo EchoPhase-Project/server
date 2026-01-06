@@ -31,7 +31,7 @@ export default function DragDropExample() {
             }}
         >
             <IoAlert />
-            Перетащи меня
+            Drag me!
         </div>
     );
 }

@@ -4,6 +4,7 @@ namespace EchoPhase.Interfaces
 {
     public interface IDiscordClient
     {
-        public Task<IDiscordApiResponse<IEnumerable<DiscordUserGuildsResponseDto>>> GetUserGuildsAsync(DiscordUserGuildsQueryDto query);
+        void WithAuth(string token);
+        Task<IDiscordApiResponse<IEnumerable<DiscordUserGuildsResponseDto>>> GetUserGuildsAsync(DiscordUserGuildsQueryDto query);
     }
 }

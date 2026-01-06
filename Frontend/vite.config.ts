@@ -45,6 +45,7 @@ export default defineConfig({
             '@styles': path.resolve(__dirname, 'src', 'styles'),
             '@static': path.resolve(__dirname, 'src', 'static'),
             '@shaders': path.resolve(__dirname, 'src', 'shaders'),
+            '@assets': path.resolve(__dirname, 'src', 'static', 'assets'),
         },
         extensions: ['.js', '.jsx', '.ts', '.tsx', '.scss', '.css'],
     },
@@ -61,10 +62,16 @@ export default defineConfig({
         },
     },
     server: {
-        port: 3000,
+        port: 5173,
         open: true,
         strictPort: true,
         hmr: true,
+        // origin: 'http://localhost:8080',
+    },
+    preview: {
+        port: 4173,
+        open: true,
+        strictPort: true,
         // origin: 'http://localhost:8080',
     },
     optimizeDeps: {

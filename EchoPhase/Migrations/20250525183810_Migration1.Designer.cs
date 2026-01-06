@@ -26,7 +26,7 @@ namespace EchoPhase.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("EchoPhase.Models.ApiToken", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.ApiToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -63,7 +63,7 @@ namespace EchoPhase.Migrations
                     b.ToTable("DiscordTokens", "EchoPhase");
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.User", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -150,7 +150,7 @@ namespace EchoPhase.Migrations
                         });
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.WebHook", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WebHook", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -189,7 +189,7 @@ namespace EchoPhase.Migrations
                     b.ToTable("WebHooks", "EchoPhase");
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.UserRole", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.UserRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -361,9 +361,9 @@ namespace EchoPhase.Migrations
                     b.ToTable("AspNetUserTokens", "EchoPhase");
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.ApiToken", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.ApiToken", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", "User")
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
                         .WithMany("DiscordTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -372,9 +372,9 @@ namespace EchoPhase.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.WebHook", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WebHook", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", "User")
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
                         .WithMany("WebHooks")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -385,7 +385,7 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("JwtToken", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", "User")
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
                         .WithMany("JwtTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -396,7 +396,7 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
-                    b.HasOne("EchoPhase.Models.UserRole", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.UserRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -405,7 +405,7 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -414,7 +414,7 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -423,13 +423,13 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
                 {
-                    b.HasOne("EchoPhase.Models.UserRole", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.UserRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EchoPhase.Models.User", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -438,14 +438,14 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.User", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.User", b =>
                 {
                     b.Navigation("DiscordTokens");
 

@@ -1,5 +1,5 @@
 using EchoPhase.Interfaces;
-using EchoPhase.Models;
+using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,7 +20,7 @@ namespace EchoPhase.DAL.Postgres
 
         public override DbSet<User> Users { get; set; } = default!;
 
-        public DbSet<JwtToken> JwtTokens { get; set; } = default!;
+        public DbSet<RefreshToken> RefreshTokens { get; set; } = default!;
         public DbSet<WebHook> WebHooks { get; set; } = default!;
 
         public DbSet<DiscordToken> DiscordTokens { get; set; } = default!;
@@ -30,6 +30,35 @@ namespace EchoPhase.DAL.Postgres
             builder.HasDefaultSchema(DefaultSchema);
 
             base.OnModelCreating(builder);
+
+            foreach (var entityType in builder.Model.GetEntityTypes())
+            {
+                if (typeof(ITrackingEntity).IsAssignableFrom(entityType.ClrType))
+                {
+                    var clrType = entityType.ClrType;
+                    var entityBuilder = builder.Entity(clrType);
+
+                    entityBuilder.Property(nameof(ITrackingEntity.UpdatedAt))
+                        .IsRequired()
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    entityBuilder.Property(nameof(ITrackingEntity.CreatedAt))
+                        .IsRequired()
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                }
+            }
+
+            foreach (var entityType in builder.Model.GetEntityTypes())
+            {
+                if (typeof(IConcurrentEntity).IsAssignableFrom(entityType.ClrType))
+                {
+                    var clrType = entityType.ClrType;
+                    var entityBuilder = builder.Entity(clrType);
+
+                    entityBuilder.Property(nameof(IConcurrentEntity.ConcurrencyStamp))
+                        .IsRequired();
+                }
+            }
 
             builder.Entity<User>(entity =>
             {
@@ -46,63 +75,54 @@ namespace EchoPhase.DAL.Postgres
                     .IsRequired();
                 entity.Property(u => u.ProfileImageName)
                     .HasMaxLength(64);
-
-                entity.Property(e => e.UpdatedAt)
-                    .IsRequired();
-                entity.Property(e => e.CreatedAt)
-                    .IsRequired();
             });
 
             builder.Entity<WebHook>(entity =>
             {
                 entity.ToTable("WebHooks");
                 entity.HasKey(e => e.Id);
-                entity.HasIndex(e => e.Url)
+                entity.HasIndex(e => new { e.Url, e.UserId })
                     .IsUnique();
 
                 entity.HasOne(e => e.User)
                     .WithMany(u => u.WebHooks)
                     .HasForeignKey(e => e.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
-
-                entity.Property(e => e.UpdatedAt)
-                    .IsRequired();
-                entity.Property(e => e.CreatedAt)
-                    .IsRequired();
             });
 
             builder.Entity<UserRole>(entity =>
             {
                 entity.ToTable("Roles");
-                entity.HasIndex(it => it.Name)
-                    .IsUnique();
-                entity.Property(it => it.Name)
-                    .IsRequired();
+
+                entity.HasIndex(it => it.Name).IsUnique();
+                entity.Property(it => it.Name).IsRequired();
             });
 
-            builder.Entity<JwtToken>(entity =>
+            builder.Entity<RefreshToken>(entity =>
             {
-                entity.ToTable("JwtTokens");
+                entity.ToTable("RefreshTokens");
                 entity.HasKey(e => e.Id);
-                entity.HasIndex(it => it.Token)
+                entity.HasIndex(t => new { t.RefreshValue, t.UserId })
+                    .IsUnique();
+                entity.HasIndex(t => new { t.DeviceId, t.UserId })
+                    .IsUnique();
+                entity.HasIndex(t => new { t.RefreshValue, t.DeviceId })
                     .IsUnique();
 
                 entity.HasOne(t => t.User)
-                    .WithMany(u => u.JwtTokens)
+                    .WithMany(u => u.RefreshTokens)
                     .HasForeignKey(t => t.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
-
-                entity.Property(e => e.UpdatedAt)
-                    .IsRequired();
-                entity.Property(e => e.CreatedAt)
-                    .IsRequired();
             });
 
             builder.Entity<DiscordToken>(entity =>
             {
-                entity.ToTable("DiscordTokens");
+                entity.ToTable("ApiTokens");
                 entity.HasKey(e => e.Id);
-                entity.HasIndex(it => it.Token)
+                entity.HasIndex(t => new { t.Name, t.UserId })
+                    .IsUnique();
+
+                entity.HasIndex(t => new { t.Token, t.UserId })
                     .IsUnique();
 
                 entity.HasOne(t => t.User)
@@ -110,9 +130,9 @@ namespace EchoPhase.DAL.Postgres
                     .HasForeignKey(t => t.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                entity.Property(e => e.UpdatedAt)
+                entity.Property(e => e.Name)
                     .IsRequired();
-                entity.Property(e => e.CreatedAt)
+                entity.Property(e => e.Token)
                     .IsRequired();
             });
         }

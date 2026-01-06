@@ -11,7 +11,7 @@ $link-color: #3291ff;
 $link-color-dark: color.adjust($link-color, $lightness: -15%);
 $link-color-rgb: utils.hex-to-rgb($link-color);
 
-$font-primary: 'Poppins';
+$font-primary: 'Iosevka';
 $font-secondary: 'Inter';
 $transition-speed: 200ms;
 
@@ -43,57 +43,57 @@ $shadow-color: #141414;
 $shadow-color-rgb: utils.hex-to-rgb($shadow-color);
 
 :root {
-    color-scheme: light;
-    --button-bg-primary: #{$button-bg-primary};
-    --button-bg-primary-rgb: #{$button-bg-primary-rgb};
+  color-scheme: light;
+  --button-bg-primary: #{$button-bg-primary};
+  --button-bg-primary-rgb: #{$button-bg-primary-rgb};
 
-    --button-fg-primary: #{$button-fg-primary};
-    --button-fg-primary-rgb: #{$button-fg-primary-rgb};
+  --button-fg-primary: #{$button-fg-primary};
+  --button-fg-primary-rgb: #{$button-fg-primary-rgb};
 
-    --link-color: #{$link-color};
-    --link-color-dark: #{$link-color-dark};
-    --link-color-rgb: #{$link-color-rgb};
+  --link-color: #{$link-color};
+  --link-color-dark: #{$link-color-dark};
+  --link-color-rgb: #{$link-color-rgb};
 
-    --font-primary: #{$font-primary};
-    --font-secondary: #{$font-secondary};
-    --transition-speed: #{$transition-speed};
+  --font-primary: #{$font-primary};
+  --font-secondary: #{$font-secondary};
+  --transition-speed: #{$transition-speed};
 
-    --bg: #{$bg-light};
-    --bg-rgb: #{$bg-light-rgb};
+  --bg: #{$bg-light};
+  --bg-rgb: #{$bg-light-rgb};
 
-    --surface: #{$surface-light};
-    --surface-rgb: #{$surface-light-rgb};
+  --surface: #{$surface-light};
+  --surface-rgb: #{$surface-light-rgb};
 
-    --text-primary: #{$text-primary-light};
-    --text-primary-rgb: #{$text-primary-light-rgb};
+  --text-primary: #{$text-primary-light};
+  --text-primary-rgb: #{$text-primary-light-rgb};
 
-    --text-primary-hover: #{$text-primary-hover-light};
-    --text-primary-hover-rgb: #{$text-primary-hover-light-rgb};
+  --text-primary-hover: #{$text-primary-hover-light};
+  --text-primary-hover-rgb: #{$text-primary-hover-light-rgb};
 
-    --shadow-color: #{$shadow-color};
-    --shadow-color-rgb: #{$shadow-color-rgb};
+  --shadow-color: #{$shadow-color};
+  --shadow-color-rgb: #{$shadow-color-rgb};
 }
 
 [data-theme='dark'] {
-    color-scheme: dark;
-    --button-bg-primary: #{$button-bg-primary};
-    --button-bg-primary-rgb: #{$button-bg-primary-rgb};
+  color-scheme: dark;
+  --button-bg-primary: #{$button-bg-primary};
+  --button-bg-primary-rgb: #{$button-bg-primary-rgb};
 
-    --button-fg-primary: #{$button-fg-primary};
-    --button-fg-primary-rgb: #{$button-fg-primary-rgb};
+  --button-fg-primary: #{$button-fg-primary};
+  --button-fg-primary-rgb: #{$button-fg-primary-rgb};
 
-    --link-color: #{$link-color};
-    --link-color-rgb: #{$link-color-rgb};
+  --link-color: #{$link-color};
+  --link-color-rgb: #{$link-color-rgb};
 
-    --bg: #{$bg-dark};
-    --bg-rgb: #{$bg-dark-rgb};
+  --bg: #{$bg-dark};
+  --bg-rgb: #{$bg-dark-rgb};
 
-    --surface: #{$surface-dark};
-    --surface-rgb: #{$surface-dark-rgb};
+  --surface: #{$surface-dark};
+  --surface-rgb: #{$surface-dark-rgb};
 
-    --text-primary: #{$text-primary-dark};
-    --text-primary-rgb: #{$text-primary-dark-rgb};
+  --text-primary: #{$text-primary-dark};
+  --text-primary-rgb: #{$text-primary-dark-rgb};
 
-    --text-primary-hover: #{$text-primary-hover-dark};
-    --text-primary-hover-rgb: #{$text-primary-hover-dark-rgb};
+  --text-primary-hover: #{$text-primary-hover-dark};
+  --text-primary-hover-rgb: #{$text-primary-hover-dark-rgb};
 }

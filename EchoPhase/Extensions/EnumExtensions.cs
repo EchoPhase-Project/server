@@ -7,10 +7,9 @@ namespace EchoPhase.Extensions
     {
         public static bool TryParseEnum<T>(this string value, out T result) where T : struct
         {
+            result = default(T);
             if (!typeof(T).IsEnum)
-            {
-                throw new ArgumentException("T must be an enumerated type");
-            }
+                return false;
 
             return Enum.TryParse(value, true, out result);
         }
@@ -23,11 +22,6 @@ namespace EchoPhase.Extensions
                 return memberInfo[0].GetCustomAttributes(typeof(IgnoreOpCodeAttribute), false).Any();
             }
             return false;
-        }
-
-        public static bool IsValid(this OpCodes opCode)
-        {
-            return Enum.IsDefined(typeof(OpCodes), opCode);
         }
     }
 }

@@ -1,10 +1,9 @@
-using EchoPhase.Models;
-using EchoPhase.Repositories;
-using EchoPhase.Repositories.Options;
+using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.DAL.Postgres.Repositories.Options;
 
 namespace EchoPhase.Interfaces
 {
-    public interface IWebHookRepository : IRepositoryBase<WebHookRepository, WebHookOptions>
+    public interface IWebHookRepository : IRepositoryBase<WebHookOptions>
     {
         public IEnumerable<WebHook> Get(
             WebHookSearchOptions options,

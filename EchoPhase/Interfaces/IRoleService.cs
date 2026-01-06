@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-using EchoPhase.Models;
+using EchoPhase.DAL.Postgres.Models;
 
 namespace EchoPhase.Interfaces
 {

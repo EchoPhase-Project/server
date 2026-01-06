@@ -1,6 +1,6 @@
-using Spectre.Console.Cli;
-using Spectre.Console;
 using System.ComponentModel;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace EchoPhase.Commands.Settings
 {

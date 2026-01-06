@@ -18,12 +18,12 @@ namespace EchoPhase.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("public")
-                .HasAnnotation("ProductVersion", "8.0.2")
+                .HasAnnotation("ProductVersion", "9.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("EchoPhase.Models.DiscordToken", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.DiscordToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -34,7 +34,9 @@ namespace EchoPhase.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -45,60 +47,73 @@ namespace EchoPhase.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Token")
-                        .IsUnique();
-
                     b.HasIndex("UserId");
 
-                    b.ToTable("DiscordTokens", "public");
+                    b.HasIndex("Name", "UserId")
+                        .IsUnique();
+
+                    b.HasIndex("Token", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ApiTokens", "public");
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.JwtToken", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshToken", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<DateTime>("ExpiryDate")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<string>("DeviceId")
+                        .HasColumnType("text");
 
-                    b.Property<string>("Token")
+                    b.Property<string>("RefreshValue")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Token")
-                        .IsUnique();
-
                     b.HasIndex("UserId");
 
-                    b.ToTable("JwtTokens", "public");
+                    b.HasIndex("DeviceId", "UserId")
+                        .IsUnique();
+
+                    b.HasIndex("RefreshValue", "DeviceId")
+                        .IsUnique();
+
+                    b.HasIndex("RefreshValue", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("RefreshTokens", "public");
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.User", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -112,7 +127,9 @@ namespace EchoPhase.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -160,7 +177,9 @@ namespace EchoPhase.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("UserName")
                         .IsRequired()
@@ -185,50 +204,7 @@ namespace EchoPhase.Migrations
                         });
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.WebHook", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("Intents")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Url")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("WebHooks", "public");
-                });
-
-            modelBuilder.Entity("EchoPhase.Models.UserRole", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.UserRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -238,6 +214,11 @@ namespace EchoPhase.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("text");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -246,6 +227,11 @@ namespace EchoPhase.Migrations
                     b.Property<string>("NormalizedName")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.HasKey("Id");
 
@@ -257,6 +243,54 @@ namespace EchoPhase.Migrations
                         .HasDatabaseName("RoleNameIndex");
 
                     b.ToTable("Roles", "public");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WebHook", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Intents")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Url", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("WebHooks", "public");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -362,9 +396,9 @@ namespace EchoPhase.Migrations
                     b.ToTable("AspNetUserTokens", "public");
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.DiscordToken", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.DiscordToken", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", "User")
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
                         .WithMany("DiscordTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -373,10 +407,10 @@ namespace EchoPhase.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.JwtToken", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshToken", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", "User")
-                        .WithMany("JwtTokens")
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
+                        .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -384,9 +418,9 @@ namespace EchoPhase.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.WebHook", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WebHook", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", "User")
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
                         .WithMany("WebHooks")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -397,7 +431,7 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
-                    b.HasOne("EchoPhase.Models.UserRole", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.UserRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -406,7 +440,7 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -415,7 +449,7 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -424,13 +458,13 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
                 {
-                    b.HasOne("EchoPhase.Models.UserRole", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.UserRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EchoPhase.Models.User", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -439,18 +473,18 @@ namespace EchoPhase.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
                 {
-                    b.HasOne("EchoPhase.Models.User", null)
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("EchoPhase.Models.User", b =>
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.User", b =>
                 {
                     b.Navigation("DiscordTokens");
 
-                    b.Navigation("JwtTokens");
+                    b.Navigation("RefreshTokens");
 
                     b.Navigation("WebHooks");
                 });

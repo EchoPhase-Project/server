@@ -2,20 +2,33 @@ services:
   echophase:
     image: localhost:5000/echophase:latest
     restart: unless-stopped
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      ASPNETCORE_URLS: http://0.0.0.0:8080
     env_file:
       - ./.env
     ports:
       - "8080:8080"
     volumes:
-      - ./logs:/app/Logs
+      - logs:/app/Logs
     networks:
       - echonet
+    healthcheck:
+      test: ["CMD", "dotnet", "EchoPhase.dll", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     depends_on:
       echophase-migrate:
         condition: service_completed_successfully
+
+  echophase-frontend:
+    image: localhost:5000/echophase-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - echonet
+    depends_on:
+      echophase:
+        condition: service_healthy
 
   echophase-migrate:
     image: localhost:5000/echophase:latest
@@ -29,6 +42,8 @@ services:
         condition: service_healthy
       valkey:
         condition: service_healthy
+      scylla:
+        condition: service_healthy
     networks:
       - echonet
     restart: "no"
@@ -40,7 +55,7 @@ services:
       - ./.env
     command: ["valkey-server", "--requirepass", "${VALKEY_PASSWORD}"]
     volumes:
-      - ./valkey:/data
+      - valkey-data:/data
     networks:
       - echonet
     healthcheck:
@@ -55,7 +70,7 @@ services:
     env_file:
       - ./.env
     volumes:
-      - ./postgres:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - echonet
     healthcheck:
@@ -64,6 +79,27 @@ services:
       timeout: 5s
       retries: 5
 
+  scylla:
+    image: scylladb/scylla:latest
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    networks:
+      - echonet
+    volumes:
+      - scylla-data:/var/lib/scylla
+    healthcheck:
+      test: ["CMD", "cqlsh", "-u", "${SCYLLA_USERNAME:-cassandra}", "-p", "${SCYLLA_PASSWORD:-cassandra}", "-e", "describe keyspaces"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   echonet:
     driver: bridge
+
+volumes:
+  logs:
+  valkey-data:
+  postgres-data:
+  scylla-data:

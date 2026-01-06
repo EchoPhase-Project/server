@@ -1,7 +1,10 @@
 import { For } from 'solid-js';
 import { NavLink } from '@lib/nav';
+import { useI18n } from '@lib/i18n';
 
 export function NavBuilder(props: { links: NavLink[] }) {
+    const { t } = useI18n();
+
     return (
         <nav class="navbar">
             <ul class="navbar-nav">
@@ -14,7 +17,9 @@ export function NavBuilder(props: { links: NavLink[] }) {
                                     <i class="nav-icon">
                                         <Icon />
                                     </i>
-                                    <span class="link-text">{link.text}</span>
+                                    <span class="link-text">
+                                        {t(link.i18n, link.text)}
+                                    </span>
                                 </a>
                             </li>
                         );

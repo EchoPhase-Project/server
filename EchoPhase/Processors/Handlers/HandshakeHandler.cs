@@ -1,9 +1,11 @@
 using System.Net.WebSockets;
 using EchoPhase.Attributes;
 using EchoPhase.Exceptions;
-using EchoPhase.Models;
+using EchoPhase.Extensions;
+using EchoPhase.Interfaces;
 using EchoPhase.Processors.Enums;
 using EchoPhase.Processors.Payloads;
+using EchoPhase.Services.Bitmasks;
 using EchoPhase.Services.WebSockets;
 
 namespace EchoPhase.Processors.Handlers
@@ -13,12 +15,14 @@ namespace EchoPhase.Processors.Handlers
     {
         private readonly WebSocketService _webSocketService;
         private readonly WebSocketConnectionManager _connectionManager;
+        private readonly IIntentsBitMaskService _intentsService;
 
         public HandshakeHandler(IServiceProvider serviceProvider)
         : base(serviceProvider)
         {
             _webSocketService = GetService<WebSocketService>();
             _connectionManager = GetService<WebSocketConnectionManager>();
+            _intentsService = GetService<IIntentsBitMaskService>();
         }
 
         public override async Task HandleAsync(WebSocket webSocket, HandshakePayload payload)
@@ -26,32 +30,51 @@ namespace EchoPhase.Processors.Handlers
             try
             {
                 var connection = await _connectionManager.GetConnectionAsync(webSocket);
-                connection.Intents = payload.Intents.HasValue ? payload.Intents.Value : 0;
 
-                var response = new EventMessage
+                if (payload.Intents is not null)
                 {
-                    Op = OpCodes.HandshakeAck,
-                    D = new HandshakeAckPayload()
+                    var result = IntentsBitMaskService.Deserialize(payload.Intents);
+
+                    if (result.TryGetError(out var error))
                     {
-                        HeartbeatInterval = WebSocketConnectionManager.heartbeatInterval.TotalMilliseconds
+                        var responseError = EventMessage<ErrorPayload>.Create(OpCodes.Error, err =>
+                        {
+                            err.Code = ErrorCodes.DeserializationError;
+                            err.Message = error.Value;
+                        });
+
+                        await _webSocketService.SendMessageToConnectionAsync(webSocket, responseError);
+                        return;
                     }
-                };
+
+                    if (result.TryGetValue(out var value))
+                    {
+                        connection.Intents = value;
+                    }
+                }
+
+                var intents = Array.Empty<string>();
+
+                var decodingResult = _intentsService.Decode(connection.Intents);
+
+                if (decodingResult.TryGetValue(out var decoded))
+                    intents = decoded;
+
+                var response = EventMessage<HandshakeAckPayload>.Create(OpCodes.HandshakeAck, p =>
+                {
+                    p.HeartbeatInterval = WebSocketConnectionManager.heartbeatInterval.TotalMilliseconds;
+                    p.Intents = intents;
+                });
 
                 await _webSocketService.SendMessageToConnectionAsync(webSocket, response);
             }
             catch (WebSocketConnectionNotFoundException)
             {
-                string errorMessage = "Connection not found.";
-
-                var response = new EventMessage()
+                var response = EventMessage<ErrorPayload>.Create(OpCodes.Error, p =>
                 {
-                    Op = OpCodes.Error,
-                    D = new ErrorPayload()
-                    {
-                        Code = ErrorCodes.NotFound,
-                        Message = errorMessage
-                    }
-                };
+                    p.Code = ErrorCodes.NotFound;
+                    p.Message = "Connection not found.";
+                });
 
                 await _webSocketService.SendMessageToConnectionAsync(webSocket, response);
 

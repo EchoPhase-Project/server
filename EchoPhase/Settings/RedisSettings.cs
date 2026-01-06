@@ -1,8 +1,9 @@
 using EchoPhase.Interfaces;
+using EchoPhase.DAL.Redis.Interfaces;
 
 namespace EchoPhase.Settings
 {
-    public class RedisSettings : IValidatable
+    public class RedisSettings : IRedisSettings, IValidatable
     {
         public string ConnectionString { get; set; } = string.Empty;
         public string InstanceName { get; set; } = string.Empty;

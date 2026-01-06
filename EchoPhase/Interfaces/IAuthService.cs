@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using EchoPhase.Models;
+using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Identity;
 
 namespace EchoPhase.Interfaces

@@ -2,9 +2,8 @@ using EchoPhase.Interfaces;
 
 namespace EchoPhase.Services
 {
-    public abstract class DataServiceBase<TC, TR, TO> : IDataService<TC, TO>
-        where TC : DataServiceBase<TC, TR, TO>
-        where TR : IRepositoryBase<TR, TO>
+    public abstract class DataServiceBase<TR, TO> : IDataServiceBase<TR>
+        where TR : IRepositoryBase<TO>
     {
         protected readonly TR _repository;
 
@@ -15,16 +14,14 @@ namespace EchoPhase.Services
             _repository = repository;
         }
 
-        public virtual TC WithOptions(TO options)
+        public virtual void ConfigureRepository(Action<TR> action)
         {
-            _repository.WithOptions(options);
-            return (TC)this;
+            action(_repository);
         }
 
-        public virtual TC WithOptions(Action<TO> configure)
+        public virtual Task ConfigureRepositoryAsync(Func<TR, Task> action)
         {
-            _repository.WithOptions(configure);
-            return (TC)this;
+            return action(_repository);
         }
     }
 }

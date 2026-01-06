@@ -4,4 +4,5 @@ export interface NavLink {
     routeName: string;
     icon: Component;
     text: string;
+    i18n: string;
 }

@@ -1,9 +1,9 @@
 using System.Net.WebSockets;
-using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using EchoPhase.Exceptions;
+using EchoPhase.Extensions;
 using EchoPhase.Interfaces;
 using EchoPhase.Services.WebSockets.Models;
 
@@ -12,17 +12,17 @@ namespace EchoPhase.Services.WebSockets
     public class WebSocketService
     {
         private readonly IRoleService _roleService;
-        private readonly IIntentsService _intentsService;
+        private readonly IIntentsBitMaskService _intentsBitmaskService;
         private readonly WebSocketConnectionManager _connectionManager;
 
         public WebSocketService(
             IRoleService roleService,
-            IIntentsService intentsService,
+            IIntentsBitMaskService intentsBitmaskService,
             WebSocketConnectionManager connectionManager
         )
         {
             _roleService = roleService;
-            _intentsService = intentsService;
+            _intentsBitmaskService = intentsBitmaskService;
             _connectionManager = connectionManager;
         }
 
@@ -41,7 +41,7 @@ namespace EchoPhase.Services.WebSockets
 
         public async Task SendMessageToConnectionAsync<T>(WebSocketConnection connection, T message, ISet<string> intents)
         {
-            if (!_intentsService.Has(connection.Intents, intents))
+            if (!_intentsBitmaskService.Has(connection.Intents, intents.ToArray()))
                 throw new MissingIntentsException(
                     "{hash}: Connection lacks required intents. Expected: {actual}",
                     connection.WebSocket.GetHashCode().ToString(),
@@ -51,20 +51,11 @@ namespace EchoPhase.Services.WebSockets
             await SendMessageToConnectionAsync(connection, message);
         }
 
-        public async Task SendMessageToUserAsync<T, TS>(Guid userId, T message, ISet<string> intents, TS? shardId = null)
-            where TS : struct
+        public async Task SendMessageToUserAsync<T>(Guid userId, T message, ISet<string> intents)
         {
             var connections = _connectionManager.GetConnections(userId);
             if (connections.Count == 0)
                 return;
-
-            if (shardId is Guid id)
-            {
-                int index = CalculateShardIndex(id, connections.Count);
-                var connection = connections[index];
-                await SendMessageToConnectionAsync(connection, message, intents);
-                return;
-            }
 
             foreach (var connection in connections)
             {
@@ -72,7 +63,28 @@ namespace EchoPhase.Services.WebSockets
             }
         }
 
-        public async Task SendMessageToUsersAsync<T, TS>(ISet<Guid> userIds, T message, ISet<string> intents, TS? shardId = null)
+        public async Task SendMessageToUserAsync<T, TS>(Guid userId, T message, ISet<string> intents, TS shardId)
+            where TS : struct
+        {
+            var connections = _connectionManager.GetConnections(userId);
+            if (connections.Count == 0)
+                return;
+
+            var index = CalculateShardIndex(shardId, connections.Count);
+            var connection = connections[index];
+            await SendMessageToConnectionAsync(connection, message, intents);
+            return;
+        }
+
+        public async Task SendMessageToUsersAsync<T>(ISet<Guid> userIds, T message, ISet<string> intents)
+        {
+            foreach (var userId in userIds)
+            {
+                await SendMessageToUserAsync(userId, message, intents);
+            }
+        }
+
+        public async Task SendMessageToUsersAsync<T, TS>(ISet<Guid> userIds, T message, ISet<string> intents, TS shardId)
             where TS : struct
         {
             foreach (var userId in userIds)
@@ -81,14 +93,27 @@ namespace EchoPhase.Services.WebSockets
             }
         }
 
-        public async Task SendMessageToAllAsync<T, TS>(T message, ISet<string> intents, TS? shardId = null)
+        public async Task SendMessageToAllAsync<T>(T message, ISet<string> intents)
+        {
+            var userIds = _connectionManager.GetConnections().Select(c => c.Key).ToHashSet();
+            await SendMessageToUsersAsync(userIds, message, intents);
+        }
+
+        public async Task SendMessageToAllAsync<T, TS>(T message, ISet<string> intents, TS shardId)
             where TS : struct
         {
             var userIds = _connectionManager.GetConnections().Select(c => c.Key).ToHashSet();
             await SendMessageToUsersAsync(userIds, message, intents, shardId);
         }
 
-        public async Task SendMessageToRoleAsync<T, TS>(string role, T message, ISet<string> intents, TS? shardId = null)
+        public async Task SendMessageToRoleAsync<T>(string role, T message, ISet<string> intents)
+        {
+            var usersWithRole = await _roleService.GetUsersInRoleAsync(role);
+            var userIds = usersWithRole.Select(u => u.Id).ToHashSet();
+            await SendMessageToUsersAsync(userIds, message, intents);
+        }
+
+        public async Task SendMessageToRoleAsync<T, TS>(string role, T message, ISet<string> intents, TS shardId)
             where TS : struct
         {
             var usersWithRole = await _roleService.GetUsersInRoleAsync(role);
@@ -96,7 +121,14 @@ namespace EchoPhase.Services.WebSockets
             await SendMessageToUsersAsync(userIds, message, intents, shardId);
         }
 
-        public async Task SendMessageToRolesAsync<T, TS>(ISet<string> roles, T message, ISet<string> intents, TS? shardId = null)
+        public async Task SendMessageToRolesAsync<T>(ISet<string> roles, T message, ISet<string> intents)
+        {
+            var usersWithRole = await _roleService.GetUsersInRolesAsync(roles);
+            var userIds = usersWithRole.Select(u => u.Id).ToHashSet();
+            await SendMessageToUsersAsync(userIds, message, intents);
+        }
+
+        public async Task SendMessageToRolesAsync<T, TS>(ISet<string> roles, T message, ISet<string> intents, TS shardId)
             where TS : struct
         {
             var usersWithRole = await _roleService.GetUsersInRolesAsync(roles);
@@ -104,17 +136,13 @@ namespace EchoPhase.Services.WebSockets
             await SendMessageToUsersAsync(userIds, message, intents, shardId);
         }
 
-        private int CalculateShardIndex<T>(T id, int count) where T : struct
-        {
-            BigInteger BIid = new BigInteger(ToByteArray<T>(id), isUnsigned: true, isBigEndian: false);
-            return (int)(BIid % count);
-        }
-
-        private byte[] ToByteArray<T>(T value) where T : struct
+        private int CalculateShardIndex<T>(T value, int shardCount) where T : struct
         {
             ReadOnlySpan<T> span = MemoryMarshal.CreateReadOnlySpan(ref value, 1);
             ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(span);
-            return bytes.ToArray();
+
+            ulong hash = BitConverter.ToUInt64(bytes.ComputeXxHash3());
+            return (int)(hash % (ulong)shardCount);
         }
 
         private string SerializeMessage<T>(T message) =>

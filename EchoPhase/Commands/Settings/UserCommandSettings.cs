@@ -1,6 +1,6 @@
-using Spectre.Console.Cli;
-using Spectre.Console;
 using System.ComponentModel;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace EchoPhase.Commands.Settings
 {
@@ -8,7 +8,7 @@ namespace EchoPhase.Commands.Settings
     {
         [CommandArgument(0, "<USERNAME>")]
         [Description("User's username")]
-        public string Username { get; set; } = "";
+        public string Username { get; set; } = string.Empty;
 
         [CommandOption("--continue|-c")]
         [DefaultValue(false)]

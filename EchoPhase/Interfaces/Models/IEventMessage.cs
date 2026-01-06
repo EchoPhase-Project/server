@@ -6,11 +6,15 @@ namespace EchoPhase.Interfaces
     {
         OpCodes Op
         {
-            get; set;
+            get;
         }
-        object D
+    }
+
+    public interface IEventMessage<T> : IEventMessage
+    {
+        T D
         {
-            get; set;
+            get;
         }
     }
 }

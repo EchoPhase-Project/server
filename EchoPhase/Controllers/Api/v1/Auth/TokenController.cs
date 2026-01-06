@@ -1,6 +1,4 @@
 using EchoPhase.Interfaces;
-using EchoPhase.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ParkSquare.AspNetCore.Sitemap;
@@ -26,7 +24,7 @@ namespace PointsApp.Controllers
 
         [HttpGet]
         [Route("{guid:guid}", Name = "GenerateTokenGuid")]
-        [Authorize(Policy = "ApiAccess")]
+        [Authorize(Policy = "DevOrHigher")]
         public async Task<IActionResult> TokenGeneration(Guid guid)
         {
             var users = _userService.Get(x =>
@@ -46,7 +44,7 @@ namespace PointsApp.Controllers
 
         [HttpGet]
         [Route("{username}", Name = "GenerateTokenUserName")]
-        [Authorize(Policy = "ApiAccess")]
+        [Authorize(Policy = "DevOrHigher")]
         public async Task<IActionResult> TokenGeneration(string username)
         {
             var users = _userService.Get(x =>
@@ -66,7 +64,7 @@ namespace PointsApp.Controllers
 
         [HttpGet]
         [Route("", Name = "GenerateTokenSelf")]
-        [Authorize(Policy = "ApiAccess")]
+        [Authorize(Policy = "DevOrHigher")]
         public async Task<IActionResult> TokenGeneration()
         {
             var user = await _userService.GetAsync(User);
@@ -76,53 +74,5 @@ namespace PointsApp.Controllers
 
             return Ok(dict);
         }
-
-        [HttpDelete]
-        [Route("", Name = "InvalidateToken")]
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "ApiAccess")]
-        public async Task<IActionResult> TokenInvalidation([FromBody] TokenInvalidationDto dto)
-        {
-            var user = await _userService.GetAsync(User);
-            if (string.IsNullOrEmpty(dto.Token))
-                return BadRequest("Invalid parameters or arguments.");
-
-            _jwtService.RevokeToken(User, dto.Token);
-
-            return Ok("Token invalidated successfully.");
-        }
-
-        [HttpPut]
-        [Route("", Name = "ExtendToken")]
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "ApiAccess")]
-        public async Task<IActionResult> TokenExtension([FromBody] TokenExtensionDto dto)
-        {
-            var user = await _userService.GetAsync(User);
-            if (string.IsNullOrEmpty(dto.Token))
-                return BadRequest("Invalid parameters or arguments.");
-
-            _jwtService.ExtendToken(User, dto.Token);
-
-            return Ok("Token extended successfully.");
-        }
     }
 }
-
-namespace EchoPhase.Models
-{
-    public class TokenInvalidationDto
-    {
-        public string? Token
-        {
-            get; set;
-        }
-    }
-
-    public class TokenExtensionDto
-    {
-        public string? Token
-        {
-            get; set;
-        }
-    }
-}
-

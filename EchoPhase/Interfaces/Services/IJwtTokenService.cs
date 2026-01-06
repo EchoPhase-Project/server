@@ -1,13 +1,11 @@
 using System.Security.Claims;
-using EchoPhase.Models;
+using EchoPhase.DAL.Postgres.Models;
 
 namespace EchoPhase.Interfaces
 {
     public interface IJwtTokenService
     {
-        Task<string> GenerateTokenAsync(User user);
+        Task<string> GenerateTokenAsync(User user, TimeSpan? lifetime = null);
         ClaimsPrincipal? ValidateToken(string token);
-        void RevokeToken(ClaimsPrincipal user, string token);
-        void ExtendToken(ClaimsPrincipal user, string token);
     }
 }

@@ -1,4 +1,4 @@
-using EchoPhase.Services;
+using EchoPhase.Security;
 
 namespace EchoPhase.Interfaces
 {

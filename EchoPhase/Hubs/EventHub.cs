@@ -1,5 +1,5 @@
 using EchoPhase.Interfaces;
-using EchoPhase.Models;
+using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Services.Internal;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

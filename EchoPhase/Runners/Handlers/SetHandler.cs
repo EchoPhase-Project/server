@@ -1,17 +1,31 @@
 using EchoPhase.Attributes;
-using EchoPhase.Helpers;
 using EchoPhase.Interfaces;
 using EchoPhase.Runners.Enums;
 using EchoPhase.Runners.Params;
 using Newtonsoft.Json.Linq;
+using EchoPhase.Expressions.Tokens;
+using EchoPhase.Expressions;
+using EchoPhase.Extensions;
+using System.Collections;
 
 namespace EchoPhase.Runners.Handlers
 {
     [BlockTypeHandler(BlockTypes.Set)]
     public class SetHandler : BlockHandlerBase<SetParams>
     {
+        private readonly ILexer<TemplateToken> _lexer;
+        private readonly IParser<TemplateToken> _parser;
+        private readonly ILexer<PathToken> _pathLexer;
+        private readonly IPathParser<PathToken> _pathParser;
+
         public SetHandler(IServiceProvider serviceProvider)
-            : base(serviceProvider) { }
+            : base(serviceProvider)
+        {
+            _lexer = GetService<ILexer<TemplateToken>>();
+            _parser = GetService<IParser<TemplateToken>>();
+            _pathLexer = GetService<ILexer<PathToken>>();
+            _pathParser = GetService<IPathParser<PathToken>>();
+        }
 
         public override Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, SetParams param)
         {
@@ -24,7 +38,13 @@ namespace EchoPhase.Runners.Handlers
                 if (raw == null)
                     throw new InvalidOperationException("Variable string parse exception.");
 
-                string processed = ExpressionHelper.ProcessStringWithExpressions(raw, context.Variables);
+                var result = Eval.Process<string>(_lexer, _parser, raw, context.Variables);
+
+                if (!result.TryGetValue(out var processed))
+                    if (result.TryGetError(out var err))
+                        throw new Exception(err.Message);
+                    else
+                        throw new Exception("Unknown error");
 
                 value = TryParsePrimitive(processed);
             }
@@ -43,10 +63,11 @@ namespace EchoPhase.Runners.Handlers
             }
 
             if (value != null)
-                context.Variables[param.Name] = value;
+                Eval.Set(_pathLexer, _pathParser, context.Variables, param.Name, value);
 
             return Task.FromResult(param.Next);
         }
+
 
         private object TryParsePrimitive(string input)
         {

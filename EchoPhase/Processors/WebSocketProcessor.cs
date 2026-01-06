@@ -1,7 +1,6 @@
 using System.Net.WebSockets;
 using System.Text.Json;
 using EchoPhase.Interfaces;
-using EchoPhase.Models;
 using EchoPhase.Processors.Enums;
 using EchoPhase.Processors.Handlers;
 using EchoPhase.Processors.Payloads;
@@ -31,52 +30,39 @@ namespace EchoPhase.Processors
 
         public async Task HandleMessageAsync(WebSocket webSocket, string message)
         {
-            EventMessage? eventMessage = JsonSerializer.Deserialize<EventMessage>(message);
-            if (eventMessage == null)
+            var rawMessage = JsonSerializer.Deserialize<RawEventMessage>(message);
+            if (rawMessage == null)
             {
-                string errorMessage = "Unable to deserialize JSON.";
-
-                var response = new EventMessage()
-                {
-                    Op = OpCodes.Error,
-                    D = new ErrorPayload()
-                    {
-                        Code = ErrorCodes.DeserializationError,
-                        Message = errorMessage
-                    }
-                };
-
-                await _webSocketService.SendMessageToConnectionAsync(webSocket, response);
-
-                throw new InvalidOperationException(errorMessage);
+                await SendErrorAsync(webSocket, ErrorCodes.DeserializationError, "Unable to deserialize JSON.");
+                return;
             }
 
-            await HandleMessageAsync(webSocket, eventMessage);
-        }
+            if (rawMessage.D == null)
+            {
+                await SendErrorAsync(webSocket, ErrorCodes.InvalidPayload, "Payload data is missing.");
+                return;
+            }
 
-
-        public async Task HandleMessageAsync(WebSocket webSocket, EventMessage eventMessage)
-        {
             try
             {
-                var handler = _handlerResolver.GetHandler(eventMessage.Op);
-
-                await handler.HandleAsync(webSocket, eventMessage.D);
+                var handler = _handlerResolver.GetHandler(rawMessage.Op);
+                await handler.HandleAsync(webSocket, rawMessage.D);
             }
             catch (NotSupportedException e)
             {
-                var errorMessage = new EventMessage
-                {
-                    Op = OpCodes.Error,
-                    D = new ErrorPayload()
-                    {
-                        Code = ErrorCodes.Unsupported,
-                        Message = e.Message
-                    }
-                };
-
-                await _webSocketService.SendMessageToConnectionAsync(webSocket, errorMessage);
+                await SendErrorAsync(webSocket, ErrorCodes.Unsupported, e.Message);
             }
+        }
+
+        private async Task SendErrorAsync(WebSocket socket, ErrorCodes code, string msg)
+        {
+            var error = EventMessage<ErrorPayload>.Create(OpCodes.Error, e =>
+            {
+                e.Code = code;
+                e.Message = msg;
+            });
+
+            await _webSocketService.SendMessageToConnectionAsync(socket, error);
         }
     }
 }

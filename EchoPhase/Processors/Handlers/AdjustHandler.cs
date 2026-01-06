@@ -1,9 +1,10 @@
 using System.Net.WebSockets;
 using EchoPhase.Attributes;
 using EchoPhase.Exceptions;
-using EchoPhase.Models;
+using EchoPhase.Extensions;
 using EchoPhase.Processors.Enums;
 using EchoPhase.Processors.Payloads;
+using EchoPhase.Services.Bitmasks;
 using EchoPhase.Services.WebSockets;
 
 namespace EchoPhase.Processors.Handlers
@@ -26,29 +27,32 @@ namespace EchoPhase.Processors.Handlers
             try
             {
                 var connection = await _connectionManager.GetConnectionAsync(webSocket);
-                connection.Intents = payload.Intents;
 
-                var response = new EventMessage
+                var result = IntentsBitMaskService.Deserialize(payload.Intents);
+
+                if (result.TryGetError(out var error))
                 {
-                    Op = OpCodes.AdjustAck,
-                    D = new AdjustAckPayload() { }
-                };
+                    var responseError = EventMessage<ErrorPayload>.Create(OpCodes.Error, err =>
+                    {
+                        err.Code = ErrorCodes.DeserializationError;
+                        err.Message = error.Value;
+                    });
+
+                    await _webSocketService.SendMessageToConnectionAsync(webSocket, responseError);
+                    return;
+                }
+
+                var response = EventMessage<AdjustAckPayload>.Create(OpCodes.AdjustAck);
 
                 await _webSocketService.SendMessageToConnectionAsync(webSocket, response);
             }
             catch (WebSocketConnectionNotFoundException)
             {
-                string errorMessage = "Connection not found.";
-
-                var response = new EventMessage()
+                var response = EventMessage<ErrorPayload>.Create(OpCodes.Error, p =>
                 {
-                    Op = OpCodes.Error,
-                    D = new ErrorPayload()
-                    {
-                        Code = ErrorCodes.NotFound,
-                        Message = errorMessage
-                    }
-                };
+                    p.Code = ErrorCodes.NotFound;
+                    p.Message = "Connection not found.";
+                });
 
                 await _webSocketService.SendMessageToConnectionAsync(webSocket, response);
 

@@ -6,13 +6,13 @@ using EchoPhase.DAL.Postgres;
 using EchoPhase.Enums;
 using EchoPhase.Extensions;
 using EchoPhase.Interfaces;
-using EchoPhase.Models;
-using EchoPhase.Repositories;
-using EchoPhase.Repositories.Options;
+using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.DAL.Postgres.Repositories;
+using EchoPhase.DAL.Postgres.Repositories.Options;
 
 namespace EchoPhase.Services.WebHooks
 {
-    public class WebHookService : DataServiceBase<WebHookService, WebHookRepository, WebHookOptions>
+    public class WebHookService : DataServiceBase<WebHookRepository, WebHookOptions>
     {
         private readonly PostgresContext _context;
         private readonly HttpClient _httpClient;

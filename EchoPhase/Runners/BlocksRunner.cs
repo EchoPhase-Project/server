@@ -13,6 +13,17 @@ namespace EchoPhase.Runners
             _resolver = resolver;
         }
 
+        public static IBlockExecutionContext Create(
+            IEnumerable<int>? startIds = null,
+            IEnumerable<IBlock>? blocks = null)
+        {
+            return new BlockExecutionContext
+            {
+                StartIds = startIds?.ToList() ?? new List<int>(),
+                Blocks   = blocks?.ToList() ?? new List<IBlock>(),
+            };
+        }
+
         public async Task<IBlockExecutionContext> ExecuteAsync(IBlockExecutionContext context)
         {
             if (context is null)
@@ -58,6 +69,7 @@ namespace EchoPhase.Runners
                     };
 
                     context.Errors.Add(error);
+                    throw;
                 }
 
                 foreach (var nextId in next)

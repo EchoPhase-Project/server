@@ -9,8 +9,18 @@ export default function Home() {
 
     onMount(() => {
         setNavLinks([
-            { routeName: '/', icon: TbBuildingEstate, text: 'Home' },
-            { routeName: '/about', icon: AiOutlineInfoCircle, text: 'About' },
+            {
+                routeName: '/',
+                icon: TbBuildingEstate,
+                text: 'Home',
+                i18n: 'nav.home',
+            },
+            {
+                routeName: '/about',
+                icon: AiOutlineInfoCircle,
+                text: 'About',
+                i18n: 'nav.about',
+            },
         ]);
     });
 

@@ -6,7 +6,7 @@ namespace EchoPhase.Settings
     {
         public int TagSize { get; set; } = 16;
         public int NonceSize { get; set; } = 12;
-        public string Key { get; set; } = "aes";
+        public string Key { get; set; } = "aes-gcm";
 
         public bool IsValid(out string errorMessage)
         {

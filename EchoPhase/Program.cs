@@ -4,16 +4,26 @@ namespace EchoPhase
 {
     public class Program
     {
-        public static async Task Main(string[] args)
+        public static async Task<int> Main(string[] args)
         {
-            var host = CreateHostBuilder(args).Build();
+            var hostBuilder = CreateHostBuilder(args);
+            var host = hostBuilder.Build();
 
             var result = await host.CheckArgsAsync(args);
 
-            if (result != 0)
-                return;
+            Console.WriteLine(result);
+            if (result >= 0)
+                return result;
 
-            host.Run();
+            try
+            {
+                await host.RunAsync();
+                return 0;
+            }
+            catch (Exception)
+            {
+                return 1;
+            }
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -29,6 +39,11 @@ namespace EchoPhase
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
+                })
+                .UseSystemd()
+                .UseConsoleLifetime(options =>
+                {
+                    options.SuppressStatusMessages = false;
                 });
     }
 }

@@ -9,7 +9,10 @@ namespace EchoPhase.Settings
         public string Audience { get; set; } = string.Empty;
         public string ValidIssuer { get; set; } = string.Empty;
         public IEnumerable<string> ValidAudiences { get; set; } = new HashSet<string>();
-        public int ExpirationInMinutes { get; set; }
+        public int LifetimeInMinutes
+        {
+            get; set;
+        }
 
         public bool IsValid(out string errorMessage)
         {
@@ -45,9 +48,9 @@ namespace EchoPhase.Settings
                 return false;
             }
 
-            if (ExpirationInMinutes <= 0)
+            if (LifetimeInMinutes <= 0)
             {
-                errorMessage = "ExpirationInMinutes must be greater than zero.";
+                errorMessage = "Lifetime must be greater than zero.";
                 return false;
             }
 

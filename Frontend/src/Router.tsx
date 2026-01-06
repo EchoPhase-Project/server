@@ -1,6 +1,10 @@
 import { Component, lazy } from 'solid-js';
 import { Router } from '@solidjs/router';
 import { NavProvider } from '@lib/nav';
+import { I18nProvider } from '@lib/i18n';
+import { AuthProvider } from '@lib/api';
+import { ThemeProvider } from '@lib/theme';
+import { CryptoProvider } from '@lib/crypto25519';
 
 interface RouterComponentProps {
     base?: string;
@@ -35,11 +39,19 @@ const routes = [
 ];
 
 const RouterComponent = (props: RouterComponentProps) => (
-    <NavProvider>
-        <Router base={props.base} root={props.root}>
-            {routes}
-        </Router>
-    </NavProvider>
+    <CryptoProvider>
+        <ThemeProvider>
+            <I18nProvider>
+                <NavProvider>
+                    <AuthProvider>
+                        <Router base={props.base} root={props.root}>
+                            {routes}
+                        </Router>
+                    </AuthProvider>
+                </NavProvider>
+            </I18nProvider>
+        </ThemeProvider>
+    </CryptoProvider>
 );
 
 export default RouterComponent;

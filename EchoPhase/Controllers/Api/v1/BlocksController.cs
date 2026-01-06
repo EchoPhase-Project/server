@@ -30,14 +30,10 @@ namespace EchoPhase.Controllers
         [HttpPost("run")]
         public async Task<IActionResult> RunBlocks([FromBody] RunBlocksRequest request)
         {
-            IBlockExecutionContext context = new BlockExecutionContext
-            {
-                StartIds = request.StartIds,
-                Blocks = request.Blocks
-            };
+            var context = BlocksRunner.Create(request.StartIds, request.Blocks);
 
             context = await _runner.ExecuteAsync(context);
-            return Ok(context);
+            return Ok(_projection.Project(context, ctx => ctx.Errors, ctx => ctx.Output, ctx => ctx.Variables));
         }
     }
 

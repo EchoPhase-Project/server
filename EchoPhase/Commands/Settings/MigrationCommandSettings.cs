@@ -1,6 +1,6 @@
-using Spectre.Console.Cli;
 using System.ComponentModel;
 using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace EchoPhase.Commands.Settings
 {
@@ -12,9 +12,9 @@ namespace EchoPhase.Commands.Settings
         public bool Continue { get; set; } = false;
 
         [CommandOption("--verbose|-v")]
-        [DefaultValue(true)]
+        [DefaultValue(false)]
         [Description("Show command output")]
-        public bool Verbose { get; set; } = true;
+        public bool Verbose { get; set; } = false;
 
         public override ValidationResult Validate()
         {

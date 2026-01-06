@@ -1,14 +1,16 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Redis.Models;
+using EchoPhase.DAL.Redis.Interfaces;
 using EchoPhase.Interfaces;
-using EchoPhase.Models;
-using EchoPhase.Repositories;
+using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.DAL.Postgres.Repositories;
 using Microsoft.AspNetCore.Identity;
 
 namespace EchoPhase.Services
 {
-    public class UserService : DataServiceBase<UserService, UserRepository, EchoPhase.Repositories.Options.UserOptions>, IUserService
+    public class UserService : DataServiceBase<UserRepository, EchoPhase.DAL.Postgres.Repositories.Options.UserOptions>, IUserService
     {
         private readonly PostgresContext _context;
         private readonly UserManager<User> _userManager;
@@ -30,16 +32,16 @@ namespace EchoPhase.Services
         }
 
         public IEnumerable<User> Get(
-            EchoPhase.Repositories.Options.UserSearchOptions opts,
-            Func<IQueryable<User>, EchoPhase.Repositories.Options.UserSearchOptions, IQueryable<User>>? extraFilters = null
+            EchoPhase.DAL.Postgres.Repositories.Options.UserSearchOptions opts,
+            Func<IQueryable<User>, EchoPhase.DAL.Postgres.Repositories.Options.UserSearchOptions, IQueryable<User>>? extraFilters = null
         )
         {
             return _repository.Get(opts, extraFilters);
         }
 
         public IEnumerable<User> Get(
-            Action<EchoPhase.Repositories.Options.UserSearchOptions> configure,
-            Func<IQueryable<User>, EchoPhase.Repositories.Options.UserSearchOptions, IQueryable<User>>? extraFilters = null
+            Action<EchoPhase.DAL.Postgres.Repositories.Options.UserSearchOptions> configure,
+            Func<IQueryable<User>, EchoPhase.DAL.Postgres.Repositories.Options.UserSearchOptions, IQueryable<User>>? extraFilters = null
         )
         {
             return _repository.Get(configure, extraFilters);
@@ -98,10 +100,12 @@ namespace EchoPhase.Services
 
         private string GenerateRandomCode()
         {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            var random = new Random();
-            return new string(Enumerable.Repeat(chars, 16)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
+            var bytes = new byte[12];
+            RandomNumberGenerator.Fill(bytes);
+            return Convert.ToBase64String(bytes)
+                .Replace('+', '-')
+                .Replace('/', '_')
+                .TrimEnd('=');
         }
 
         public async Task<Guid> GetIdFromCode(string code) =>

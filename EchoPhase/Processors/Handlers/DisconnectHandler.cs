@@ -1,6 +1,5 @@
 using System.Net.WebSockets;
 using EchoPhase.Attributes;
-using EchoPhase.Models;
 using EchoPhase.Processors.Enums;
 using EchoPhase.Processors.Payloads;
 using EchoPhase.Services.WebSockets;
@@ -26,11 +25,7 @@ namespace EchoPhase.Processors.Handlers
             if (userId == Guid.Empty)
                 return;
 
-            var response = new EventMessage
-            {
-                Op = OpCodes.DisconnectAck,
-                D = new DisconnectAckPayload() { }
-            };
+            var response = EventMessage.Create(OpCodes.DisconnectAck);
 
             await _webSocketService.SendMessageToConnectionAsync(webSocket, response);
             await _connectionManager.CloseConnectionAsync(userId, webSocket);

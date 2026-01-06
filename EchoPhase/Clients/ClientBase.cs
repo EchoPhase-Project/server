@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
@@ -23,6 +24,21 @@ namespace EchoPhase.Clients
             {
                 PropertyNameCaseInsensitive = true
             };
+        }
+
+        protected void Configure(Action<HttpClient> action)
+        {
+            action(_client);
+        }
+
+        protected Task ConfigureAsync(Func<HttpClient, Task> action)
+        {
+            return action(_client);
+        }
+
+        protected void WithAuth(string scheme, string token)
+        {
+            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(scheme, token);
         }
 
         protected async Task<IClientResponse<TR, TE>> SendAsync<TQ, TB, TR, TE>(

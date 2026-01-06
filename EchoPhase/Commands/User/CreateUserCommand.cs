@@ -1,9 +1,9 @@
-using Spectre.Console.Cli;
-using Spectre.Console;
 using System.Text;
 using EchoPhase.Commands.Settings;
-using EchoPhase.Interfaces;
 using EchoPhase.Extensions;
+using EchoPhase.Interfaces;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace EchoPhase.Commands
 {
