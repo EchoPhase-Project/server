@@ -1,5 +1,5 @@
-using EchoPhase.Interfaces;
 using EchoPhase.DAL.Redis.Interfaces;
+using EchoPhase.Interfaces;
 
 namespace EchoPhase.Settings
 {

@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Caching.Distributed;
 using EchoPhase.DAL.Redis.Interfaces;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace EchoPhase.DAL.Redis
 {

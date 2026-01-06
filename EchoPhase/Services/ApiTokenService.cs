@@ -1,10 +1,10 @@
 using System.Linq.Expressions;
 using EchoPhase.DAL.Postgres;
-using EchoPhase.Extensions;
-using EchoPhase.Interfaces;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Postgres.Repositories.Options;
+using EchoPhase.Extensions;
+using EchoPhase.Interfaces;
 using EchoPhase.Security;
 using EchoPhase.Services.Results;
 

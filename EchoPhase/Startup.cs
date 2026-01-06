@@ -1,24 +1,24 @@
 using System.Reflection;
+using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Extensions;
 using EchoPhase.Helpers;
 using EchoPhase.Hubs;
 using EchoPhase.Hubs.Managers;
 using EchoPhase.Interfaces;
 using EchoPhase.Middlewares;
-using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.RouteConstraints;
 using EchoPhase.Security;
 using EchoPhase.Services;
 using EchoPhase.Services.Bitmasks;
 using EchoPhase.Services.Internal;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using ParkSquare.AspNetCore.Sitemap;
 
 namespace EchoPhase
@@ -153,7 +153,7 @@ namespace EchoPhase
             //services.AddTwitchClient(Configuration.GetSection("Twitch"));
             services.AddDiscordClient(Configuration.GetSection("Discord"));
 
-			services.AddHealthChecks()
+            services.AddHealthChecks()
                 .AddCheck("self", () => HealthCheckResult.Healthy());
 
             /*

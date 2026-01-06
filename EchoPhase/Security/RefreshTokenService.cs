@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using EchoPhase.DAL.Postgres;
-using EchoPhase.Interfaces;
 using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.Interfaces;
 using EchoPhase.Security.Models;
 
 namespace EchoPhase.Security

@@ -96,7 +96,7 @@ namespace EchoPhase.Security
 
             httpContext.Response.Cookies.Append(
                 name,
-                tokens.RequestToken ?? string.Empty,
+                tokens.CookieToken ?? string.Empty,
                 new CookieOptions
                 {
                     HttpOnly = true,

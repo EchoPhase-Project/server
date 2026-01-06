@@ -1,6 +1,6 @@
 using System.Text.Json;
-using EchoPhase.Funcs;
 using EchoPhase.DAL.Redis.Interfaces;
+using EchoPhase.Funcs;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace EchoPhase.DAL.Redis

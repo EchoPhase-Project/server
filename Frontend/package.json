@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "EchoPhase frontend",
   "main": "index.js",
+  "config": {
+    "dockerImage": "echophase-frontend",
+    "dockerRegistry": "localhost:5000",
+    "dockerTag": "latest"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,9 +16,9 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "gen:lib": "tsx scripts/generate-lib-indexes.ts",
-    "docker:build": "docker build -t echophase-frontend .",
-    "docker:tag": "docker tag echophase-frontend localhost:5000/echophase-frontend:latest",
-    "docker:push": "docker push localhost:5000/echophase-frontend:latest",
+    "docker:build": "docker build -t $npm_package_config_dockerImage .",
+    "docker:tag": "docker tag $npm_package_config_dockerImage $npm_package_config_dockerRegistry/$npm_package_config_dockerImage:$npm_package_config_dockerTag",
+    "docker:push": "docker push $npm_package_config_dockerRegistry/$npm_package_config_dockerImage:$npm_package_config_dockerTag",
     "docker:publish": "npm run docker:build && npm run docker:tag && npm run docker:push"
   },
   "keywords": [],

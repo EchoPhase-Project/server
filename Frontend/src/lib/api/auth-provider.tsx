@@ -3,68 +3,96 @@ import {
     useContext,
     ParentComponent,
     createSignal,
-    createEffect,
+    createResource,
     Accessor,
 } from 'solid-js';
-import { API_CONFIG } from '@lib/api';
 import type { User, LoginCredentials, RegisterData, ErrorItem } from '@lib/api';
-import { CsrfService } from '@lib/csrf';
 
 interface AuthContextValue {
     user: Accessor<User | null>;
+    refetchUser: Promise<User | null>;
     isAuthenticated: Accessor<boolean>;
     isLoading: Accessor<boolean>;
-    login: (credentials: LoginCredentials) => Promise<{
-        success: boolean;
-        error?: ErrorItem[];
-    }>;
-    register: (data: RegisterData) => Promise<{
-        success: boolean;
-        error?: ErrorItem[];
-    }>;
+    csrfToken: Accessor<string | null>;
+    refetchCsrf: Promise<string | null>;
+    login: (
+        credentials: LoginCredentials
+    ) => Promise<{ success: boolean; error?: ErrorItem[] }>;
+    register: (
+        data: RegisterData
+    ) => Promise<{ success: boolean; error?: ErrorItem[] }>;
     logout: () => Promise<void>;
-    checkAuth: () => Promise<void>;
+    addCsrfToken: () => Record<string, string>;
+    hasCsrfToken: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue>();
+const CSRF_KEY = 'X-CSRF-TOKEN';
 
 export const AuthProvider: ParentComponent = (props) => {
-    const [user, setUser] = createSignal<User | null>(null);
+    // -------------------
+    // Signals & Resources
+    // -------------------
     const [isLoading, setIsLoading] = createSignal(false);
-    const [isInitialized, setIsInitialized] = createSignal(false);
 
-    const isAuthenticated = () => user() !== null;
+    const fetchMe = async (): Promise<User | null> => {
+        const res = await fetch(`/api/v1/auth/me`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) return null;
+        return res.json();
+    };
+    const [user, { refetch: refetchUser }] = createResource<User | null>(
+        fetchMe
+    );
 
-    createEffect(() => {
-        if (!isInitialized()) {
-            checkAuth();
-        }
-    });
+    const isAuthenticated = () => !!user();
 
-    const checkAuth = async () => {
+    const fetchCsrfToken = async (): Promise<string | null> => {
+        sessionStorage.removeItem(CSRF_KEY);
+        if (!isAuthenticated()) return null;
+
         try {
-            setIsLoading(true);
-            const res = await fetch(`/api/v1/auth/me`, {
+            const res = await fetch('/api/v1/auth/antiforgery', {
                 method: 'GET',
                 credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
             });
-
-            if (res.ok) {
-                const userData: User = await res.json();
-                setUser(userData);
-            } else {
-                setUser(null);
+            if (!res.ok) return null;
+            const token = res.headers.get(CSRF_KEY);
+            if (token) {
+                sessionStorage.setItem(CSRF_KEY, token);
+                return token;
             }
-        } catch (error) {
-            console.error('Auth check failed:', error);
-            setUser(null);
-        } finally {
-            setIsLoading(false);
-            setIsInitialized(true);
+            return null;
+        } catch {
+            return null;
         }
     };
+    const [csrfToken, { refetch: refetchCsrf }] = createResource<string | null>(
+        () => isAuthenticated(),
+        fetchCsrfToken
+    );
 
+    // -------------------
+    // CSRF Helpers
+    // -------------------
+    const addCsrfToken = (): Record<string, string> => {
+        const t = csrfToken();
+        if (!t) {
+            throw new Error(
+                'CSRF token is not available. Make sure to fetch it before making this request.'
+            );
+        }
+        return { [CSRF_KEY]: t };
+    };
+
+    const hasCsrfToken = () => csrfToken() !== null;
+
+    // -------------------
+    // Auth Methods
+    // -------------------
     const login = async (credentials: LoginCredentials) => {
         try {
             setIsLoading(true);
@@ -74,17 +102,8 @@ export const AuthProvider: ParentComponent = (props) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(credentials),
             });
-
             if (res.ok) {
-                const csrfToken = res.headers.get('X-CSRF-TOKEN');
-                if (csrfToken) {
-                    CsrfService.saveToken(csrfToken);
-                    localStorage.setItem('csrf-token', csrfToken);
-                }
-
-                const userData: User = await res.json();
-                setUser(userData);
-
+                await refetchUser();
                 return { success: true };
             } else {
                 return {
@@ -94,7 +113,7 @@ export const AuthProvider: ParentComponent = (props) => {
                     ],
                 };
             }
-        } catch (error) {
+        } catch {
             return {
                 success: false,
                 error: [
@@ -118,20 +137,13 @@ export const AuthProvider: ParentComponent = (props) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-
             if (res.ok) {
-                const userData: User = await res.json();
-                setUser(userData);
-
                 return { success: true };
             } else {
                 const result: ErrorItem[] = await res.json();
-                return {
-                    success: false,
-                    error: result,
-                };
+                return { success: false, error: result };
             }
-        } catch (error) {
+        } catch {
             return {
                 success: false,
                 error: [
@@ -152,25 +164,34 @@ export const AuthProvider: ParentComponent = (props) => {
             await fetch(`/api/v1/auth/logout`, {
                 method: 'POST',
                 credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...addCsrfToken(),
+                },
             });
-        } catch (error) {
-            console.error('Logout failed:', error);
+        } catch (err) {
+            console.error('Logout failed:', err);
         } finally {
-            setUser(null);
-            localStorage.removeItem('csrf-token');
+            await refetchUser();
             setIsLoading(false);
         }
     };
 
+    // -------------------
+    // Context Value
+    // -------------------
     const value: AuthContextValue = {
         user,
+        refetchUser,
         isAuthenticated,
         isLoading,
+        csrfToken,
+        refetchCsrf,
         login,
         register,
         logout,
-        checkAuth,
+        addCsrfToken,
+        hasCsrfToken,
     };
 
     return (
@@ -182,8 +203,6 @@ export const AuthProvider: ParentComponent = (props) => {
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within AuthProvider');
-    }
+    if (!context) throw new Error('useAuth must be used within AuthProvider');
     return context;
 };

@@ -16,7 +16,10 @@ namespace EchoPhase.Services.Models
         }
         public object Params { get; set; } = default!;
         public Func<IServiceProvider, object, CancellationToken, Task> TaskFunc { get; init; } = default!;
-        public TimeSpan? RetryDelay { get; set; }
+        public TimeSpan? RetryDelay
+        {
+            get; set;
+        }
         public TimeSpan? Interval
         {
             get; set;

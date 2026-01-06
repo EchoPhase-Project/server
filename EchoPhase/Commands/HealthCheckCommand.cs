@@ -6,7 +6,9 @@ namespace EchoPhase.Commands
 {
     public class HealthCheckCommand : AsyncCommand<HealthCheckCommandSettings>
     {
-        public HealthCheckCommand() {}
+        public HealthCheckCommand()
+        {
+        }
 
         public override async Task<int> ExecuteAsync(CommandContext context, HealthCheckCommandSettings settings)
         {

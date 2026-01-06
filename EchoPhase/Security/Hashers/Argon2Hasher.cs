@@ -1,9 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
+using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Extensions;
 using EchoPhase.Interfaces;
-using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.Security;
 using EchoPhase.Settings;
 using Isopoh.Cryptography.Argon2;
 using Isopoh.Cryptography.SecureArray;

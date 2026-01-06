@@ -1,5 +1,5 @@
-using EchoPhase.Expressions.Tokens;
 using System.Text;
+using EchoPhase.Expressions.Tokens;
 using EchoPhase.Interfaces;
 
 namespace EchoPhase.Expressions.Lexers

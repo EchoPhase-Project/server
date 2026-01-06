@@ -42,13 +42,13 @@ const RouterComponent = (props: RouterComponentProps) => (
     <CryptoProvider>
         <ThemeProvider>
             <I18nProvider>
-                <NavProvider>
-                    <AuthProvider>
+                <AuthProvider>
+                    <NavProvider>
                         <Router base={props.base} root={props.root}>
                             {routes}
                         </Router>
-                    </AuthProvider>
-                </NavProvider>
+                    </NavProvider>
+                </AuthProvider>
             </I18nProvider>
         </ThemeProvider>
     </CryptoProvider>

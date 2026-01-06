@@ -70,7 +70,7 @@ namespace EchoPhase.Extensions
                     .WithExample(new[] { "healthcheck" });
             });
 
-            return args.Count() > 0 ?  await app.RunAsync(args) : -1;
+            return args.Count() > 0 ? await app.RunAsync(args) : -1;
         }
     }
 }

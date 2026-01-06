@@ -1,4 +1,3 @@
-using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories.Options;
 using EchoPhase.Security;

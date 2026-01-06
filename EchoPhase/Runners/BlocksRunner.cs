@@ -20,7 +20,7 @@ namespace EchoPhase.Runners
             return new BlockExecutionContext
             {
                 StartIds = startIds?.ToList() ?? new List<int>(),
-                Blocks   = blocks?.ToList() ?? new List<IBlock>(),
+                Blocks = blocks?.ToList() ?? new List<IBlock>(),
             };
         }
 

@@ -25,13 +25,6 @@ namespace EchoPhase.Controllers
             _projection = projection;
         }
 
-        [HttpGet("")]
-        public async Task<IActionResult> GetCurrentUser()
-        {
-            var user = await _userService.GetAsync(User);
-            return Ok(_projection.Project(user, u => u.Id, u => u.Name, u => u.UserName));
-        }
-
         [HttpGet("{username}")]
         public IActionResult GetUser(string username)
         {

@@ -1,14 +1,13 @@
 using System.ComponentModel.DataAnnotations;
+using EchoPhase.Helpers;
 using EchoPhase.Interfaces;
 using EchoPhase.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using EchoPhase.Helpers;
 
 namespace EchoPhase.Controllers
 {
     [ApiController]
-    [AllowAnonymous]
     [Route("api/v1/[controller]")]
     public class AuthController : ControllerBase
     {
@@ -34,6 +33,7 @@ namespace EchoPhase.Controllers
         }
 
         [HttpPost("register")]
+        [AllowAnonymous]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
             var result = await _authService.CreateUserAsync(dto.Name, dto.Username, dto.Password);
@@ -41,18 +41,23 @@ namespace EchoPhase.Controllers
         }
 
         [HttpPost("login")]
+        [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
             var result = await _authService.AuthenticateAsync(dto.Username, dto.Password);
             if (!result.Succeeded)
                 return Unauthorized();
+            return Ok();
+        }
 
+        [HttpGet("antiforgery")]
+        public IActionResult Csrf()
+        {
             _antiforgeryService.Set();
             return Ok();
         }
 
         [HttpGet("me")]
-        [Authorize]
         public async Task<IActionResult> Me()
         {
             var user = await _userService.GetAsync(User);
@@ -64,7 +69,7 @@ namespace EchoPhase.Controllers
         }
 
         [HttpPost("logout")]
-        [Authorize]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
             await _authService.LogoutAsync();

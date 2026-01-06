@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using EchoPhase.DAL.Postgres;
-using EchoPhase.Interfaces;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
+using EchoPhase.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 

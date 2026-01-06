@@ -1,5 +1,5 @@
-using EchoPhase.Interfaces;
 using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.Interfaces;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 

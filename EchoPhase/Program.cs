@@ -11,7 +11,6 @@ namespace EchoPhase
 
             var result = await host.CheckArgsAsync(args);
 
-            Console.WriteLine(result);
             if (result >= 0)
                 return result;
 

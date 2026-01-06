@@ -1,9 +1,8 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
-using EchoPhase.DAL.Redis.Models;
 using EchoPhase.DAL.Redis.Interfaces;
+using EchoPhase.DAL.Redis.Models;
 using EchoPhase.Exceptions;
-using EchoPhase.Interfaces;
 using EchoPhase.Services.WebSockets.Models;
 
 namespace EchoPhase.Services.WebSockets

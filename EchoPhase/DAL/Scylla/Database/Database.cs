@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Reflection;
 using Cassandra;
+using EchoPhase.DAL.Scylla.Cql;
 using EchoPhase.DAL.Scylla.Enums;
 using EchoPhase.DAL.Scylla.Interfaces;
 using EchoPhase.DAL.Scylla.Models;
-using EchoPhase.DAL.Scylla.Cql;
 using ISession = Cassandra.ISession;
 
 namespace EchoPhase.DAL.Scylla

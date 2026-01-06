@@ -1,8 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Extensions;
 using EchoPhase.Interfaces;
-using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Services.Bitmasks;
 using EchoPhase.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;

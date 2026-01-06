@@ -1,10 +1,10 @@
 using EchoPhase.Attributes;
+using EchoPhase.Expressions;
+using EchoPhase.Expressions.Tokens;
+using EchoPhase.Extensions;
 using EchoPhase.Interfaces;
 using EchoPhase.Runners.Enums;
 using EchoPhase.Runners.Params;
-using EchoPhase.Expressions.Tokens;
-using EchoPhase.Expressions;
-using EchoPhase.Extensions;
 
 namespace EchoPhase.Runners.Handlers
 {

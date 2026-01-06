@@ -310,11 +310,11 @@ namespace EchoPhase.Expressions.Parsers
             {
                 "==" => comparisonResult == 0,
                 "!=" => comparisonResult != 0,
-                ">"  => comparisonResult > 0,
-                "<"  => comparisonResult < 0,
+                ">" => comparisonResult > 0,
+                "<" => comparisonResult < 0,
                 ">=" => comparisonResult >= 0,
                 "<=" => comparisonResult <= 0,
-                _    => throw new NotSupportedException($"Unknown operator {op}")
+                _ => throw new NotSupportedException($"Unknown operator {op}")
             };
         }
     }
