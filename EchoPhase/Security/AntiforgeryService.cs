@@ -56,54 +56,33 @@ namespace EchoPhase.Security
         /// </exception>
         public void Set(string cookieName = CsrfCookieName, string headerName = CsrfHeaderName)
         {
-            SetInCookie(cookieName);
-            SetInHeader(headerName);
-        }
-
-        /// <summary>
-        /// Generates and stores the CSRF token, then sets it in the response headers.
-        /// </summary>
-        /// <param name="name">
-        /// The name of the response header to store the CSRF token in. Defaults to <c>CsrfHeaderName</c>.
-        /// </param>
-        /// <exception cref="InvalidOperationException">
-        /// Thrown if the current <c>HttpContext</c> is <c>null</c>.
-        /// </exception>
-        public void SetInHeader(string name = CsrfHeaderName)
-        {
-            var httpContext = _httpContextAccessor.HttpContext
-                ?? throw new InvalidOperationException("HttpContext is null.");
-
-            var tokens = _antiforgery.GetAndStoreTokens(httpContext);
-            httpContext.Response.Headers[name] = tokens.RequestToken;
-        }
-
-        /// <summary>
-        /// Generates and stores the CSRF token, then appends it to the response cookies.
-        /// </summary>
-        /// <param name="name">
-        /// The name of the cookie in which to store the CSRF token. Defaults to <c>CsrfCookieName</c>.
-        /// </param>
-        /// <exception cref="InvalidOperationException">
-        /// Thrown if the current <c>HttpContext</c> is <c>null</c>.
-        /// </exception>
-        public void SetInCookie(string name = CsrfCookieName)
-        {
             var httpContext = _httpContextAccessor.HttpContext
                 ?? throw new InvalidOperationException("HttpContext is null.");
 
             var tokens = _antiforgery.GetAndStoreTokens(httpContext);
 
-            httpContext.Response.Cookies.Append(
-                name,
-                tokens.CookieToken ?? string.Empty,
-                new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = httpContext.Request.IsHttps,
-                    SameSite = SameSiteMode.Strict,
-                    Path = "/"
-                });
+            if (string.IsNullOrEmpty(tokens.RequestToken))
+            {
+                throw new InvalidOperationException("Request token is null or empty.");
+            }
+
+            httpContext.Response.Headers[headerName] = tokens.RequestToken;
+
+            if (!string.IsNullOrEmpty(tokens.CookieToken))
+            {
+                httpContext.Response.Cookies.Append(
+                    cookieName,
+                    tokens.CookieToken,
+                    new CookieOptions
+                    {
+                        HttpOnly = true,
+                        Secure = httpContext.Request.IsHttps,
+                        SameSite = SameSiteMode.Strict,
+                        Path = "/",
+                        IsEssential = true
+                    });
+            }
+            Console.WriteLine($"{tokens.RequestToken} {tokens.CookieToken}");
         }
 
         /// <summary>
@@ -160,13 +139,13 @@ namespace EchoPhase.Security
         /// </returns>
         /// <exception cref="InvalidOperationException">Thrown if <see cref="HttpContext"/> is null.</exception>
         /// <exception cref="KeyNotFoundException">Thrown if the token value is not found or provided.</exception>
-        public string Get()
+        public AntiforgeryTokenSet Get()
         {
             var httpContext = _httpContextAccessor.HttpContext
                 ?? throw new InvalidOperationException("HttpContext is null.");
 
             var tokens = _antiforgery.GetAndStoreTokens(httpContext);
-            return tokens.RequestToken
+            return tokens
                 ?? throw new KeyNotFoundException("No request token generated or found.");
         }
 

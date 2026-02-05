@@ -133,6 +133,16 @@ export class DragAndDrop {
                         const dx = i.modify_X ? moveEvent.movementX : 0;
                         const dy = i.modify_Y ? moveEvent.movementY : 0;
 
+                        /*
+						const prevPointerEvents = i.target.style.pointerEvents;
+						i.target.style.pointerEvents = "none";
+
+						const elemUnderCursor = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY) as HTMLElement | null;
+
+						i.target.style.pointerEvents = prevPointerEvents;
+						console.log(elemUnderCursor);
+						*/
+
                         // Fire continuous drag callbacks
                         i.currentTarget_f?.(moveEvent, i.currentTarget, i);
                         i.target_f?.(moveEvent, i.target, i);

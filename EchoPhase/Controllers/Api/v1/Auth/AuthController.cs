@@ -36,8 +36,15 @@ namespace EchoPhase.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
-            var result = await _authService.CreateUserAsync(dto.Name, dto.Username, dto.Password);
-            return result.Succeeded ? Ok() : BadRequest(result.Errors);
+            var registrationResult = await _authService.CreateUserAsync(dto.Name, dto.Username, dto.Password);
+            if (!registrationResult.Succeeded)
+                return BadRequest(registrationResult.Errors);
+
+            var signInResult = await _authService.AuthenticateAsync(dto.Username, dto.Password);
+            if (!signInResult.Succeeded)
+                return Unauthorized();
+
+            return Ok();
         }
 
         [HttpPost("login")]

@@ -17,7 +17,7 @@ namespace EchoPhase.Commands
             _intentsService = intentsService;
         }
 
-        public override int Execute(CommandContext context, IntentsSerializeCommandSettings settings)
+        public override int Execute(CommandContext context, IntentsSerializeCommandSettings settings, CancellationToken cancellationToken)
         {
             var encoded = _intentsService.Encode(settings.Intents);
 

@@ -1,0 +1,92 @@
+:root {
+    --cursor-z: 98;
+    --cursor-speed: 0.135s;
+    --cursor-delay: 0s;
+    --cursor-color: 225, 225, 225;
+}
+
+iframes {
+    pointer-events: none;
+}
+
+#cursor-container,
+#cursor {
+    width: 1em;
+    height: 1em;
+    pointer-events: none;
+}
+
+#cursor {
+    background-color: rgba(var(--cursor-color), 0.9);
+    border-radius: 50%;
+    transform-origin: 50% 50%;
+    transition:
+        background-color ease-in,
+        width cubic-bezier(0.35, 0.35, 1, 1),
+        height cubic-bezier(0.35, 0.35, 1, 1),
+        border ease-out,
+        opacity ease-in;
+    transition-duration: var(--cursor-speed);
+    transform: translate(-50%, -50%);
+    box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
+    z-index: calc(var(--cursor-z) + 1);
+}
+#cursor-container {
+    position: absolute;
+    width: 0;
+    height: 0;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    z-index: var(--cursor-z);
+}
+
+.cursor-hidden {
+    opacity: 0 !important;
+}
+.cursor-visible {
+    opacity: 1 !important;
+}
+.cursor-focus {
+    width: 0.75em !important;
+    height: 0.75em !important;
+}
+.cursor-interaction {
+    transition-delay: var(--cursor-delay);
+}
+.cursor-nav-item,
+.cursor-logo,
+.cursor-dropdown {
+    background-color: rgba(var(--cursor-color), 0.4) !important;
+}
+.cursor-editProfilePicture {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75em !important;
+    height: 2.75em !important;
+    overflow: hidden;
+    background-color: rgba(var(--cursor-color), 0.7) !important;
+}
+.cursor-editProfilePicture::after {
+    content: 'Edit';
+    font-size: 0.9em;
+    text-align: center;
+    color: black;
+}
+
+* {
+    cursor: none !important;
+}
+
+@media (pointer: none), (pointer: coarse) {
+    #cursor,
+    #cursor-icon {
+        display: none !important;
+        visibility: hidden;
+        opacity: 0 !important;
+    }
+    * {
+        cursor: auto !important;
+    }
+}

@@ -72,5 +72,4 @@ packages/
 *.vim
 
 # Development test dirs
-helm/
 k8s/

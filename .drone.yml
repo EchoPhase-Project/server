@@ -1,0 +1,147 @@
+---
+kind: pipeline
+type: docker
+name: echophase-build
+
+services:
+  - name: docker
+    image: docker:24-dind
+    privileged: true
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+
+volumes:
+  - name: dockersock
+    host:
+      path: /var/run/docker.sock
+
+environment:
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_VERIFY: 1
+  DOCKER_TLS_CERTDIR: /certs
+  DOCKER_DRIVER: overlay2
+  
+  FRONTEND_IMAGE_NAME: echophase-frontend
+  FRONTEND_REGISTRY: localhost:5000
+  FRONTEND_TAG: latest
+  
+  BACKEND_IMAGE_NAME: echophase
+  BACKEND_REGISTRY: localhost:5000
+  BACKEND_TAG: latest
+
+steps:
+  - name: docker-info
+    image: docker:24-dind
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - sleep 5
+      - docker info
+      - docker login -u $${DOCKER_USERNAME} -p $${DOCKER_PASSWORD} $${DOCKER_REGISTRY} || true
+    environment:
+      DOCKER_USERNAME:
+        from_secret: docker_username
+      DOCKER_PASSWORD:
+        from_secret: docker_password
+      DOCKER_REGISTRY:
+        from_secret: docker_registry
+
+  - name: build-frontend
+    image: docker:24-dind
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - cd frontend
+      - echo "Building frontend Docker image..."
+      - docker build -t $${FRONTEND_IMAGE_NAME} .
+      - echo "Tagging frontend Docker image..."
+      - docker tag $${FRONTEND_IMAGE_NAME} $${FRONTEND_REGISTRY}/$${FRONTEND_IMAGE_NAME}:$${FRONTEND_TAG}
+      - echo "Pushing frontend Docker image..."
+      - docker push $${FRONTEND_REGISTRY}/$${FRONTEND_IMAGE_NAME}:$${FRONTEND_TAG}
+    environment:
+      FRONTEND_IMAGE_NAME: echophase-frontend
+      FRONTEND_REGISTRY: localhost:5000
+      FRONTEND_TAG: latest
+    depends_on:
+      - docker-info
+
+  - name: build-backend
+    image: docker:24-dind
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - cd backend
+      - echo "Building backend Docker image..."
+      - docker build -t $${BACKEND_IMAGE_NAME} .
+      - echo "Tagging backend Docker image..."
+      - docker tag $${BACKEND_IMAGE_NAME} $${BACKEND_REGISTRY}/$${BACKEND_IMAGE_NAME}:$${BACKEND_TAG}
+      - echo "Pushing backend Docker image..."
+      - docker push $${BACKEND_REGISTRY}/$${BACKEND_IMAGE_NAME}:$${BACKEND_TAG}
+    environment:
+      BACKEND_IMAGE_NAME: echophase
+      BACKEND_REGISTRY: localhost:5000
+      BACKEND_TAG: latest
+    depends_on:
+      - docker-info
+
+  - name: deploy
+    image: docker/compose:latest
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - echo "Deploying with docker-compose..."
+      - docker-compose pull
+      - docker-compose down
+      - docker-compose up -d
+    depends_on:
+      - build-frontend
+      - build-backend
+    when:
+      branch:
+        - main
+
+trigger:
+  branch:
+    - main
+    - develop
+  event:
+    - push
+    - pull_request
+
+---
+kind: pipeline
+type: docker
+name: echophase-test
+
+steps:
+  - name: test-frontend
+    image: node:20-alpine
+    commands:
+      - cd frontend
+      - npm ci
+      - npm run lint
+      - npm run build
+
+  - name: test-backend
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    commands:
+      - cd backend
+      - dotnet restore
+      - dotnet build
+      - dotnet test
+
+trigger:
+  branch:
+    - main
+    - develop
+  event:
+    - push
+    - pull_request
+
+depends_on:
+  - echophase-build

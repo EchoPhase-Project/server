@@ -3,15 +3,18 @@ import { useI18n } from '@lib/i18n';
 import { Dropdown } from './Dropdown';
 
 export function LanguageDropdown(props: { returnUrl?: string }) {
-    const { getAvailableLocales, setLocale, currentLocale, t } = useI18n();
+    const { availableLocales, setLocale, currentLocale, t } = useI18n();
 
-    const options = createMemo(() =>
-        getAvailableLocales().map(({ code, nativeName }) => ({
+    const options = createMemo(() => {
+        const locales = availableLocales();
+        if (!locales) return [];
+
+        return locales.map(({ code, nativeName }) => ({
             value: code,
             label: code.toUpperCase(),
             ariaLabel: nativeName,
-        }))
-    );
+        }));
+    });
 
     const handleChange = (newLocale: string) => {
         setLocale(newLocale);

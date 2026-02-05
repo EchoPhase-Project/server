@@ -17,7 +17,7 @@ namespace EchoPhase.Commands
             _permissionsService = permissionsService;
         }
 
-        public override int Execute(CommandContext context, PermissionsDeserializeCommandSettings settings)
+        public override int Execute(CommandContext context, PermissionsDeserializeCommandSettings settings, CancellationToken cancellationToken)
         {
             var deserialized = PermissionsBitMaskService.Deserialize(settings.Permissions);
 

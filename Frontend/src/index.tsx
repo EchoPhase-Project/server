@@ -1,12 +1,13 @@
 import { render } from 'solid-js/web';
+import Root from './Root';
 import Layout from './Layout';
 import RouterComponent from './Router';
 
-async function bootstrap() {
-    render(
-        () => <RouterComponent root={Layout} />,
-        document.getElementById('root') as HTMLElement
-    );
-}
-
-bootstrap();
+render(
+    () => (
+        <Root>
+            <RouterComponent root={Layout} />
+        </Root>
+    ),
+    document.getElementById('root') as HTMLElement
+);

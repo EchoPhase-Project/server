@@ -19,7 +19,7 @@ namespace EchoPhase.Commands
             _userService = userService;
         }
 
-        public override async Task<int> ExecuteAsync(CommandContext context, RolesCommandSettings settings)
+        public override async Task<int> ExecuteAsync(CommandContext context, RolesCommandSettings settings, CancellationToken cancellationToken)
         {
             var users = _userService.Get(opts =>
             {

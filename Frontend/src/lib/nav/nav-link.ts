@@ -1,8 +1,12 @@
-import { Component } from 'solid-js';
+import { Component, JSX } from 'solid-js';
 
 export interface NavLink {
-    routeName: string;
     icon: Component;
     text: string;
-    i18n: string;
+    events?: Partial<
+        Record<
+            keyof JSX.EventHandlerUnion<HTMLButtonElement, Event>,
+            JSX.EventHandlerUnion<HTMLButtonElement, Event>
+        >
+    >;
 }

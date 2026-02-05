@@ -1,6 +1,11 @@
 @mixin prefix($property, $value, $prefixes...) {
   @each $prefix in $prefixes {
-    #{if($prefix == "std", "", "-" + $prefix + "-") + $property}: #{$value};
+    $prefix-str: '';
+    @if $prefix != 'std' {
+      $prefix-str: '-' + $prefix + '-';
+    }
+
+    #{$prefix-str + $property}: #{$value};
   }
   #{$property}: #{$value};
 }

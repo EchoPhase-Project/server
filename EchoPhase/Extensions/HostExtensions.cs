@@ -68,6 +68,10 @@ namespace EchoPhase.Extensions
                 config.AddCommand<HealthCheckCommand>("healthcheck")
                     .WithDescription("Healthcheck")
                     .WithExample(new[] { "healthcheck" });
+#if DEBUG
+    config.PropagateExceptions();
+    config.ValidateExamples();
+#endif
             });
 
             return args.Count() > 0 ? await app.RunAsync(args) : -1;

@@ -3,7 +3,6 @@ import type { ParentProps } from 'solid-js';
 import { useNav, NavBuilder } from '@lib/nav';
 import { Header } from '@/components/Header';
 import '@styles/global.scss';
-import '@styles/navbar.scss';
 
 const Layout: Component<ParentProps> = (props) => {
     const { navLinks } = useNav();

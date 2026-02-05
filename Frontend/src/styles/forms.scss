@@ -44,11 +44,16 @@
 
   @each $prefix in $prefixes {
     @each $key in $iterator {
-      input::#{if($prefix == 'std', '', '-' + $prefix + '-')}#{$key} {
+      $prefix-str: '';
+      @if $prefix != 'std' {
+        $prefix-str: '-' + $prefix + '-';
+      }
+
+      input::#{$prefix-str}#{$key} {
         @extend %placeholder !optional;
       }
 
-      input:focus::#{if($prefix == 'std', '', '-' + $prefix + '-')}#{$key} {
+      input:focus::#{$prefix-str}#{$key} {
         @extend %input !optional;
       }
     }

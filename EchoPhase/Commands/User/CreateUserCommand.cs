@@ -18,7 +18,7 @@ namespace EchoPhase.Commands
             _authService = authService;
         }
 
-        public override async Task<int> ExecuteAsync(CommandContext context, CreateUserCommandSettings settings)
+        public override async Task<int> ExecuteAsync(CommandContext context, CreateUserCommandSettings settings, CancellationToken cancellationToken)
         {
             var password = settings.Password;
             if (password.TryFromBase64String(out var bytes))

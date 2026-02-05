@@ -1,15 +1,21 @@
+import { onMount } from 'solid-js';
+import { useRootMeta } from '@lib/root';
 import { IoBeerOutline } from 'solid-icons/io';
-import Head from './Head';
 
-const About = () => (
-    <div>
-        <Head
-            title="About Us - SolidJS"
-            description="Learn more about our SolidJS app"
-        />
-        <h1>About Page</h1>
-        <IoBeerOutline style={{ 'font-size': '48px', color: 'orange' }} />
-    </div>
-);
+const About = () => {
+    const { setTitle, setDescription } = useRootMeta();
+
+    onMount(() => {
+        setTitle('About · EchoPhase');
+        setDescription('Learn more about EchoPhase and its architecture');
+    });
+
+    return (
+        <div>
+            <h1>About Page</h1>
+            <IoBeerOutline style={{ 'font-size': '48px', color: 'orange' }} />
+        </div>
+    );
+};
 
 export default About;

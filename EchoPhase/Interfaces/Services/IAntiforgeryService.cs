@@ -1,21 +1,10 @@
 using EchoPhase.Security;
+using Microsoft.AspNetCore.Antiforgery;
 
 namespace EchoPhase.Interfaces
 {
     public interface IAntiforgeryService
     {
-        /// <summary>
-        /// Generates and stores the CSRF token, then sets it in the response cookie.
-        /// </summary>
-        /// <param name="name">The name of the cookie to store the CSRF token. Optional.</param>
-        void SetInCookie(string name = AntiforgeryService.CsrfCookieName);
-
-        /// <summary>
-        /// Generates and stores the CSRF token, then sets it in the response headers.
-        /// </summary>
-        /// <param name="name">The name of the header to store the CSRF token. Optional.</param>
-        void SetInHeader(string name = AntiforgeryService.CsrfHeaderName);
-
         /// <summary>
         /// Generates and stores the CSRF token, then sets it both in cookie and header.
         /// </summary>
@@ -27,7 +16,7 @@ namespace EchoPhase.Interfaces
         /// Retrieves the current CSRF token from the request context.
         /// </summary>
         /// <returns>The CSRF token string or null if unavailable.</returns>
-        string Get();
+        AntiforgeryTokenSet Get();
 
         /// <summary>
         /// Retrieves the CSRF token value from the specified request cookie.

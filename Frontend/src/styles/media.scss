@@ -4,12 +4,16 @@
   $query: '';
 
   @each $arg in $args {
-    $op: if($query != '', ' and ', '');
-    $wrapped: if(
-      string.index($arg, ':') and not string.index($arg, '('),
-      '(' + $arg + ')',
-      $arg
-    );
+    $op: '';
+    @if $query != '' {
+      $op: ' and ';
+    }
+
+    $wrapped: $arg;
+    @if string.index($arg, ':') and not string.index($arg, '(') {
+      $wrapped: '(' + $arg + ')';
+    }
+
     $query: $query + $op + $wrapped;
   }
 
