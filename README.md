@@ -70,7 +70,7 @@ $ docker run registry:2
 
 **Launching default Helm:**
 ```
-helm upgrade --install echophase helm --namespace echophase --create-namespace
+helm install echophase helm --namespace echophase --create-namespace
 ```
 
 **Launching default Docker Compose:**
