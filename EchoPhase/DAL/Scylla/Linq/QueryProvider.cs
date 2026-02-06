@@ -14,13 +14,20 @@ namespace EchoPhase.DAL.Scylla
             _context = dbContext;
         }
 
-        public IQueryable CreateQuery(Expression expression) =>
-            (IQueryable)Activator.CreateInstance(
-                typeof(DbSet<>).MakeGenericType(expression.Type.GetGenericArguments()[0]),
+        IQueryable IQueryProvider.CreateQuery(Expression expression)
+        {
+            var elementType = expression.Type.GetGenericArguments()[0];
+            return (IQueryable)Activator.CreateInstance(
+                typeof(DbSet<>).MakeGenericType(elementType),
                 this, expression)!;
+        }
 
-        public IQueryable<TElement> CreateQuery<TElement>(Expression expression) =>
-            new DbSet<TElement>(this, expression);
+        IQueryable<TElement> IQueryProvider.CreateQuery<TElement>(Expression expression)
+        {
+            return (IQueryable<TElement>)Activator.CreateInstance(
+                typeof(DbSet<>).MakeGenericType(typeof(TElement)),
+                this, expression)!;
+        }
 
         public object? Execute(Expression expression) => Execute<object>(expression);
 

@@ -1,69 +1,208 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using EchoPhase.DAL.Scylla.Interfaces;
 
 namespace EchoPhase.DAL.Scylla
 {
-    public class EntityBuilder<TEntity> : IEntityBuilder<TEntity>
+    public class EntityBuilder<TEntity> : IEntityBuilder<TEntity> where TEntity : class
     {
         private readonly Dictionary<string, string> _columnMappings = new();
-        private readonly List<string> _primaryKeys = new();
+        private readonly Dictionary<string, Type> _columnTypes = new();
+        private readonly List<string> _partitionKeys = new();
+        private readonly List<string> _clusteringKeys = new();
+        private readonly HashSet<string> _ignoredProperties = new();
 
-        public string? TableName
-        {
-            get; private set;
-        }
+        private string? _tableName;
+        private string? _keyspace;
 
-        public IEntityBuilder<TEntity> ToTable(string name)
+        #region Table Configuration
+
+        public string? TableName => _tableName;
+        public string? Keyspace => _keyspace;
+
+        public IEntityBuilder<TEntity> ToTable(string name, string? keyspace = null)
         {
-            TableName = name;
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Table name cannot be null or empty", nameof(name));
+
+            _tableName = name;
+            _keyspace = keyspace;
             return this;
         }
 
-        public PropertyBuilder<TEntity, TProp> Property<TProp>(Expression<Func<TEntity, TProp>> prop)
+        public string GetTableName() => _tableName ?? typeof(TEntity).Name.ToLowerInvariant();
+
+        public string GetFullTableName() =>
+            string.IsNullOrEmpty(_keyspace)
+                ? GetTableName()
+                : $"{_keyspace}.{GetTableName()}";
+
+        #endregion
+
+        #region Property Configuration
+
+        public PropertyBuilder<TEntity, TProp> Property<TProp>(Expression<Func<TEntity, TProp>> propertyExpression)
         {
-            var name = GetPropertyName(prop);
-            return new PropertyBuilder<TEntity, TProp>(this, name);
+            var propertyName = GetPropertyName(propertyExpression);
+            return new PropertyBuilder<TEntity, TProp>(this, propertyName);
         }
 
-        public IEntityBuilder<TEntity> HasKey<T>(Expression<Func<TEntity, T>> prop)
+        public IEntityBuilder<TEntity> Ignore<TProp>(Expression<Func<TEntity, TProp>> propertyExpression)
         {
-            if (prop.Body is MemberExpression member)
-            {
-                _primaryKeys.Add(member.Member.Name);
-            }
-            else if (prop.Body is UnaryExpression unary && unary.Operand is MemberExpression member2)
-            {
-                _primaryKeys.Add(member2.Member.Name);
-            }
-            else if (prop.Body is NewExpression newExpr)
-            {
-                foreach (var arg in newExpr.Members!)
-                    _primaryKeys.Add(arg.Name);
-            }
-            else
-            {
-                throw new ArgumentException("Expression must be a property access or anonymous object", nameof(prop));
-            }
-
+            var propertyName = GetPropertyName(propertyExpression);
+            _ignoredProperties.Add(propertyName);
             return this;
         }
+
+        public bool IsIgnored(string propertyName) => _ignoredProperties.Contains(propertyName);
 
         internal void SetColumnName(string propertyName, string columnName)
         {
+            if (string.IsNullOrWhiteSpace(columnName))
+                throw new ArgumentException("Column name cannot be null or empty", nameof(columnName));
+
             _columnMappings[propertyName] = columnName;
         }
 
-        private string GetPropertyName<TProp>(Expression<Func<TEntity, TProp>> prop)
+        internal void SetColumnType(string propertyName, Type type)
         {
-            if (prop.Body is MemberExpression member) return member.Member.Name;
-            if (prop.Body is UnaryExpression unary && unary.Operand is MemberExpression member2) return member2.Member.Name;
-            throw new ArgumentException("Expression must be a property access", nameof(prop));
+            _columnTypes[propertyName] = type;
         }
 
-        public string GetTableName() => TableName ?? typeof(TEntity).Name;
+        public string GetColumn(string propertyName)
+        {
+            if (_ignoredProperties.Contains(propertyName))
+                throw new InvalidOperationException($"Property {propertyName} is ignored");
 
-        public string GetColumn(string propertyName) => _columnMappings.TryGetValue(propertyName, out var col) ? col : propertyName;
+            return _columnMappings.TryGetValue(propertyName, out var columnName)
+                ? columnName
+                : propertyName.ToLowerInvariant();
+        }
 
-        public IReadOnlyList<string> GetPrimaryKey() => _primaryKeys.AsReadOnly();
+        public Type? GetColumnType(string propertyName) =>
+            _columnTypes.TryGetValue(propertyName, out var type) ? type : null;
+
+        #endregion
+
+        #region Primary Key Configuration
+
+        public IEntityBuilder<TEntity> HasKey<TKey>(Expression<Func<TEntity, TKey>> keyExpression)
+        {
+            var propertyNames = ExtractPropertyNames(keyExpression);
+
+            _partitionKeys.Clear();
+            _clusteringKeys.Clear();
+            _partitionKeys.AddRange(propertyNames);
+
+            return this;
+        }
+
+        public IEntityBuilder<TEntity> HasPartitionKey<TKey>(params Expression<Func<TEntity, object>>[] keyExpressions)
+        {
+            _partitionKeys.Clear();
+
+            foreach (var expr in keyExpressions)
+            {
+                var propertyNames = ExtractPropertyNames(expr);
+                _partitionKeys.AddRange(propertyNames);
+            }
+
+            return this;
+        }
+
+        public IEntityBuilder<TEntity> HasClusteringKey<TKey>(params Expression<Func<TEntity, object>>[] keyExpressions)
+        {
+            _clusteringKeys.Clear();
+
+            foreach (var expr in keyExpressions)
+            {
+                var propertyNames = ExtractPropertyNames(expr);
+                _clusteringKeys.AddRange(propertyNames);
+            }
+
+            return this;
+        }
+
+        public IReadOnlyList<string> GetPrimaryKey() =>
+            _partitionKeys.Concat(_clusteringKeys).ToList().AsReadOnly();
+
+        public IReadOnlyList<string> GetPartitionKey() => _partitionKeys.AsReadOnly();
+
+        public IReadOnlyList<string> GetClusteringKey() => _clusteringKeys.AsReadOnly();
+
+        #endregion
+
+        #region Property Metadata
+
+        public IReadOnlyDictionary<string, string> GetAllColumnMappings() =>
+            _columnMappings.AsReadOnly();
+
+        public IEnumerable<string> GetMappedProperties() =>
+            typeof(TEntity)
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(p => p.CanRead && p.CanWrite && !_ignoredProperties.Contains(p.Name))
+                .Select(p => p.Name);
+
+        #endregion
+
+        #region Validation
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(_tableName))
+                _tableName = typeof(TEntity).Name.ToLowerInvariant();
+
+            if (!_partitionKeys.Any())
+                throw new InvalidOperationException(
+                    $"Entity {typeof(TEntity).Name} must have at least one partition key defined");
+
+            var properties = typeof(TEntity)
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Select(p => p.Name)
+                .ToHashSet();
+
+            foreach (var key in _partitionKeys.Concat(_clusteringKeys))
+            {
+                if (!properties.Contains(key))
+                    throw new InvalidOperationException(
+                        $"Key property '{key}' not found in entity {typeof(TEntity).Name}");
+            }
+        }
+
+        #endregion
+
+        #region Helper Methods
+
+        private static string GetPropertyName<TProp>(Expression<Func<TEntity, TProp>> propertyExpression)
+        {
+            return propertyExpression.Body switch
+            {
+                MemberExpression member => member.Member.Name,
+                UnaryExpression { Operand: MemberExpression member } => member.Member.Name,
+                _ => throw new ArgumentException(
+                    "Expression must be a property access (e.g., x => x.Property)",
+                    nameof(propertyExpression))
+            };
+        }
+
+        private static List<string> ExtractPropertyNames<TKey>(Expression<Func<TEntity, TKey>> keyExpression)
+        {
+            return keyExpression.Body switch
+            {
+                MemberExpression member => new List<string> { member.Member.Name },
+
+                UnaryExpression { Operand: MemberExpression member } =>
+                    new List<string> { member.Member.Name },
+
+                NewExpression newExpr when newExpr.Members != null =>
+                    newExpr.Members.Select(m => m.Name).ToList(),
+
+                _ => throw new ArgumentException(
+                    "Expression must be a property access or anonymous object (e.g., x => x.Id or x => new { x.Id, x.TenantId })",
+                    nameof(keyExpression))
+            };
+        }
+
+        #endregion
     }
 }

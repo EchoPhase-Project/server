@@ -1,8 +1,8 @@
-using System.Diagnostics;
 using System.Reflection;
 using Cassandra;
-using EchoPhase.DAL.Scylla.Cql;
+using EchoPhase.DAL.Scylla.Loggers;
 using EchoPhase.DAL.Scylla.Enums;
+using EchoPhase.DAL.Scylla.Cql;
 using EchoPhase.DAL.Scylla.Interfaces;
 using EchoPhase.DAL.Scylla.Models;
 using ISession = Cassandra.ISession;
@@ -11,24 +11,21 @@ namespace EchoPhase.DAL.Scylla
 {
     public class Database : IDisposable
     {
-        private readonly Dictionary<string, PreparedStatement> _preparedCache = new();
         private readonly Dictionary<Guid, TrackedEntity> _changeTracker = new();
         private readonly Stack<List<TrackedEntity>> _transactionStack = new();
         private readonly IScyllaSettings _settings;
         private readonly Dictionary<Type, IEntityBuilder> _builderCache = new();
         private readonly List<IMigration> _migrations = new();
         private readonly Stack<Transaction> _activeTransactions = new();
+        private readonly QueryExecutor _queryExecutor;
+        private readonly IQueryLogger _queryLogger;
+        private readonly ICqlGenerator _cqlGenerator;
+        private ISaveStrategy _saveStrategy;
 
-        public ISession Session
-        {
-            get;
-        }
-        public ModelBuilder ModelBuilder
-        {
-            get;
-        }
+        public ISession Session { get; }
+        public ModelBuilder ModelBuilder { get; }
 
-        public Database(IScyllaSettings settings)
+        public Database(IScyllaSettings settings, IQueryLogger? logger = null)
         {
             _settings = settings;
             ModelBuilder = new ModelBuilder();
@@ -48,13 +45,18 @@ namespace EchoPhase.DAL.Scylla
             catch (InvalidQueryException ex) when (ex.Message.Contains($"Keyspace '{_settings.Keyspace}' does not exist"))
             {
                 Session = cluster.Connect();
-                ExecuteQuery($@"
-                    CREATE KEYSPACE IF NOT EXISTS {_settings.Keyspace}
-                    WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}};
-                ");
 
+                var migration = new MigrationBuilder();
+                migration.CreateKeyspace(_settings.Keyspace, replicationFactor: 1);
+
+                Session.Execute(migration.GetCommands().First());
                 Session = cluster.Connect(_settings.Keyspace);
             }
+
+            _cqlGenerator = new CqlGenerator();
+            _queryExecutor = new QueryExecutor(Session, _queryLogger);
+            _saveStrategy = new DirectSaveStrategy(_cqlGenerator, _queryExecutor, GetBuilder);
+            _queryLogger = logger ?? new ConsoleQueryLogger();
 
             EnsureMigrationsTable();
             LoadMigrationsFromAssembly(Assembly.GetExecutingAssembly());
@@ -121,228 +123,106 @@ namespace EchoPhase.DAL.Scylla
 
         #region Transactions & SaveChanges
 
-        public void PushActiveTransaction(Transaction tx) => _activeTransactions.Push(tx);
+        internal Transaction? CurrentTransaction =>
+            _activeTransactions.Count > 0 ? _activeTransactions.Peek() : null;
+
+        public void PushActiveTransaction(Transaction tx)
+        {
+            _activeTransactions.Push(tx);
+            UpdateSaveStrategy();
+        }
+
         public void PopActiveTransaction()
         {
-            if (_activeTransactions.Any())
+            if (_activeTransactions.Count > 0)
                 _activeTransactions.Pop();
+            UpdateSaveStrategy();
         }
 
-        internal Transaction? CurrentTransaction => _activeTransactions.Any() ? _activeTransactions.Peek() : null;
-
-        public Transaction BeginTransaction() => new Transaction(this);
-
-        private (string cql, object[] parameters) GenerateInsertCql(object entity, IEntityBuilder builder)
+        private void UpdateSaveStrategy()
         {
-            var type = entity.GetType();
-            var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanRead).ToList();
-
-            var columns = props.Select(p => builder.GetColumn(p.Name)).ToList();
-            var placeholders = Enumerable.Repeat("?", columns.Count).ToList();
-            var values = props.Select(p => p.GetValue(entity) ?? DBNull.Value).ToArray();
-
-            var cql = $"INSERT INTO {builder.GetTableName()} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", placeholders)})";
-            return (cql, values);
+            _saveStrategy = CurrentTransaction != null
+                ? new TransactionSaveStrategy(_cqlGenerator, GetBuilder)
+                : new DirectSaveStrategy(_cqlGenerator, _queryExecutor, GetBuilder);
         }
 
-        private (string cql, object[] parameters) GenerateUpdateCql(object entity, IEntityBuilder builder)
-        {
-            var pkNames = builder.GetPrimaryKey();
-            if (pkNames == null || !pkNames.Any())
-                throw new InvalidOperationException($"Primary key not defined for {entity.GetType().Name}");
-
-            var type = entity.GetType();
-            var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                            .Where(p => p.CanRead && !pkNames.Contains(p.Name))
-                            .ToList();
-
-            var setClauses = props.Select(p => $"{builder.GetColumn(p.Name)} = ?").ToList();
-            var values = props.Select(p => p.GetValue(entity) ?? DBNull.Value).ToList();
-
-            foreach (var pk in pkNames)
-            {
-                var pkProp = type.GetProperty(pk, BindingFlags.Public | BindingFlags.Instance)
-                             ?? throw new InvalidOperationException($"Primary key property {pk} not found");
-                values.Add(pkProp.GetValue(entity) ?? DBNull.Value);
-            }
-
-            var whereClause = string.Join(" AND ", pkNames.Select(pk => $"{builder.GetColumn(pk)} = ?"));
-
-            var cql = $"UPDATE {builder.GetTableName()} SET {string.Join(", ", setClauses)} WHERE {whereClause}";
-            return (cql, values.ToArray());
-        }
-
-        private (string cql, object[] parameters) GenerateDeleteCql(object entity, IEntityBuilder builder)
-        {
-            var pkNames = builder.GetPrimaryKey();
-            if (pkNames == null || !pkNames.Any())
-                throw new InvalidOperationException($"Primary key not defined for {entity.GetType().Name}");
-
-            var type = entity.GetType();
-            var values = new List<object>();
-
-            foreach (var pk in pkNames)
-            {
-                var pkProp = type.GetProperty(pk, BindingFlags.Public | BindingFlags.Instance)
-                             ?? throw new InvalidOperationException($"Primary key property {pk} not found");
-                values.Add(pkProp.GetValue(entity) ?? DBNull.Value);
-            }
-
-            var whereClause = string.Join(" AND ", pkNames.Select(pk => $"{builder.GetColumn(pk)} = ?"));
-            var cql = $"DELETE FROM {builder.GetTableName()} WHERE {whereClause}";
-            return (cql, values.ToArray());
-        }
+        public Transaction BeginTransaction(BatchType batchType = BatchType.Logged)
+            => new Transaction(this, batchType);
 
         public int SaveChanges()
         {
-            var actions = _changeTracker.Values.Where(t => t.State != EntityState.Unchanged).ToList();
-            if (!actions.Any()) return 0;
+            var changedEntities = GetChangedEntities();
+            if (!changedEntities.Any()) return 0;
 
-            foreach (var tracked in actions)
-            {
-                var builder = GetBuilder(tracked.EntityType);
+            var count = _saveStrategy.Execute(changedEntities, CurrentTransaction);
 
-                (string? cql, object[] parameters) = tracked.State switch
-                {
-                    EntityState.Added => GenerateInsertCql(tracked.Entity, builder),
-                    EntityState.Modified => GenerateUpdateCql(tracked.Entity, builder),
-                    EntityState.Deleted => GenerateDeleteCql(tracked.Entity, builder),
-                    _ => (null, Array.Empty<object>())
-                };
-
-                if (cql == null) continue;
-
-                var bound = GetBoundStatement(cql, parameters);
-
-                if (CurrentTransaction != null)
-                    CurrentTransaction.AddToBatch(bound);
-                else
-                    Session.Execute(bound);
-            }
-
-            foreach (var tracked in actions)
-                tracked.State = EntityState.Unchanged;
-
+            MarkEntitiesAsUnchanged(changedEntities);
             _changeTracker.Clear();
-            return 1;
+
+            return count;
         }
 
         public async Task<int> SaveChangesAsync()
         {
-            var actions = _changeTracker.Values.Where(t => t.State != EntityState.Unchanged).ToList();
-            if (!actions.Any()) return 0;
+            var changedEntities = GetChangedEntities();
+            if (!changedEntities.Any()) return 0;
 
-            foreach (var tracked in actions)
-            {
-                var builder = GetBuilder(tracked.EntityType);
+            var count = await _saveStrategy.ExecuteAsync(changedEntities, CurrentTransaction);
 
-                (string? cql, object[] parameters) = tracked.State switch
-                {
-                    EntityState.Added => GenerateInsertCql(tracked.Entity, builder),
-                    EntityState.Modified => GenerateUpdateCql(tracked.Entity, builder),
-                    EntityState.Deleted => GenerateDeleteCql(tracked.Entity, builder),
-                    _ => (null, Array.Empty<object>())
-                };
-
-                if (cql == null) continue;
-
-                var bound = await GetBoundStatementAsync(cql, parameters);
-
-                if (CurrentTransaction != null)
-                    CurrentTransaction.AddToBatch(bound);
-                else
-                    await Session.ExecuteAsync(bound);
-            }
-
-            foreach (var tracked in actions)
-                tracked.State = EntityState.Unchanged;
-
+            MarkEntitiesAsUnchanged(changedEntities);
             _changeTracker.Clear();
-            return 1;
+
+            return count;
         }
 
-        private BoundStatement GetBoundStatement(string cql, params object[] parameters)
-        {
-            if (!_preparedCache.TryGetValue(cql, out var prepared))
-            {
-                prepared = Session.Prepare(cql);
-                _preparedCache[cql] = prepared;
-            }
-            return prepared.Bind(parameters);
-        }
+        private List<TrackedEntity> GetChangedEntities() =>
+            _changeTracker.Values
+                .Where(t => t.State != EntityState.Unchanged)
+                .ToList();
 
-        private async Task<BoundStatement> GetBoundStatementAsync(string cql, params object[] parameters)
+        private static void MarkEntitiesAsUnchanged(IEnumerable<TrackedEntity> entities)
         {
-            if (!_preparedCache.TryGetValue(cql, out var prepared))
-            {
-                prepared = await Session.PrepareAsync(cql);
-                _preparedCache[cql] = prepared;
-            }
-            return prepared.Bind(parameters);
+            foreach (var entity in entities)
+                entity.State = EntityState.Unchanged;
         }
 
         #endregion
 
         #region Queries
 
-        public IEnumerable<TResult> ExecuteQuery<TResult>(string cql, Func<Row, TResult>? projector = null)
-        {
-            var stopwatch = Stopwatch.StartNew();
-
-            LogQuery(cql, typeof(TResult), Array.Empty<object>());
-
-            var rs = Session.Execute(cql);
-            stopwatch.Stop();
-
-            LogQueryTiming(stopwatch.ElapsedMilliseconds);
-
-            if (projector != null) return rs.Select(projector);
-            if (typeof(TResult) == typeof(Row)) return rs.Cast<TResult>();
-            throw new InvalidOperationException("No projector provided for non-Row type");
-        }
-
-        public async Task<IEnumerable<TResult>> ExecuteQueryAsync<TResult>(
+        public IEnumerable<TResult> ExecuteQuery<TResult>(
             string cql,
-            Func<Row, TResult>? projector,
-            params object[] parameters
-        )
+            Func<Row, TResult>? projector = null,
+            params object[] parameters)
         {
-            var stopwatch = Stopwatch.StartNew();
-
-            LogQuery(cql, typeof(TResult), parameters);
-
-            var stmt = await GetBoundStatementAsync(cql, parameters);
-            var rs = await Session.ExecuteAsync(stmt);
-            stopwatch.Stop();
-
-            LogQueryTiming(stopwatch.ElapsedMilliseconds);
-
-            if (projector != null) return rs.Select(projector).ToList();
-            if (typeof(TResult) == typeof(Row)) return rs.Cast<TResult>().ToList();
-            throw new InvalidOperationException("No projector provided for non-Row type");
+            return _queryExecutor.Execute(cql, projector, parameters);
         }
 
-        public IEnumerable<Row> ExecuteQuery(string cql) => ExecuteQuery<Row>(cql, null);
-
-        public Task<IEnumerable<Row>> ExecuteQueryAsync(string cql) => ExecuteQueryAsync<Row>(cql, null);
-
-        private void LogQuery(string cql, Type resultType, object[] parameters)
+        public Task<IEnumerable<TResult>> ExecuteQueryAsync<TResult>(
+            string cql,
+            Func<Row, TResult>? projector = null,
+            params object[] parameters)
         {
-            var method = MethodBase.GetCurrentMethod();
-            var ns = method?.DeclaringType?.Namespace;
-            var className = method?.DeclaringType?.Name;
-            var methodName = method?.Name;
-
-            var fullName = $"{ns}.{className}.{methodName}";
-            Console.WriteLine($"info: {fullName}[{DateTime.Now:HHmmss}]");
-            Console.WriteLine($"      Executing query (returning {resultType.Name})");
-            Console.WriteLine($"{CqlFormatter.FormatCql(cql)}");
+            return _queryExecutor.ExecuteAsync(cql, projector, parameters);
         }
 
-        private void LogQueryTiming(long elapsedMs)
-        {
-            Debug.WriteLine($"      Executed in {elapsedMs}ms\n");
-        }
+        public IEnumerable<Row> ExecuteQuery(string cql, params object[] parameters)
+            => _queryExecutor.Execute(cql, parameters);
+
+        public Task<IEnumerable<Row>> ExecuteQueryAsync(string cql, params object[] parameters)
+            => _queryExecutor.ExecuteAsync(cql, parameters);
+
+        public TResult? ExecuteScalar<TResult>(string cql, params object[] parameters)
+            => _queryExecutor.ExecuteScalar<TResult>(cql, parameters);
+
+        public Task<TResult?> ExecuteScalarAsync<TResult>(string cql, params object[] parameters)
+            => _queryExecutor.ExecuteScalarAsync<TResult>(cql, parameters);
+
+        public void ExecuteNonQuery(string cql, params object[] parameters)
+            => _queryExecutor.ExecuteNonQuery(cql, parameters);
+
+        public Task ExecuteNonQueryAsync(string cql, params object[] parameters)
+            => _queryExecutor.ExecuteNonQueryAsync(cql, parameters);
 
         #endregion
 
@@ -350,12 +230,17 @@ namespace EchoPhase.DAL.Scylla
 
         private void EnsureMigrationsTable()
         {
-            var cql = @"
-                CREATE TABLE IF NOT EXISTS schema_migrations (
-                    migration_id text PRIMARY KEY,
-                    applied_at timestamp
-                );";
-            ExecuteQuery(cql);
+            var migration = new MigrationBuilder();
+
+            migration.CreateTable(table => table
+                .WithKeyspace(_settings.Keyspace)
+                .Text("migration_id", nullable: false)
+                .Timestamp("applied_at")
+                .PrimaryKey("migration_id"),
+                ifNotExists: true
+            );
+
+            ExecuteQuery(migration.GetCommands().First());
         }
 
         private void LoadMigrationsFromAssembly(Assembly assembly)
@@ -374,39 +259,62 @@ namespace EchoPhase.DAL.Scylla
 
         public async Task<IEnumerable<IMigration>> GetPendingMigrationsAsync()
         {
-            var rs = await ExecuteQueryAsync("SELECT migration_id FROM schema_migrations;");
-            var applied = rs.Select(r => r.GetValue<string>("migration_id")).ToHashSet();
-            return _migrations.Where(m => !applied.Contains(m.Id));
+            var applied = await ExecuteQueryAsync(
+                "SELECT migration_id FROM schema_migrations",
+                row => row.GetValue<string>("migration_id")
+            );
+
+            var appliedSet = applied.ToHashSet();
+            return _migrations.Where(m => !appliedSet.Contains(m.Id));
         }
 
         public async Task MigrateAsync()
         {
             var pendingMigrations = (await GetPendingMigrationsAsync()).ToList();
-            if (!pendingMigrations.Any())
-            {
-                return;
-            }
 
             foreach (var migration in pendingMigrations)
             {
                 try
                 {
                     await migration.Up(this);
+
                     var valid = await migration.Validate(this);
                     if (!valid)
                         throw new InvalidOperationException($"Validation failed for migration {migration.Id}");
 
-                    await ExecuteQueryAsync(
+                    await ExecuteNonQueryAsync(
                         "INSERT INTO schema_migrations (migration_id, applied_at) VALUES (?, ?)",
-                        row => row,
-                        migration.Id, DateTime.UtcNow
+                        migration.Id,
+                        DateTime.UtcNow
                     );
                 }
-                catch
+                catch (Exception)
                 {
-                    try { await migration.Down(this); } catch { }
+                    await migration.Down(this);
                     throw;
                 }
+            }
+        }
+
+        public void ApplyMigration(Action<MigrationBuilder> buildAction)
+        {
+            var migration = new MigrationBuilder();
+            buildAction(migration);
+
+            foreach (var command in migration.GetCommands())
+            {
+                ExecuteNonQuery(command);
+            }
+        }
+
+        public async Task ApplyMigrationAsync(Action<MigrationBuilder> buildAction)
+        {
+            var migration = new MigrationBuilder();
+            buildAction(migration);
+
+            foreach (var command in migration.GetCommands())
+            {
+                await ExecuteNonQueryAsync(command);
             }
         }
 
@@ -416,7 +324,8 @@ namespace EchoPhase.DAL.Scylla
         {
             _changeTracker.Clear();
             _transactionStack.Clear();
-            _preparedCache.Clear();
+            _queryExecutor.ClearPreparedStatements();
+            Session?.Dispose();
         }
     }
 }

@@ -33,8 +33,17 @@ namespace EchoPhase.Expressions.Parsers
             _variables = variables;
         }
 
-        private Token Current => _tokens[_pos];
-        private Token Advance() => _tokens[_pos++];
+        private Token Current =>
+            _pos < _tokens.Count
+                ? _tokens[_pos]
+                : throw new IndexOutOfRangeException($"Unexpected end of input: {_tokens[^1]} {_pos}");
+
+        private Token Advance()
+        {
+            if (_pos >= _tokens.Count)
+                throw new IndexOutOfRangeException($"Unexpected end of input: {_tokens[^1]} {_pos}");
+            return _tokens[_pos++];
+        }
 
         public T Parse<T>() =>
             (T)Convert.ChangeType(ParseExpression(), typeof(T), CultureInfo.InvariantCulture);

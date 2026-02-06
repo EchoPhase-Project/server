@@ -30,7 +30,7 @@ namespace EchoPhase.DAL.Scylla
         public int SaveChanges() => Database.SaveChanges();
         public Task<int> SaveChangesAsync() => Database.SaveChangesAsync();
 
-        public EntityBuilder<TEntity> Entity<TEntity>() where TEntity : notnull
+        public EntityBuilder<TEntity> Entity<TEntity>() where TEntity : class
         {
             if (!_entityBuilders.TryGetValue(typeof(TEntity), out var builderObj))
             {
@@ -41,8 +41,13 @@ namespace EchoPhase.DAL.Scylla
             return (EntityBuilder<TEntity>)builderObj;
         }
 
-        public DbSet<TEntity> Set<TEntity>()
+        public DbSet<TEntity> Set<TEntity>() where TEntity : class, new()
             => new DbSet<TEntity>(_queryProviderFactory);
+
+        public IQueryable<T> Query<T>() where T : class, new()
+        {
+            return Set<T>().AsQueryable();
+        }
 
         public virtual void OnSetRegistration()
         {

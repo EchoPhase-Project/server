@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Cassandra;
 
 namespace EchoPhase.DAL.Scylla
@@ -5,57 +6,148 @@ namespace EchoPhase.DAL.Scylla
     public class Transaction : IDisposable
     {
         private readonly Database _database;
-        private readonly BatchStatement _batch;
-        private bool _completed;
+        private readonly List<BoundStatement> _statements;
+        private readonly ConcurrentDictionary<string, PreparedStatement> _preparedCache;
+        private bool _committed;
+        private bool _disposed;
+        private BatchType _batchType;
 
-        internal Transaction(Database database)
+        internal Transaction(Database database, BatchType batchType = BatchType.Logged)
         {
-            _database = database;
-            _batch = new BatchStatement();
+            _database = database ?? throw new ArgumentNullException(nameof(database));
+            _statements = new List<BoundStatement>();
+            _preparedCache = new ConcurrentDictionary<string, PreparedStatement>();
+            _batchType = batchType;
             _database.PushActiveTransaction(this);
         }
 
-        internal void AddToBatch(BoundStatement bound)
+        internal void AddStatement(string cql, params object[] parameters)
         {
-            if (_completed)
-                throw new InvalidOperationException("Transaction already completed");
-            _batch.Add(bound);
+            if (_committed)
+                throw new InvalidOperationException("Cannot add statements to a committed transaction");
+
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(Transaction));
+
+            var prepared = _preparedCache.GetOrAdd(cql, _database.Session.Prepare);
+            var bound = prepared.Bind(parameters);
+            _statements.Add(bound);
+        }
+
+        public int StatementCount => _statements.Count;
+
+        public BatchType BatchType
+        {
+            get => _batchType;
+            set
+            {
+                if (_committed)
+                    throw new InvalidOperationException("Cannot change batch type after commit");
+                _batchType = value;
+            }
         }
 
         public void Commit()
         {
-            if (_completed) throw new InvalidOperationException("Transaction already completed");
+            if (_committed)
+                throw new InvalidOperationException("Transaction already committed");
 
-            if (!_batch.IsEmpty)
-                _database.Session.Execute(_batch);
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(Transaction));
 
-            _completed = true;
-            _database.PopActiveTransaction();
+            try
+            {
+                if (_statements.Any())
+                {
+                    var batch = new BatchStatement();
+                    batch.SetBatchType(_batchType);
+
+                    foreach (var statement in _statements)
+                    {
+                        batch.Add(statement);
+                    }
+
+                    _database.Session.Execute(batch);
+                }
+                _committed = true;
+            }
+            finally
+            {
+                _database.PopActiveTransaction();
+            }
         }
 
         public async Task CommitAsync()
         {
-            if (_completed) throw new InvalidOperationException("Transaction already completed");
+            if (_committed)
+                throw new InvalidOperationException("Transaction already committed");
 
-            if (!_batch.IsEmpty)
-                await _database.Session.ExecuteAsync(_batch);
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(Transaction));
 
-            _completed = true;
-            _database.PopActiveTransaction();
+            try
+            {
+                if (_statements.Any())
+                {
+                    var batch = new BatchStatement();
+                    batch.SetBatchType(_batchType);
+
+                    foreach (var statement in _statements)
+                    {
+                        batch.Add(statement);
+                    }
+
+                    await _database.Session.ExecuteAsync(batch);
+                }
+                _committed = true;
+            }
+            finally
+            {
+                _database.PopActiveTransaction();
+            }
         }
 
         public void Rollback()
         {
-            if (_completed) throw new InvalidOperationException("Transaction already completed");
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(Transaction));
 
-            _completed = true;
+            if (_committed)
+                throw new InvalidOperationException("Cannot rollback a committed transaction");
+
+            _statements.Clear();
             _database.PopActiveTransaction();
+        }
+
+        public void Clear()
+        {
+            if (_committed)
+                throw new InvalidOperationException("Cannot clear a committed transaction");
+
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(Transaction));
+
+            _statements.Clear();
         }
 
         public void Dispose()
         {
-            if (!_completed)
-                Rollback();
+            if (_disposed) return;
+
+            if (!_committed)
+            {
+                try
+                {
+                    Rollback();
+                }
+                catch
+                {
+                }
+            }
+
+            _statements.Clear();
+            _preparedCache.Clear();
+            _disposed = true;
         }
     }
 }

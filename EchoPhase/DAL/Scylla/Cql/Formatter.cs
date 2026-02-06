@@ -4,87 +4,93 @@ namespace EchoPhase.DAL.Scylla.Cql
 {
     public static class CqlFormatter
     {
-        public static string FormatCql(string cql)
+        private static readonly string[] Keywords = new[]
         {
-            var tokens = Lexer.Lex(cql);
+            "SELECT", "FROM", "WHERE", "INSERT", "INTO", "UPDATE", "DELETE",
+            "CREATE", "TABLE", "DROP", "ALTER", "WITH", "AND", "OR",
+            "PRIMARY", "KEY", "CLUSTERING", "ORDER", "BY", "IF", "NOT", "EXISTS",
+            "KEYSPACE", "INDEX", "TYPE", "VALUES", "SET", "LIMIT", "ALLOW", "FILTERING"
+        };
+
+        public static string Format(string cql, int indentSize = 6)
+        {
+            if (string.IsNullOrWhiteSpace(cql))
+                return string.Empty;
+
+            var tokens = Lexer.Tokenize(cql);
+            return FormatTokens(tokens, indentSize);
+        }
+
+        private static string FormatTokens(List<Token> tokens, int indentSize)
+        {
             var sb = new StringBuilder();
-            var currentLine = new List<string>();
-            bool inParams = false;
-            int parenLevel = 0;
+            var indent = new string(' ', indentSize);
+            var currentLine = new List<Token>();
+            var parenDepth = 0;
+            var isInParentheses = false;
 
-            int i = 0;
-            while (i < tokens.Count)
+            for (int i = 0; i < tokens.Count; i++)
             {
-                string token = tokens[i];
+                var token = tokens[i];
 
-                if (token == "(") { inParams = true; parenLevel++; }
-                if (token == ")") { parenLevel--; if (parenLevel <= 0) { inParams = false; parenLevel = 0; } }
-
-                if (!inParams && IsUpper(token))
+                switch (token.Type)
                 {
-                    if (currentLine.Count > 0)
-                    {
-                        sb.AppendLine("      " + JoinTokens(currentLine));
-                        currentLine.Clear();
-                    }
+                    case TokenType.OpenParen:
+                        parenDepth++;
+                        isInParentheses = true;
+                        currentLine.Add(token);
+                        break;
 
-                    var commandTokens = new List<string> { token };
-                    int j = i + 1;
-                    while (j < tokens.Count && !inParams && IsUpper(tokens[j]))
-                    {
-                        commandTokens.Add(tokens[j]);
-                        j++;
-                    }
-                    currentLine.AddRange(commandTokens);
-                    i = j - 1;
-                }
-                else
-                {
-                    currentLine.Add(token);
-                }
+                    case TokenType.CloseParen:
+                        parenDepth--;
+                        if (parenDepth == 0)
+                            isInParentheses = false;
+                        currentLine.Add(token);
+                        break;
 
-                i++;
+                    case TokenType.Keyword when !isInParentheses:
+                        if (currentLine.Count > 0)
+                        {
+                            sb.AppendLine(indent + JoinTokens(currentLine));
+                            currentLine.Clear();
+                        }
+                        currentLine.Add(token);
+                        break;
+
+                    default:
+                        currentLine.Add(token);
+                        break;
+                }
             }
 
             if (currentLine.Count > 0)
-                sb.AppendLine("      " + JoinTokens(currentLine));
+            {
+                sb.AppendLine(indent + JoinTokens(currentLine));
+            }
 
             return sb.ToString().TrimEnd();
         }
 
-        private static string JoinTokens(List<string> tokens)
+        private static string JoinTokens(List<Token> tokens)
         {
             var sb = new StringBuilder();
+
             for (int i = 0; i < tokens.Count; i++)
             {
-                string token = tokens[i];
+                var token = tokens[i];
+                var needsSpace = i > 0 &&
+                                 tokens[i - 1].Type != TokenType.OpenParen &&
+                                 token.Type != TokenType.CloseParen &&
+                                 token.Type != TokenType.Comma &&
+                                 token.Type != TokenType.Semicolon;
 
-                if (token == "(")
-                {
-                    sb.Append(token);
-                }
-                else if (token == ")" || token == ";")
-                {
-                    sb.Append(token);
-                }
-                else if (token == ",")
-                {
-                    sb.Append(token);
-                }
-                else
-                {
-                    if (i > 0 && tokens[i - 1] != "(") sb.Append(" ");
-                    sb.Append(token);
-                }
+                if (needsSpace)
+                    sb.Append(' ');
+
+                sb.Append(token.Value);
             }
-            return sb.ToString();
-        }
 
-        private static bool IsUpper(string token)
-        {
-            foreach (char c in token)
-                if (!char.IsUpper(c)) return false;
-            return true;
+            return sb.ToString();
         }
     }
 }
