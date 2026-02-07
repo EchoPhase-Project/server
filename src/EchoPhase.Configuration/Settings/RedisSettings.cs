@@ -1,0 +1,26 @@
+namespace EchoPhase.Configuration.Settings
+{
+    public class RedisSettings : IRedisSettings, IValidatable
+    {
+        public string ConnectionString { get; set; } = string.Empty;
+        public string InstanceName { get; set; } = string.Empty;
+        public Guid TenantId { get; set; } // Автоматически распарсится из string
+
+        public IValidationResult Validate()
+        {
+            if (string.IsNullOrWhiteSpace(ConnectionString))
+                return ValidationResult.Failure(error =>
+                    error.Set(nameof(ConnectionString), "Redis connection string is missing."));
+
+            if (string.IsNullOrWhiteSpace(InstanceName))
+                return ValidationResult.Failure(error =>
+                    error.Set(nameof(InstanceName), "Redis instance name is missing."));
+
+            if (TenantId == Guid.Empty)
+                return ValidationResult.Failure(error =>
+                    error.Set(nameof(TenantId), "TenantId cannot be empty."));
+
+            return ValidationResult.Success();
+        }
+    }
+}
