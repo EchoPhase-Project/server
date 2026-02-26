@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console.Cli" Version="0.53.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EchoPhase.Identity\EchoPhase.Identity.csproj" />
+    <ProjectReference Include="..\EchoPhase.DAL.Postgres\EchoPhase.DAL.Postgres.csproj" />
+    <ProjectReference Include="..\EchoPhase.DAL.Scylla\EchoPhase.DAL.Scylla.csproj" />
+    <ProjectReference Include="..\EchoPhase.Security.Authentication\EchoPhase.Security.Authentication.csproj" />
+  </ItemGroup>
+
+</Project>

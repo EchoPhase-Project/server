@@ -1,5 +1,5 @@
-using EchoPhase.Clients.Twitch.Models;
 using EchoPhase.Clients.Models;
+using EchoPhase.Clients.Twitch.Models;
 
 namespace EchoPhase.Clients.Twitch.Extensions
 {

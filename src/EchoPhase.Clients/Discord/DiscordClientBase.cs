@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Logging;
 using EchoPhase.Clients.Discord.Extensions;
 using EchoPhase.Clients.Discord.Models;
+using Microsoft.Extensions.Logging;
 
 namespace EchoPhase.Clients.Discord
 {

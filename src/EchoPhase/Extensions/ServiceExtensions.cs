@@ -1,38 +1,40 @@
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
-using EchoPhase.Profilers;
 using EchoPhase.Clients.Discord;
 using EchoPhase.Configuration.Settings;
 using EchoPhase.Configuration.Validators;
-using EchoPhase.Constants;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Redis;
 using EchoPhase.DAL.Redis.Interfaces;
 using EchoPhase.DAL.Scylla;
-using EchoPhase.Enums;
+using EchoPhase.Identity;
+using EchoPhase.Interfaces;
+using EchoPhase.Profilers;
+using EchoPhase.Runners.Blocks;
+using EchoPhase.Runners.Blocks.Handlers;
+using EchoPhase.Runners.Roslyn;
+using EchoPhase.Runners.Roslyn.Validators;
 using EchoPhase.Scripting.Lexers;
 using EchoPhase.Scripting.Parsers;
 using EchoPhase.Scripting.Tokens;
-using EchoPhase.Factories;
-using EchoPhase.Handlers;
-using EchoPhase.Interfaces;
-using EchoPhase.Processors;
-using EchoPhase.Processors.Handlers;
-using EchoPhase.Runners.Roslyn;
-using EchoPhase.Runners.Roslyn.Validators;
-using EchoPhase.Runners.Blocks;
-using EchoPhase.Runners.Blocks.Handlers;
-using EchoPhase.Security;
+using EchoPhase.Security.Antiforgery;
+using EchoPhase.Security.Authentication;
+using EchoPhase.Security.Authorization.Factories;
+using EchoPhase.Security.Authorization.Handlers;
+using EchoPhase.Security.BitMasks;
+using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Security.Cryptography;
 using EchoPhase.Security.Hashers;
-using EchoPhase.Types.Extensions;
 using EchoPhase.Services;
-using EchoPhase.Services.Bitmasks;
 using EchoPhase.Services.Events;
-using EchoPhase.Services.WebHooks;
-using EchoPhase.Services.WebSockets;
+using EchoPhase.WebHooks;
+using EchoPhase.Types.Result.Extensions;
+using EchoPhase.WebSockets;
+using EchoPhase.WebSockets.Processors;
+using EchoPhase.WebSockets.Processors.Handlers;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -268,7 +270,7 @@ namespace EchoPhase.Extensions
                 .SetApplicationName(entryAssemblyName);
 
             services.AddSingleton<ICacheContext, RedisContext>();
-            services.AddTransient<IKeysService, KeysService>();
+            services.AddTransient<IKeyVault, KeyVault>();
 
             services.AddDistributedMemoryCache();
 
@@ -446,7 +448,7 @@ namespace EchoPhase.Extensions
                         .GetRequiredService<IOptions<AuthenticationSettings>>().Value.Schemes.Bearer;
 
                     var keysService = serviceProvider
-                        .GetRequiredService<IKeysService>();
+                        .GetRequiredService<IKeyVault>();
 
                     var result = keysService.GetOrSet(settings.Key);
 
@@ -479,12 +481,19 @@ namespace EchoPhase.Extensions
             return services;
         }
 
-        public static IServiceCollection AddEventService(this IServiceCollection services)
+        public static IServiceCollection AddEventService(this IServiceCollection services, IConfigurationSection configurationSection)
         {
             services.AddHttpClient();
 
             services.AddScoped<WebHookRepository>();
             services.AddScoped<WebHookService>();
+
+            services.AddOptions<WebSocketSettings>()
+                .Bind(configurationSection)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<WebSocketSettings>, WebSocketSettingsValidator>();
 
             services.AddSingleton<WebSocketConnectionManager>();
             services.AddScoped<WebSocketService>();
@@ -506,7 +515,7 @@ namespace EchoPhase.Extensions
 
             services.AddSingleton<IValidateOptions<AesSettings>, AesSettingsValidator>();
 
-            services.AddSingleton<AesService>();
+            services.AddSingleton<AesGcm>();
 
             return services;
         }
@@ -545,9 +554,9 @@ namespace EchoPhase.Extensions
 
         public static IServiceCollection AddPolicies(this IServiceCollection services)
         {
-            services.AddSingleton<IRolesBitMaskService, RolesBitMaskService>();
-            services.AddSingleton<IIntentsBitMaskService, IntentsBitMaskService>();
-            services.AddSingleton<IPermissionsBitMaskService, PermissionsBitMaskService>();
+            services.AddSingleton<IRolesBitMask, RolesBitMask>();
+            services.AddSingleton<IIntentsBitMask, IntentsBitMask>();
+            services.AddSingleton<IPermissionsBitMask, PermissionsBitMask>();
 
             services.AddSingleton<IRolesFactory, RolesFactory>();
             services.AddSingleton<IPermissionsFactory, PermissionsFactory>();
@@ -629,7 +638,7 @@ namespace EchoPhase.Extensions
 
             services.AddSingleton<IValidateOptions<Crypto25519Settings>, Crypto25519SettingsValidator>();
 
-            services.AddSingleton<ICrypto25519Service, Crypto25519Service>();
+            services.AddSingleton<ICrypto25519, Crypto25519>();
             return services;
         }
 

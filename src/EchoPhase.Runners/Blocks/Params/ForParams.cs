@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
-using EchoPhase.Types.Results;
 using EchoPhase.Configuration.Settings;
+using EchoPhase.Types.Validation;
 
 namespace EchoPhase.Runners.Blocks.Params
 {
@@ -10,10 +10,16 @@ namespace EchoPhase.Runners.Blocks.Params
         public string CounterVar { get; set; } = string.Empty;
 
         [JsonPropertyName("start")]
-        public int Start { get; set; }
+        public int Start
+        {
+            get; set;
+        }
 
         [JsonPropertyName("end")]
-        public int End { get; set; }
+        public int End
+        {
+            get; set;
+        }
 
         [JsonPropertyName("step")]
         public int Step { get; set; } = 1;

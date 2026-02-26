@@ -1,4 +1,5 @@
-using EchoPhase.Interfaces;
+using EchoPhase.Identity;
+using EchoPhase.Security.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ParkSquare.AspNetCore.Sitemap;

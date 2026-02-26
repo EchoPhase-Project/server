@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
-using EchoPhase.Extensions;
 using Microsoft.Extensions.DependencyInjection;
+using EchoPhase.Extensions;
 
 namespace EchoPhase.EvalTests
 {

@@ -1,6 +1,6 @@
 using EchoPhase.Interfaces;
-using EchoPhase.Services.WebHooks;
-using EchoPhase.Services.WebSockets;
+using EchoPhase.WebSockets;
+using EchoPhase.WebHooks;
 
 namespace EchoPhase.Services.Events
 {
@@ -20,7 +20,7 @@ namespace EchoPhase.Services.Events
         public async Task SendMessageToAllAsync<T, TS>(T message, ISet<string> intents, TS shardId)
             where TS : struct
         {
-            await _webSocketService.SendMessageToAllAsync(message, intents, shardId);
+            await _webSocketService.BroadcastMessageAsync(message, intents, shardId);
             await _webHookService.SendMessageToAllAsync(message, intents);
         }
 
@@ -40,7 +40,7 @@ namespace EchoPhase.Services.Events
 
         public async Task SendMessageToAllAsync<T>(T message, ISet<string> intents)
         {
-            await _webSocketService.SendMessageToAllAsync(message, intents);
+            await _webSocketService.BroadcastMessageAsync(message, intents);
             await _webHookService.SendMessageToAllAsync(message, intents);
         }
 

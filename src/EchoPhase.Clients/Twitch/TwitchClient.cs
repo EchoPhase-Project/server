@@ -1,7 +1,6 @@
-using EchoPhase.Clients.Models;
-using Microsoft.Extensions.Logging;
 using EchoPhase.Clients.Twitch.Dto;
 using EchoPhase.Clients.Twitch.Models;
+using Microsoft.Extensions.Logging;
 
 namespace EchoPhase.Clients.Twitch
 {

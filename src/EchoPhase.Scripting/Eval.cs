@@ -1,8 +1,7 @@
-using System.Linq.Expressions;
 using EchoPhase.Scripting.Lexers;
 using EchoPhase.Scripting.Parsers;
 using EchoPhase.Scripting.Tokens;
-using EchoPhase.Types.Results;
+using EchoPhase.Types.Result;
 
 namespace EchoPhase.Scripting
 {

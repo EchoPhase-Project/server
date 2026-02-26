@@ -1,7 +1,8 @@
 using System.ComponentModel.DataAnnotations;
-using EchoPhase.Helpers;
-using EchoPhase.Interfaces;
-using EchoPhase.Services;
+using EchoPhase.Identity;
+using EchoPhase.Projection;
+using EchoPhase.Security.Antiforgery;
+using EchoPhase.Security.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,22 +15,19 @@ namespace EchoPhase.Controllers
         private readonly IAuthService _authService;
         private readonly IAntiforgeryService _antiforgeryService;
         private readonly IUserService _userService;
-        private readonly ProjectionHelper _projection;
-        private readonly TaskSchedulerService _scheduledTaskService;
+        private readonly Projector _projector;
 
         public AuthController(
             IAuthService authService,
             IAntiforgeryService antiforgeryService,
             IUserService userService,
-            ProjectionHelper projection,
-            TaskSchedulerService scheduledTaskService
+            Projector projector
         )
         {
             _authService = authService;
             _antiforgeryService = antiforgeryService;
             _userService = userService;
-            _projection = projection;
-            _scheduledTaskService = scheduledTaskService;
+            _projector = projector;
         }
 
         [HttpPost("register")]
@@ -72,7 +70,7 @@ namespace EchoPhase.Controllers
                 return Unauthorized();
 
 
-            return Ok(_projection.Project(user, u => u.UserName, u => u.Id));
+            return Ok(_projector.Project(user, u => u.UserName, u => u.Id));
         }
 
         [HttpPost("logout")]

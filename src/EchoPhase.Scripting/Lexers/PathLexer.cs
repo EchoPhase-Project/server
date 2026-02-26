@@ -1,6 +1,6 @@
 using System.Text;
-using EchoPhase.Scripting.Tokens;
 using EchoPhase.Profilers;
+using EchoPhase.Scripting.Tokens;
 
 namespace EchoPhase.Scripting.Lexers
 {

@@ -1,0 +1,32 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EchoPhase.Cli/EchoPhase.Cli.csproj" />
+    <Project Path="src/EchoPhase.Clients/EchoPhase.Clients.csproj" />
+    <Project Path="src/EchoPhase.Configuration/EchoPhase.Configuration.csproj" />
+    <Project Path="src/EchoPhase.DAL.Postgres/EchoPhase.DAL.Postgres.csproj" />
+    <Project Path="src/EchoPhase.DAL.Redis/EchoPhase.DAL.Redis.csproj" />
+    <Project Path="src/EchoPhase.DAL.Scylla/EchoPhase.DAL.Scylla.csproj" />
+    <Project Path="src/EchoPhase.Identity/EchoPhase.Identity.csproj" />
+    <Project Path="src/EchoPhase.Profilers/EchoPhase.Profilers.csproj" />
+    <Project Path="src/EchoPhase.Projection/EchoPhase.Projection.csproj" />
+    <Project Path="src/EchoPhase.QRCodes/EchoPhase.QRCodes.csproj" />
+    <Project Path="src/EchoPhase.Runners/EchoPhase.Runners.csproj" />
+    <Project Path="src/EchoPhase.Scheduling/EchoPhase.Scheduling.csproj" />
+    <Project Path="src/EchoPhase.Scripting/EchoPhase.Scripting.csproj" />
+    <Project Path="src/EchoPhase.Security.Antiforgery/EchoPhase.Security.Antiforgery.csproj" />
+    <Project Path="src/EchoPhase.Security.Authentication/EchoPhase.Security.Authentication.csproj" />
+    <Project Path="src/EchoPhase.Security.Authorization/EchoPhase.Security.Authorization.csproj" />
+    <Project Path="src/EchoPhase.Security.BitMasks/EchoPhase.Security.BitMasks.csproj" />
+    <Project Path="src/EchoPhase.Security.Cryptography/EchoPhase.Security.Cryptography.csproj" />
+    <Project Path="src/EchoPhase.Security.Hashers/EchoPhase.Security.Hashers.csproj" />
+    <Project Path="src/EchoPhase.Types/EchoPhase.Types.csproj" />
+    <Project Path="src/EchoPhase.WebHooks/EchoPhase.WebHooks.csproj" />
+    <Project Path="src/EchoPhase.WebSockets/EchoPhase.WebSockets.csproj" />
+    <Project Path="src/EchoPhase/EchoPhase.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EchoPhase.Crypto25519Tests/EchoPhase.Crypto25519Tests.csproj" />
+    <Project Path="tests/EchoPhase.EvalTests/EchoPhase.EvalTests.csproj" />
+    <Project Path="tests/EchoPhase.TaskSchedulerTests/EchoPhase.TaskSchedulerTests.csproj" />
+  </Folder>
+</Solution>

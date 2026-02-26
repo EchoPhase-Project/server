@@ -1,10 +1,10 @@
 using System.Collections;
-using EchoPhase.Scripting.Tokens;
-using EchoPhase.Scripting.Lexers;
 using EchoPhase.Profilers;
-using Newtonsoft.Json.Linq;
-using EchoPhase.Types.Extensions;
+using EchoPhase.Scripting.Lexers;
+using EchoPhase.Scripting.Tokens;
+using EchoPhase.Types.Result.Extensions;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Scripting.Parsers
 {

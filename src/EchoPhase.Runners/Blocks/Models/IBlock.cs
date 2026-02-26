@@ -1,5 +1,3 @@
-using EchoPhase.Runners.Blocks;
-
 namespace EchoPhase.Runners.Blocks.Models
 {
     public interface IBlock

@@ -1,6 +1,6 @@
 using EchoPhase.Hubs;
-using EchoPhase.Services.WebSockets;
 using Microsoft.AspNetCore.SignalR;
+using EchoPhase.WebSockets;
 
 namespace EchoPhase.Services.Internal
 {
@@ -39,7 +39,7 @@ namespace EchoPhase.Services.Internal
             IsShuttingDown = true;
             Task.Run(async () =>
             {
-                await _webSocketConnectionManager.CloseConnectionsAsync();
+                await _webSocketConnectionManager.CloseAllConnectionsAsync();
             }).Wait();
         }
 
@@ -47,7 +47,7 @@ namespace EchoPhase.Services.Internal
         {
             Task.Run(() =>
             {
-                _webSocketConnectionManager.AbortConnections();
+                _webSocketConnectionManager.AbortAllConnections();
             }).Wait();
         }
     }

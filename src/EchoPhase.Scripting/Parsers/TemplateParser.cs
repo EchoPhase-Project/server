@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text;
-using EchoPhase.Scripting.Tokens;
-using EchoPhase.Scripting.Lexers;
 using EchoPhase.Profilers;
+using EchoPhase.Scripting.Lexers;
+using EchoPhase.Scripting.Tokens;
 
 namespace EchoPhase.Scripting.Parsers
 {

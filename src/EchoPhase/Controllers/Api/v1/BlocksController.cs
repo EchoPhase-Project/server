@@ -1,4 +1,4 @@
-using EchoPhase.Helpers;
+using EchoPhase.Projection;
 using EchoPhase.Runners.Blocks;
 using EchoPhase.Runners.Blocks.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -13,17 +13,17 @@ namespace EchoPhase.Controllers
     {
         private readonly BlocksRunner _runner;
         private readonly IServiceProvider _serviceProvider;
-        private readonly ProjectionHelper _projection;
+        private readonly Projector _projector;
 
         public BlocksController(
             BlocksRunner runner,
             IServiceProvider serviceProvider,
-            ProjectionHelper projection
+            Projector projector
         )
         {
             _runner = runner;
             _serviceProvider = serviceProvider;
-            _projection = projection;
+            _projector = projector;
         }
 
         [HttpPost("run")]
@@ -32,7 +32,7 @@ namespace EchoPhase.Controllers
             var context = BlocksRunner.Create(request.StartIds, request.Blocks);
 
             context = await _runner.ExecuteAsync(context);
-            return Ok(_projection.Project(context, ctx => ctx.Errors, ctx => ctx.Output, ctx => ctx.Variables));
+            return Ok(_projector.Project(context, ctx => ctx.Errors, ctx => ctx.Output, ctx => ctx.Variables));
         }
     }
 

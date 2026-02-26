@@ -1,5 +1,4 @@
 using EchoPhase.Clients.Models;
-using EchoPhase.Clients.Twitch.Models;
 
 namespace EchoPhase.Clients.Twitch.Models
 {

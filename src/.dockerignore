@@ -7,7 +7,7 @@ _ReSharper*
 # NuGet package directory
 packages/
 
-# MSTest test Results
+# MSTest test.Result
 [Tt]est[Rr]esult*
 
 # NCrunch

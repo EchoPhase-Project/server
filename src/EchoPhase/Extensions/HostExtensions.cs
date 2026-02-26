@@ -1,5 +1,4 @@
-using EchoPhase.Commands;
-using EchoPhase.Commands.Settings;
+using Commands = EchoPhase.Cli.Commands;
 using EchoPhase.Registrars;
 using Spectre.Console.Cli;
 
@@ -17,55 +16,55 @@ namespace EchoPhase.Extensions
                 config.PropagateExceptions();
                 config.ValidateExamples();
 
-                config.AddBranch<PermissionsCommandSettings>("permissions", permissions =>
+                config.AddBranch<Commands.Permissions.PermissionsSettings>("permissions", permissions =>
                 {
                     permissions.SetDescription("Permission utilities");
-                    permissions.SetDefaultCommand<PermissionsDeserializeCommand>();
+                    permissions.SetDefaultCommand<Commands.Permissions.Deserialize.DeserializeCommand>();
 
-                    permissions.AddCommand<PermissionsDeserializeCommand>("deserialize")
+                    permissions.AddCommand<Commands.Permissions.Deserialize.DeserializeCommand>("deserialize")
                         .WithDescription("Deserialize permissions")
                         .WithExample(new[] { "permissions", "deserialize", "0:2049;1:128" });
                 });
 
-                config.AddBranch<IntentsCommandSettings>("intents", permissions =>
+                config.AddBranch<Commands.Intents.IntentsSettings>("intents", permissions =>
                 {
                     permissions.SetDescription("Intent utilities");
-                    permissions.SetDefaultCommand<IntentsSerializeCommand>();
+                    permissions.SetDefaultCommand<Commands.Intents.Serialize.SerializeCommand>();
 
-                    permissions.AddCommand<IntentsSerializeCommand>("serialize")
+                    permissions.AddCommand<Commands.Intents.Serialize.SerializeCommand>("serialize")
                         .WithDescription("Serialize intents")
                         .WithExample(new[] { "intents", "serialize", "login", "notification" });
                 });
 
-                config.AddBranch<UserCommandSettings>("user", user =>
+                config.AddBranch<Commands.User.UserSettings>("user", user =>
                 {
                     user.SetDescription("User management commands");
-                    user.SetDefaultCommand<CreateUserCommand>();
+                    user.SetDefaultCommand<Commands.User.Create.CreateCommand>();
 
-                    user.AddBranch<RoleCommandSettings>("roles", roles =>
+                    user.AddBranch<Commands.User.Roles.RolesSettings>("roles", roles =>
                     {
                         roles.SetDescription("Role management for users");
-                        roles.SetDefaultCommand<AddToRolesCommand>();
+                        roles.SetDefaultCommand<Commands.User.Roles.Add.AddCommand>();
 
-                        roles.AddCommand<AddToRolesCommand>("add")
+                        roles.AddCommand<Commands.User.Roles.Add.AddCommand>("add")
                             .WithDescription("Add roles to user")
                             .WithExample(new[] { "user", "Test", "roles", "add", "Dev", "User" });
 
-                        roles.AddCommand<RemoveFromRolesCommand>("remove")
+                        roles.AddCommand<Commands.User.Roles.Remove.RemoveCommand>("remove")
                             .WithDescription("Remove roles from user")
                             .WithExample(new[] { "user", "Test", "roles", "remove", "Dev", "User" });
                     });
 
-                    user.AddCommand<CreateUserCommand>("create")
+                    user.AddCommand<Commands.User.Create.CreateCommand>("create")
                         .WithDescription("Create user")
                         .WithExample(new[] { "user", "Test", "create", "Test", "Qwerty123456:/", "Dev", "User" });
                 });
 
-                config.AddCommand<MigrationCommand>("migrate")
+                config.AddCommand<Commands.Database.Migrate.MigrateCommand>("migrate")
                     .WithDescription("Apply database migrations")
                     .WithExample(new[] { "migrate" });
 
-                config.AddCommand<HealthCheckCommand>("healthcheck")
+                config.AddCommand<Commands.Health.Check.CheckCommand>("healthcheck")
                     .WithDescription("Healthcheck")
                     .WithExample(new[] { "healthcheck" });
 #if DEBUG

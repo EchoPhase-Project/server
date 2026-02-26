@@ -1,8 +1,8 @@
 using System.Globalization;
+using EchoPhase.Profilers;
+using EchoPhase.Scripting.Extensions;
 using EchoPhase.Scripting.Lexers;
 using EchoPhase.Scripting.Tokens;
-using EchoPhase.Scripting.Extensions;
-using EchoPhase.Profilers;
 using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Scripting.Parsers

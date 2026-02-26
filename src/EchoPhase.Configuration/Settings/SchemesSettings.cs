@@ -1,4 +1,4 @@
-using EchoPhase.Types.Extensions;
+using EchoPhase.Types.Validation.Extensions;
 
 namespace EchoPhase.Configuration.Settings
 {

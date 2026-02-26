@@ -1,5 +1,3 @@
-using EchoPhase.Clients.Twitch.Models;
-
 namespace EchoPhase.Clients.Twitch.Models
 {
     public class TwitchApiError : ITwitchApiError

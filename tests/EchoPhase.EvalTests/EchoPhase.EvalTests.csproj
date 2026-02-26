@@ -18,7 +18,6 @@
     </PackageReference>
     <PackageReference Include="xunit.v3" Version="3.0.1" />
 	<PackageVersion Include="xunit.v3.runner.console" Version="3.0.1" />
-    <ProjectReference Include="../../src/EchoPhase/EchoPhase.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +27,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\EchoPhase.Scripting\EchoPhase.Scripting.csproj" />
     <ProjectReference Include="..\..\src\EchoPhase.Types\EchoPhase.Types.csproj" />
+    <ProjectReference Include="..\..\src\EchoPhase\EchoPhase.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,18 +1,18 @@
 using Microsoft.Extensions.DependencyInjection;
-using EchoPhase.Services;
+using EchoPhase.Scheduling;
 
 namespace EchoPhase.TaskSchedulerTests
 {
 	public class ServiceTests : IDisposable
 	{
 		private readonly ServiceProvider _provider;
-		private readonly TaskSchedulerService _scheduler;
+		private readonly DelayedTaskScheduler _scheduler;
 
 		public ServiceTests()
 		{
 			var services = new ServiceCollection();
 			_provider = services.BuildServiceProvider();
-			_scheduler = new TaskSchedulerService(_provider);
+			_scheduler = new DelayedTaskScheduler(_provider);
 		}
 
 		[Fact]

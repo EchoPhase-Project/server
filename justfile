@@ -10,6 +10,14 @@ import 'just/docker.just'
 default:
     @just --list
 
+# Run tests
+test:
+    dotnet test
+
+# Run tests with detailed output
+test-verbose:
+    dotnet test --logger:"console;verbosity=detailed"
+
 # Run all checks before commit
 check: docker-build-frontend docker-build-backend
     @echo "All checks passed!"

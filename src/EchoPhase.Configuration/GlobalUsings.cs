@@ -1,1 +1,1 @@
-global using EchoPhase.Types.Results;
+global using EchoPhase.Types.Validation;

@@ -1,8 +1,9 @@
 using System.Linq.Expressions;
-using EchoPhase.Types.Results;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Postgres.Repositories.Options;
+using EchoPhase.Types.Result;
+using EchoPhase.Types.Service;
 
 namespace EchoPhase.Interfaces
 {

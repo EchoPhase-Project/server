@@ -1,5 +1,6 @@
-using EchoPhase.Helpers;
-using EchoPhase.Interfaces;
+using EchoPhase.Identity;
+using EchoPhase.Projection;
+using EchoPhase.Security.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,17 +13,17 @@ namespace EchoPhase.Controllers
     {
         private readonly IUserService _userService;
         private readonly IAntiforgeryService _antiforgeryService;
-        private readonly ProjectionHelper _projection;
+        private readonly Projector _projector;
 
         public UserController(
             IUserService userService,
             IAntiforgeryService antiforgeryService,
-            ProjectionHelper projection
+            Projector projector
         )
         {
             _userService = userService;
             _antiforgeryService = antiforgeryService;
-            _projection = projection;
+            _projector = projector;
         }
 
         [HttpGet("{username}")]
@@ -35,7 +36,7 @@ namespace EchoPhase.Controllers
 
             return Ok(users
                 .Select(user =>
-                    _projection.Project(user, u => u.Id, u => u.Name, u => u.UserName)
+                    _projector.Project(user, u => u.Id, u => u.Name, u => u.UserName)
                 ));
         }
     }

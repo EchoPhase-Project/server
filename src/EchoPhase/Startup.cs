@@ -5,13 +5,15 @@ using EchoPhase.Extensions;
 using EchoPhase.Helpers;
 using EchoPhase.Hubs;
 using EchoPhase.Hubs.Managers;
+using EchoPhase.Identity;
 using EchoPhase.Interfaces;
 using EchoPhase.Middlewares;
-using EchoPhase.RouteConstraints;
-using EchoPhase.Security;
-using EchoPhase.Services;
+using EchoPhase.Projection;
 using EchoPhase.QRCodes;
-using EchoPhase.Services.Bitmasks;
+using EchoPhase.RouteConstraints;
+using EchoPhase.Security.Authentication;
+using EchoPhase.Security.BitMasks;
+using EchoPhase.Scheduling;
 using EchoPhase.Services.Internal;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
@@ -113,14 +115,14 @@ namespace EchoPhase
             services.AddSingleton<IUserConnectionManager, UserConnectionManager>();
 
             services.AddSingleton<FileHelper>();
-            services.AddSingleton<ProjectionHelper>();
+            services.AddSingleton<Projector>();
 
             services.AddAes(Configuration.GetSection("Aes"));
             services.AddCrypto25519(Configuration.GetSection("Crypto25519"));
             services.AddPasswordHasher(Configuration.GetSection("Argon2"));
 
             services.AddSingleton<QRCodeService>();
-            services.AddSingleton<IIntentsBitMaskService, IntentsBitMaskService>();
+            services.AddSingleton<IIntentsBitMask, IntentsBitMask>();
 
             services.AddScoped<UserRepository>();
 
@@ -136,9 +138,9 @@ namespace EchoPhase
             services.AddRunners(Configuration.GetSection("Runners"));
 
             services.AddHostedService<ShutdownService>();
-            services.AddSingleton<TaskSchedulerService>();
+            services.AddSingleton<DelayedTaskScheduler>();
 
-            services.AddEventService();
+            services.AddEventService(Configuration.GetSection("WebSocket"));
 
             services.AddGrpc();
 

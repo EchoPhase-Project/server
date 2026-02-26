@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
-using EchoPhase.Types.Results;
 using EchoPhase.Configuration.Settings;
+using EchoPhase.Types.Validation;
 using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Runners.Blocks.Params

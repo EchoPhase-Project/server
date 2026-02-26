@@ -4,7 +4,10 @@ namespace EchoPhase.Configuration.Settings
     {
         public string ConnectionString { get; set; } = string.Empty;
         public string InstanceName { get; set; } = string.Empty;
-        public Guid TenantId { get; set; } // Автоматически распарсится из string
+        public Guid TenantId
+        {
+            get; set;
+        } // Автоматически распарсится из string
 
         public IValidationResult Validate()
         {

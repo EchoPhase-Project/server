@@ -1,5 +1,5 @@
-using EchoPhase.Clients.Models;
 using EchoPhase.Clients.Discord.Models;
+using EchoPhase.Clients.Models;
 
 namespace EchoPhase.Clients.Discord.Extensions
 {

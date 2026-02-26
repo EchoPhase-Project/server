@@ -1,6 +1,5 @@
 using System.Text;
-using EchoPhase.Enums;
-using EchoPhase.Interfaces;
+using EchoPhase.Security.Cryptography;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Crypto25519Tests
@@ -8,12 +7,12 @@ namespace EchoPhase.Crypto25519Tests
 	public class ServiceTests : IClassFixture<Fixture>
 	{
 		private readonly ITestOutputHelper _output;
-		private readonly ICrypto25519Service _svc;
+		private readonly ICrypto25519 _svc;
 
 		public ServiceTests(Fixture fixture, ITestOutputHelper output)
 		{
 			_output = output;
-			_svc = fixture.Provider.GetRequiredService<ICrypto25519Service>();
+			_svc = fixture.Provider.GetRequiredService<ICrypto25519>();
 		}
 
 		[Fact]

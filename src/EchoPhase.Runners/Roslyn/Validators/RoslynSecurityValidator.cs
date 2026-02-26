@@ -1,5 +1,5 @@
-using EchoPhase.Runners.Roslyn.Analyzers;
 using EchoPhase.Configuration.Settings;
+using EchoPhase.Runners.Roslyn.Analyzers;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
