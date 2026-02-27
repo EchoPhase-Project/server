@@ -7,8 +7,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BCrypt.Net-Core" Version="1.6.0" />
-    <PackageReference Include="Isopoh.Cryptography.Argon2" Version="2.0.0" />
+    <PackageReference Include="BCrypt.Net-Core" />
+    <PackageReference Include="Isopoh.Cryptography.Argon2" />
   </ItemGroup>
 
   <PropertyGroup>
