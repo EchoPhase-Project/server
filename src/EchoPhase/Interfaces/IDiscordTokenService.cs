@@ -4,17 +4,20 @@ using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Postgres.Repositories.Options;
 using EchoPhase.Types.Result;
 using EchoPhase.Types.Service;
+using EchoPhase.Types.Repository;
 
 namespace EchoPhase.Interfaces
 {
     public interface IDiscordTokenService : IDataServiceBase<DiscordToken, DiscordTokenRepository, DiscordTokenOptions>
     {
-        IEnumerable<DiscordToken> Get(
+        CursorPage<DiscordToken> Get(
             DiscordTokenSearchOptions opts,
+            CursorOptions? cursor = null,
             Func<IQueryable<DiscordToken>, DiscordTokenSearchOptions, IQueryable<DiscordToken>>? extraFilters = null
         );
-        IEnumerable<DiscordToken> Get(
+        CursorPage<DiscordToken> Get(
             Action<DiscordTokenSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
             Func<IQueryable<DiscordToken>, DiscordTokenSearchOptions, IQueryable<DiscordToken>>? extraFilters = null
         );
         Task<IServiceResult> CreateAsync(DiscordToken token);

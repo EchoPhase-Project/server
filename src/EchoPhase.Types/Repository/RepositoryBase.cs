@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
+using Microsoft.EntityFrameworkCore;
 
 namespace EchoPhase.Types.Repository
 {
@@ -106,6 +107,36 @@ namespace EchoPhase.Types.Repository
             var options = new TOptions();
             configure(options);
             return ApplySearchOptions(query, options, extraFilters);
+        }
+
+        protected CursorPage<TEntity> ApplyCursor(
+            IQueryable<TEntity> query,
+            CursorOptions cursor,
+            Func<TEntity, Guid> idSelector
+        )
+        {
+            var decodedId = CursorEncoder.Decode(cursor.After);
+
+            if (decodedId is not null)
+                query = query.Where(x => EF.Property<Guid>(x, "Id") > decodedId.Value);
+
+            var items = query
+                .OrderBy(x => EF.Property<Guid>(x, "Id"))
+                .Take(cursor.Limit + 1)
+                .ToList();
+
+            var hasMore = items.Count > cursor.Limit;
+            if (hasMore) items.RemoveAt(items.Count - 1);
+
+            var nextCursor = hasMore
+                ? CursorEncoder.Encode(idSelector(items.Last()))
+                : null;
+
+            return new CursorPage<TEntity>
+            {
+                Data = items,
+                NextCursor = nextCursor
+            };
         }
 
         public abstract IQueryable<TEntity> Build();

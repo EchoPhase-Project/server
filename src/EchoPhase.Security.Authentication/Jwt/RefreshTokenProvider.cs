@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
+using EchoPhase.Types.Repository;
 
 namespace EchoPhase.Security.Authentication.Jwt
 {
@@ -58,7 +59,7 @@ namespace EchoPhase.Security.Authentication.Jwt
             {
                 x.DeviceIds = [deviceId];
                 x.RefreshValues = [refreshToken];
-            }).FirstOrDefault();
+            }).Data.FirstOrDefault();
 
             if (existing is null)
             {
@@ -87,7 +88,7 @@ namespace EchoPhase.Security.Authentication.Jwt
                 x.UserIds = [userId];
                 x.DeviceIds = [deviceId];
                 x.RefreshValues = [refreshToken];
-            }).FirstOrDefault();
+            }).Data.FirstOrDefault();
 
             if (existing is not null)
             {
@@ -98,14 +99,17 @@ namespace EchoPhase.Security.Authentication.Jwt
 
         public async Task RevokeAllAsync(Guid userId)
         {
-            var tokens = _repository.Get(x => x.UserIds = [userId]);
+            var tokens = _repository.Get(x => x.UserIds = [userId]).Data;
             _db.RefreshTokens.RemoveRange(tokens);
             await _db.SaveChangesAsync();
         }
 
-        public Task<IEnumerable<RefreshToken>> GetSessionsAsync(Guid userId)
+        public Task<CursorPage<RefreshToken>> GetSessionsAsync(Guid userId, CursorOptions? cursor = null)
         {
-            var tokens = _repository.Get(x => x.UserIds = [userId]);
+            var tokens = _repository.Get(
+                x => x.UserIds = [userId],
+                cursor is not null ? c => { c.Limit = cursor.Limit; c.After = cursor.After; } : null
+            );
             return Task.FromResult(tokens);
         }
     }

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
+using EchoPhase.Types.Repository;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
@@ -34,20 +35,22 @@ namespace EchoPhase.Identity
             _cacheContext = cacheContext;
         }
 
-        public IEnumerable<User> Get(
+        public CursorPage<User> Get(
             UserSearchOptions opts,
+            CursorOptions? cursor = null,
             Func<IQueryable<User>, UserSearchOptions, IQueryable<User>>? extraFilters = null
         )
         {
-            return _repository.Get(opts, extraFilters);
+            return _repository.Get(opts, cursor, extraFilters);
         }
 
-        public IEnumerable<User> Get(
+        public CursorPage<User> Get(
             Action<UserSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
             Func<IQueryable<User>, UserSearchOptions, IQueryable<User>>? extraFilters = null
         )
         {
-            return _repository.Get(configure, extraFilters);
+            return _repository.Get(configure, configureCursor, extraFilters);
         }
 
         public async Task<User> GetAsync(ClaimsPrincipal userPrincipal) =>

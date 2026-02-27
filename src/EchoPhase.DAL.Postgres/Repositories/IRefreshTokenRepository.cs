@@ -6,10 +6,15 @@ namespace EchoPhase.DAL.Postgres.Repositories
 {
     public interface IRefreshTokenRepository : IRepositoryBase<RefreshToken, RefreshTokenOptions>
     {
-        IEnumerable<RefreshToken> Get(RefreshTokenSearchOptions options,
-            Func<IQueryable<RefreshToken>, RefreshTokenSearchOptions, IQueryable<RefreshToken>>? extraFilters = null);
-
-        IEnumerable<RefreshToken> Get(Action<RefreshTokenSearchOptions> configure,
-            Func<IQueryable<RefreshToken>, RefreshTokenSearchOptions, IQueryable<RefreshToken>>? extraFilters = null);
+        CursorPage<RefreshToken> Get(
+            RefreshTokenSearchOptions options,
+            CursorOptions? cursor = null,
+            Func<IQueryable<RefreshToken>, RefreshTokenSearchOptions, IQueryable<RefreshToken>>? extraFilters = null
+        );
+        CursorPage<RefreshToken> Get(
+            Action<RefreshTokenSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
+            Func<IQueryable<RefreshToken>, RefreshTokenSearchOptions, IQueryable<RefreshToken>>? extraFilters = null
+        );
     }
 }

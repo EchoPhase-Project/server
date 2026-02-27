@@ -34,10 +34,10 @@ namespace EchoPhase.Controllers.Api.v1
                 return BadRequest("Username is required.");
 
             var users = _userService.Get(x => x.UserNames = [username]);
-            if (!users.Any())
+            if (!users.Data.Any())
                 return NotFound();
 
-            return Ok(users.Select(user =>
+            return Ok(users.Data.Select(user =>
                 _projector.Project(user, u => u.Id, u => u.Name, u => u.UserName)));
         }
     }

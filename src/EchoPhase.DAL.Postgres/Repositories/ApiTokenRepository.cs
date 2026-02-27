@@ -20,8 +20,9 @@ namespace EchoPhase.DAL.Postgres.Repositories
             _aes = aes;
         }
 
-        public IEnumerable<DiscordToken> Get(
+        public CursorPage<DiscordToken> Get(
             DiscordTokenSearchOptions options,
+            CursorOptions? cursor = null,
             Func<IQueryable<DiscordToken>, DiscordTokenSearchOptions, IQueryable<DiscordToken>>? extraFilters = null
         )
         {
@@ -29,24 +30,34 @@ namespace EchoPhase.DAL.Postgres.Repositories
                 Build(), options, (query, opts) =>
                 {
                     query = ExtraFilters(query, opts);
-
-                    if (extraFilters != null)
+                    if (extraFilters is not null)
                         query = extraFilters(query, opts);
-
                     return query;
                 });
 
-            return query;
+            if (cursor is not null)
+                return ApplyCursor(query, cursor, x => x.Id);
+
+            return new CursorPage<DiscordToken> { Data = query };
         }
 
-        public IEnumerable<DiscordToken> Get(
+        public CursorPage<DiscordToken> Get(
             Action<DiscordTokenSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
             Func<IQueryable<DiscordToken>, DiscordTokenSearchOptions, IQueryable<DiscordToken>>? extraFilters = null
         )
         {
             var options = new DiscordTokenSearchOptions();
             configure(options);
-            return Get(options, extraFilters);
+
+            CursorOptions? cursor = null;
+            if (configureCursor is not null)
+            {
+                cursor = new CursorOptions();
+                configureCursor(cursor);
+            }
+
+            return Get(options, cursor, extraFilters);
         }
 
         public override IQueryable<DiscordToken> Build()

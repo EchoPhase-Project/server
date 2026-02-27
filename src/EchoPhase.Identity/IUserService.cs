@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EchoPhase.Types.Repository;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Postgres.Repositories.Options;
@@ -8,12 +9,14 @@ namespace EchoPhase.Identity
 {
     public interface IUserService : IDataServiceBase<User, UserRepository, UserOptions>
     {
-        IEnumerable<User> Get(
+        CursorPage<User> Get(
             UserSearchOptions opts,
+            CursorOptions? cursor = null,
             Func<IQueryable<User>, UserSearchOptions, IQueryable<User>>? extraFilters = null
         );
-        IEnumerable<User> Get(
+        CursorPage<User> Get(
             Action<UserSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
             Func<IQueryable<User>, UserSearchOptions, IQueryable<User>>? extraFilters = null
         );
         Task<User> GetAsync(ClaimsPrincipal userPrincipal);

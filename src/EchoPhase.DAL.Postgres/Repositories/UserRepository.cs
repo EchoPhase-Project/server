@@ -14,8 +14,9 @@ namespace EchoPhase.DAL.Postgres.Repositories
             _dbContext = dbContext;
         }
 
-        public IEnumerable<User> Get(
+        public CursorPage<User> Get(
             UserSearchOptions options,
+            CursorOptions? cursor = null,
             Func<IQueryable<User>, UserSearchOptions, IQueryable<User>>? extraFilters = null
         )
         {
@@ -23,24 +24,34 @@ namespace EchoPhase.DAL.Postgres.Repositories
                 Build(), options, (query, opts) =>
                 {
                     query = ExtraFilters(query, opts);
-
-                    if (extraFilters != null)
+                    if (extraFilters is not null)
                         query = extraFilters(query, opts);
-
                     return query;
                 });
 
-            return query;
+            if (cursor is not null)
+                return ApplyCursor(query, cursor, x => x.Id);
+
+            return new CursorPage<User> { Data = query };
         }
 
-        public IEnumerable<User> Get(
+        public CursorPage<User> Get(
             Action<UserSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
             Func<IQueryable<User>, UserSearchOptions, IQueryable<User>>? extraFilters = null
         )
         {
             var options = new UserSearchOptions();
             configure(options);
-            return Get(options, extraFilters);
+
+            CursorOptions? cursor = null;
+            if (configureCursor is not null)
+            {
+                cursor = new CursorOptions();
+                configureCursor(cursor);
+            }
+
+            return Get(options, cursor, extraFilters);
         }
 
         public override IQueryable<User> Build()

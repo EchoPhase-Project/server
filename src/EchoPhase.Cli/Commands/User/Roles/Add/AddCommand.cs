@@ -21,7 +21,7 @@ namespace EchoPhase.Cli.Commands.User.Roles.Add
             var users = _userService.Get(opts =>
             {
                 opts.UserNames = new HashSet<string> { settings.Username };
-            }).ToHashSet();
+            }).Data.ToHashSet();
 
             if (!users.Any())
             {

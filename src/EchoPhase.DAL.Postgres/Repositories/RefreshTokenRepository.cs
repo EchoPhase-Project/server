@@ -14,8 +14,9 @@ namespace EchoPhase.DAL.Postgres.Repositories
             _dbContext = dbContext;
         }
 
-        public IEnumerable<RefreshToken> Get(
+        public CursorPage<RefreshToken> Get(
             RefreshTokenSearchOptions options,
+            CursorOptions? cursor = null,
             Func<IQueryable<RefreshToken>, RefreshTokenSearchOptions, IQueryable<RefreshToken>>? extraFilters = null
         )
         {
@@ -23,21 +24,34 @@ namespace EchoPhase.DAL.Postgres.Repositories
                 Build(), options, (query, opts) =>
                 {
                     query = ExtraFilters(query, opts);
-                    if (extraFilters != null)
+                    if (extraFilters is not null)
                         query = extraFilters(query, opts);
                     return query;
                 });
-            return query;
+
+            if (cursor is not null)
+                return ApplyCursor(query, cursor, x => x.Id);
+
+            return new CursorPage<RefreshToken> { Data = query };
         }
 
-        public IEnumerable<RefreshToken> Get(
+        public CursorPage<RefreshToken> Get(
             Action<RefreshTokenSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
             Func<IQueryable<RefreshToken>, RefreshTokenSearchOptions, IQueryable<RefreshToken>>? extraFilters = null
         )
         {
             var options = new RefreshTokenSearchOptions();
             configure(options);
-            return Get(options, extraFilters);
+
+            CursorOptions? cursor = null;
+            if (configureCursor is not null)
+            {
+                cursor = new CursorOptions();
+                configureCursor(cursor);
+            }
+
+            return Get(options, cursor, extraFilters);
         }
 
         public override IQueryable<RefreshToken> Build()

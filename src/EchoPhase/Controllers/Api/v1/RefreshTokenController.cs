@@ -3,6 +3,7 @@ using EchoPhase.Security.Authentication.Jwt;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using EchoPhase.Controllers.Api.v1.Dto.Auth;
+using EchoPhase.Types.Repository;
 
 namespace EchoPhase.Controllers.Api.v1
 {
@@ -55,13 +56,17 @@ namespace EchoPhase.Controllers.Api.v1
         }
 
         [HttpGet("sessions")]
-        public async Task<IActionResult> GetSessions()
+        public async Task<IActionResult> GetSessions([FromQuery] string? after, [FromQuery] int limit = 20)
         {
             var user = await _userService.GetAsync(User);
             if (user is null || user.Id == Guid.Empty)
                 return Unauthorized();
 
-            var sessions = await _refreshTokenProvider.GetSessionsAsync(user.Id);
+            var sessions = await _refreshTokenProvider.GetSessionsAsync(user.Id, new CursorOptions
+            {
+                After = after,
+                Limit = limit
+            });
             return Ok(sessions);
         }
     }

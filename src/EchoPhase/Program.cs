@@ -43,6 +43,11 @@ namespace EchoPhase
                 .UseConsoleLifetime(options =>
                 {
                     options.SuppressStatusMessages = false;
+                })
+                .UseDefaultServiceProvider(options =>
+                {
+                    options.ValidateScopes = true;
+                    options.ValidateOnBuild = true;
                 });
     }
 }

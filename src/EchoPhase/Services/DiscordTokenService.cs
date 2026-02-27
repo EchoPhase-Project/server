@@ -9,6 +9,7 @@ using EchoPhase.Security.Cryptography;
 using EchoPhase.Types.Extensions;
 using EchoPhase.Types.Result;
 using EchoPhase.Types.Service;
+using EchoPhase.Types.Repository;
 
 namespace EchoPhase.Services
 {
@@ -33,36 +34,34 @@ namespace EchoPhase.Services
             _aes = aes;
         }
 
-        public IEnumerable<DiscordToken> Get(
+        public CursorPage<DiscordToken> Get(
             DiscordTokenSearchOptions opts,
+            CursorOptions? cursor = null,
             Func<IQueryable<DiscordToken>, DiscordTokenSearchOptions, IQueryable<DiscordToken>>? extraFilters = null
         )
         {
-            return _repository.Get(opts, (query, opts) =>
-                {
-                    ExtraFilters(query, opts);
-
-                    if (extraFilters != null)
-                        query = extraFilters(query, opts);
-
-                    return query;
-                });
+            return _repository.Get(opts, cursor, (query, opts) =>
+            {
+                ExtraFilters(query, opts);
+                if (extraFilters is not null)
+                    query = extraFilters(query, opts);
+                return query;
+            });
         }
 
-        public IEnumerable<DiscordToken> Get(
+        public CursorPage<DiscordToken> Get(
             Action<DiscordTokenSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
             Func<IQueryable<DiscordToken>, DiscordTokenSearchOptions, IQueryable<DiscordToken>>? extraFilters = null
         )
         {
-            return _repository.Get(configure, (query, opts) =>
-                {
-                    ExtraFilters(query, opts);
-
-                    if (extraFilters != null)
-                        query = extraFilters(query, opts);
-
-                    return query;
-                });
+            return _repository.Get(configure, configureCursor, (query, opts) =>
+            {
+                ExtraFilters(query, opts);
+                if (extraFilters is not null)
+                    query = extraFilters(query, opts);
+                return query;
+            });
         }
 
         public async Task<IServiceResult> CreateAsync(DiscordToken token)

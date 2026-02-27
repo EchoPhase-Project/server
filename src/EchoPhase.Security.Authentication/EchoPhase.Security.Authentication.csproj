@@ -19,6 +19,7 @@
     <ProjectReference Include="..\EchoPhase.DAL.Postgres\EchoPhase.DAL.Postgres.csproj" />
     <ProjectReference Include="..\EchoPhase.Security.Cryptography\EchoPhase.Security.Cryptography.csproj" />
     <ProjectReference Include="..\EchoPhase.Identity\EchoPhase.Identity.csproj" />
+    <ProjectReference Include="..\EchoPhase.Types\EchoPhase.Types.csproj" />
   </ItemGroup>
 
 </Project>

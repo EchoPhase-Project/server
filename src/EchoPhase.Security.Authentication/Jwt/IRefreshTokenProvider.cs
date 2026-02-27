@@ -1,4 +1,5 @@
 using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.Types.Repository;
 
 namespace EchoPhase.Security.Authentication.Jwt
 {
@@ -8,6 +9,6 @@ namespace EchoPhase.Security.Authentication.Jwt
         Task<TokenPair> RefreshAsync(string deviceId, string refreshToken);
         Task RevokeAsync(Guid userId, string deviceId, string refreshToken);
         Task RevokeAllAsync(Guid userId);
-        Task<IEnumerable<RefreshToken>> GetSessionsAsync(Guid userId);
+        Task<CursorPage<RefreshToken>> GetSessionsAsync(Guid userId, CursorOptions? cursor = null);
     }
 }

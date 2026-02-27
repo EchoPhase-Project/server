@@ -9,6 +9,7 @@ using EchoPhase.DAL.Postgres.Repositories.Options;
 using EchoPhase.Identity;
 using EchoPhase.Types.Extensions;
 using EchoPhase.Types.Service;
+using EchoPhase.Types.Repository;
 
 namespace EchoPhase.WebHooks
 {
@@ -33,20 +34,22 @@ namespace EchoPhase.WebHooks
             _roleService = roleService;
         }
 
-        public IEnumerable<WebHook> Get(
+        public CursorPage<WebHook> Get(
             WebHookSearchOptions opts,
+            CursorOptions? cursor = null,
             Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
         )
         {
-            return _repository.Get(opts, extraFilters);
+            return _repository.Get(opts, cursor, extraFilters);
         }
 
-        public IEnumerable<WebHook> Get(
+        public CursorPage<WebHook> Get(
             Action<WebHookSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
             Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
         )
         {
-            return _repository.Get(configure, extraFilters);
+            return _repository.Get(configure, configureCursor, extraFilters);
         }
 
         public async Task<IEnumerable<WebHook>> CreateAsync(params IEnumerable<WebHook> webhooks)
@@ -106,9 +109,8 @@ namespace EchoPhase.WebHooks
                 opts.Intents = intents;
                 opts.Status = WebHookStatus.Enabled;
             });
-
             var content = WrapMessage(message, Encoding.UTF8, ContentType);
-            await PostMessageToWebHooksAsync(content, webhooks);
+            await PostMessageToWebHooksAsync(content, webhooks.Data);
         }
 
         public async Task SendMessageToUsersAsync<T>(HashSet<Guid> userIds, T message, HashSet<string> intents, string ContentType = MediaTypeNames.Application.Json)
@@ -119,26 +121,21 @@ namespace EchoPhase.WebHooks
                 opts.Intents = intents;
                 opts.Status = WebHookStatus.Enabled;
             });
-
             var content = WrapMessage(message, Encoding.UTF8, ContentType);
-            await PostMessageToWebHooksAsync(content, webhooks);
+            await PostMessageToWebHooksAsync(content, webhooks.Data);
         }
 
         public async Task SendMessageToRolesAsync<T>(IEnumerable<string> roles, T message, HashSet<string> intents, string ContentType = MediaTypeNames.Application.Json)
         {
             var usersWithRole = await _roleService.GetUsersInRolesAsync(roles);
-
             var webhooks = _repository.Get(opts =>
             {
-                var userIds = usersWithRole.Select(u => u.Id).ToHashSet();
-
-                opts.UserIds = userIds;
+                opts.UserIds = usersWithRole.Select(u => u.Id).ToHashSet();
                 opts.Intents = intents;
                 opts.Status = WebHookStatus.Enabled;
             });
-
             var content = WrapMessage(message, Encoding.UTF8, ContentType);
-            await PostMessageToWebHooksAsync(content, webhooks);
+            await PostMessageToWebHooksAsync(content, webhooks.Data);
         }
 
         private async Task PostMessageToWebHooksAsync(StringContent content, IEnumerable<WebHook> webhooks)

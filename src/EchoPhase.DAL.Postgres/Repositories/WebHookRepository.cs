@@ -21,33 +21,44 @@ namespace EchoPhase.DAL.Postgres.Repositories
             _intentsService = intentsService;
         }
 
-        public IEnumerable<WebHook> Get(
+        public CursorPage<WebHook> Get(
             WebHookSearchOptions options,
+            CursorOptions? cursor = null,
             Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
         )
         {
             var query = ApplySearchOptions<WebHook, WebHookSearchOptions>(
                 Build(), options, (query, opts) =>
-                    {
-                        query = ExtraFilters(query, opts);
+                {
+                    query = ExtraFilters(query, opts);
+                    if (extraFilters is not null)
+                        query = extraFilters(query, opts);
+                    return query;
+                });
 
-                        if (extraFilters != null)
-                            query = extraFilters(query, opts);
+            if (cursor is not null)
+                return ApplyCursor(query, cursor, x => x.Id);
 
-                        return query;
-                    });
-
-            return query;
+            return new CursorPage<WebHook> { Data = query };
         }
 
-        public IEnumerable<WebHook> Get(
+        public CursorPage<WebHook> Get(
             Action<WebHookSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
             Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
         )
         {
             var options = new WebHookSearchOptions();
             configure(options);
-            return Get(options, extraFilters);
+
+            CursorOptions? cursor = null;
+            if (configureCursor is not null)
+            {
+                cursor = new CursorOptions();
+                configureCursor(cursor);
+            }
+
+            return Get(options, cursor, extraFilters);
         }
 
         public override IQueryable<WebHook> Build()

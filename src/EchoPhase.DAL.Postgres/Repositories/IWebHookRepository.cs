@@ -6,12 +6,14 @@ namespace EchoPhase.DAL.Postgres.Repositories
 {
     public interface IWebHookRepository : IRepositoryBase<WebHook, WebHookOptions>
     {
-        public IEnumerable<WebHook> Get(
+        CursorPage<WebHook> Get(
             WebHookSearchOptions options,
+            CursorOptions? cursor = null,
             Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
         );
-        public IEnumerable<WebHook> Get(
+        CursorPage<WebHook> Get(
             Action<WebHookSearchOptions> configure,
+            Action<CursorOptions>? configureCursor = null,
             Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
         );
     }

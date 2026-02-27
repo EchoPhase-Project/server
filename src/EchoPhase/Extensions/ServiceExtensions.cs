@@ -172,7 +172,11 @@ namespace EchoPhase.Extensions
             services.AddDbContext<PostgresContext>(options =>
                 options
                     .UseNpgsql(settings.ConnectionString,
-                        o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+                        o =>
+                        {
+                            o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                            o.EnableRetryOnFailure(maxRetryCount: 3);
+                        }));
 
             return services;
         }
@@ -477,6 +481,7 @@ namespace EchoPhase.Extensions
                 options.CopyFrom(authCookie));
 
             services.AddScoped<IJwtTokenProvider, JwtTokenProvider>();
+            services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
             services.AddScoped<IRefreshTokenProvider, RefreshTokenProvider>();
             services.AddScoped<IAuthService, AuthService>();
 

@@ -36,10 +36,9 @@ namespace EchoPhase.Controllers.Api.v1
         public async Task<IActionResult> GenerateById(Guid guid)
         {
             var users = _userService.Get(x => x.Ids = [guid]);
-            if (!users.Any())
+            if (!users.Data.Any())
                 return NotFound();
-
-            return Ok(await BuildTokenDictAsync(users));
+            return Ok(await BuildTokenDictAsync(users.Data));
         }
 
         [HttpPost("{username:username}")]
@@ -48,20 +47,17 @@ namespace EchoPhase.Controllers.Api.v1
         {
             if (string.IsNullOrWhiteSpace(username))
                 return BadRequest("Username is required.");
-
             var users = _userService.Get(x => x.UserNames = [username]);
-            if (!users.Any())
+            if (!users.Data.Any())
                 return NotFound();
-
-            return Ok(await BuildTokenDictAsync(users));
+            return Ok(await BuildTokenDictAsync(users.Data));
         }
 
         private async Task<IDictionary<Guid, string>> BuildTokenDictAsync(IEnumerable<User> users)
         {
-            var dict = new Dictionary<Guid, string>();
-            foreach (var user in users)
-                dict[user.Id] = await _jwt.GenerateTokenAsync(user);
-            return dict;
+            var tasks = users.Select(async user => (user.Id, Token: await _jwt.GenerateTokenAsync(user)));
+            var results = await Task.WhenAll(tasks);
+            return results.ToDictionary(x => x.Id, x => x.Token);
         }
     }
 }
