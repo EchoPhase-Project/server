@@ -36,5 +36,11 @@ namespace EchoPhase.Security.Antiforgery
         /// </summary>
         /// <returns>A task representing the asynchronous validation operation.</returns>
         Task ValidateAsync();
+
+        /// <summary>
+        /// Removes the CSRF token cookie from the response.
+        /// </summary>
+        /// <param name="cookieName">The cookie name to remove. Optional.</param>
+        void Remove(string cookieName = AntiforgeryService.CsrfCookieName);
     }
 }

@@ -2,14 +2,14 @@ using EchoPhase.Types.Repository;
 
 namespace EchoPhase.Types.Service
 {
-    public abstract class DataServiceBase<TR, TO> : IDataServiceBase<TR>
-        where TR : IRepositoryBase<TO>
+    public abstract class DataServiceBase<TEntity, TR, TO> : IDataServiceBase<TEntity, TR, TO>
+        where TR : IRepositoryBase<TEntity, TO>
+        where TEntity : class
+        where TO : class, new()
     {
         protected readonly TR _repository;
 
-        public DataServiceBase(
-            TR repository
-        )
+        public DataServiceBase(TR repository)
         {
             _repository = repository;
         }

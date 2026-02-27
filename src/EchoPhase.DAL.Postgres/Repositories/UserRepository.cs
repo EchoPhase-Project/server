@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EchoPhase.DAL.Postgres.Repositories
 {
-    public class UserRepository : RepositoryBase<UserOptions>
+    public class UserRepository : RepositoryBase<User, UserOptions>
     {
         private readonly PostgresContext _dbContext;
 
@@ -47,13 +47,13 @@ namespace EchoPhase.DAL.Postgres.Repositories
         {
             IQueryable<User> query = _dbContext.Users;
             if (_options.IncludeWebHooks)
-                query.Include(q => q.WebHooks);
+                query = query.Include(q => q.WebHooks);
 
             if (_options.IncludeRefreshTokens)
-                query.Include(q => q.RefreshTokens);
+                query = query.Include(q => q.RefreshTokens);
 
             if (_options.IncludeDiscordTokens)
-                query.Include(q => q.DiscordTokens);
+                query = query.Include(q => q.DiscordTokens);
 
             return query;
         }

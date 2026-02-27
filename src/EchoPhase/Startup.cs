@@ -11,9 +11,9 @@ using EchoPhase.Middlewares;
 using EchoPhase.Projection;
 using EchoPhase.QRCodes;
 using EchoPhase.RouteConstraints;
+using EchoPhase.Scheduling;
 using EchoPhase.Security.Authentication;
 using EchoPhase.Security.BitMasks;
-using EchoPhase.Scheduling;
 using EchoPhase.Services.Internal;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
@@ -68,6 +68,7 @@ namespace EchoPhase
             services.Configure<RouteOptions>(options =>
             {
                 options.ConstraintMap.Add("ulong", typeof(ULongRouteConstraint));
+                options.ConstraintMap.Add("username", typeof(UsernameRouteConstraint));
             });
 
             TimeZoneInfo timeZone = TimeZoneInfo.Local;
@@ -127,7 +128,6 @@ namespace EchoPhase
             services.AddScoped<UserRepository>();
 
             services.AddScoped<IUserService, UserService>();
-            services.AddScoped<IAuthService, AuthService>();
 
             services.AddScoped<UserManager<User>, UserManager<User>>();
             services.AddScoped<SignInManager<User>, SignInManager<User>>();

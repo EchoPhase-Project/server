@@ -5,27 +5,33 @@ namespace EchoPhase.EvalTests
     public class Person
     {
         public string Name { get; set; } = "";
-        public int Age { get; set; }
+        public int Age
+        {
+            get; set;
+        }
         public Address Address { get; set; } = new();
     }
 
     public class Address
     {
         public string City { get; set; } = "";
-        public int Zip { get; set; }
+        public int Zip
+        {
+            get; set;
+        }
     }
 
     public class TemplateModelTests : IClassFixture<Fixture>
     {
         private readonly ILexer<TemplateToken> _lexer;
         private readonly IParser<TemplateToken> _parser;
-		private readonly ITestOutputHelper _output;
+        private readonly ITestOutputHelper _output;
 
         public TemplateModelTests(Fixture fixture, ITestOutputHelper output)
         {
             _lexer = fixture.Provider.GetRequiredService<ILexer<TemplateToken>>();
             _parser = fixture.Provider.GetRequiredService<IParser<TemplateToken>>();
-			_output = output;
+            _output = output;
         }
 
         [Fact]

@@ -1,8 +1,8 @@
 using System.Collections;
 using System.Net.WebSockets;
-using Microsoft.AspNetCore.Http;
-using EchoPhase.Types.BitMask;
 using EchoPhase.Types.Attributes;
+using EchoPhase.Types.BitMask;
+using Microsoft.AspNetCore.Http;
 
 namespace EchoPhase.WebSockets
 {

@@ -1,12 +1,12 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
-using Microsoft.AspNetCore.Http;
 using EchoPhase.Configuration.Settings;
 using EchoPhase.DAL.Redis.Interfaces;
 using EchoPhase.DAL.Redis.Models;
+using EchoPhase.WebSockets.Exceptions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using EchoPhase.WebSockets.Exceptions;
 
 namespace EchoPhase.WebSockets
 {

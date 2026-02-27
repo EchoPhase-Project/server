@@ -7,12 +7,12 @@ using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Postgres.Repositories.Options;
 using EchoPhase.Identity;
-using EchoPhase.Types.Service;
 using EchoPhase.Types.Extensions;
+using EchoPhase.Types.Service;
 
 namespace EchoPhase.WebHooks
 {
-    public class WebHookService : DataServiceBase<WebHookRepository, WebHookOptions>
+    public class WebHookService : DataServiceBase<WebHook, WebHookRepository, WebHookOptions>
     {
         private readonly PostgresContext _context;
         private readonly HttpClient _httpClient;
@@ -99,7 +99,7 @@ namespace EchoPhase.WebHooks
             return webhooks;
         }
 
-        public async Task SendMessageToAllAsync<T>(T message, ISet<string> intents, string ContentType = MediaTypeNames.Application.Json)
+        public async Task SendMessageToAllAsync<T>(T message, HashSet<string> intents, string ContentType = MediaTypeNames.Application.Json)
         {
             var webhooks = _repository.Get(opts =>
             {
@@ -111,7 +111,7 @@ namespace EchoPhase.WebHooks
             await PostMessageToWebHooksAsync(content, webhooks);
         }
 
-        public async Task SendMessageToUsersAsync<T>(ISet<Guid> userIds, T message, ISet<string> intents, string ContentType = MediaTypeNames.Application.Json)
+        public async Task SendMessageToUsersAsync<T>(HashSet<Guid> userIds, T message, HashSet<string> intents, string ContentType = MediaTypeNames.Application.Json)
         {
             var webhooks = _repository.Get(opts =>
             {
@@ -124,7 +124,7 @@ namespace EchoPhase.WebHooks
             await PostMessageToWebHooksAsync(content, webhooks);
         }
 
-        public async Task SendMessageToRolesAsync<T>(IEnumerable<string> roles, T message, ISet<string> intents, string ContentType = MediaTypeNames.Application.Json)
+        public async Task SendMessageToRolesAsync<T>(IEnumerable<string> roles, T message, HashSet<string> intents, string ContentType = MediaTypeNames.Application.Json)
         {
             var usersWithRole = await _roleService.GetUsersInRolesAsync(roles);
 

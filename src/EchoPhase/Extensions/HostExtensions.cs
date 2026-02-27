@@ -1,6 +1,6 @@
-using Commands = EchoPhase.Cli.Commands;
 using EchoPhase.Registrars;
 using Spectre.Console.Cli;
+using Commands = EchoPhase.Cli.Commands;
 
 namespace EchoPhase.Extensions
 {

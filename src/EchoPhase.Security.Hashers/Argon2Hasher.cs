@@ -1,4 +1,3 @@
-using RNG = System.Security.Cryptography.RandomNumberGenerator;
 using System.Text;
 using EchoPhase.Configuration.Settings;
 using EchoPhase.DAL.Postgres.Models;
@@ -9,6 +8,7 @@ using Isopoh.Cryptography.Argon2;
 using Isopoh.Cryptography.SecureArray;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
+using RNG = System.Security.Cryptography.RandomNumberGenerator;
 
 namespace EchoPhase.Security.Hashers
 {

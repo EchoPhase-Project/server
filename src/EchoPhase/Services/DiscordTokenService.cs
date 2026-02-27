@@ -6,13 +6,13 @@ using EchoPhase.DAL.Postgres.Repositories.Options;
 using EchoPhase.Identity;
 using EchoPhase.Interfaces;
 using EchoPhase.Security.Cryptography;
+using EchoPhase.Types.Extensions;
 using EchoPhase.Types.Result;
 using EchoPhase.Types.Service;
-using EchoPhase.Types.Extensions;
 
 namespace EchoPhase.Services
 {
-    public class DiscordTokenService : DataServiceBase<DiscordTokenRepository, DiscordTokenOptions>, IDiscordTokenService
+    public class DiscordTokenService : DataServiceBase<DiscordToken, DiscordTokenRepository, DiscordTokenOptions>, IDiscordTokenService
     {
         private readonly PostgresContext _context;
         private readonly IWebHostEnvironment _environment;

@@ -1,14 +1,14 @@
 using System.Net.WebSockets;
 using System.Text;
 using EchoPhase.Identity;
+using EchoPhase.WebSockets;
+using EchoPhase.WebSockets.Processors;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ParkSquare.AspNetCore.Sitemap;
-using EchoPhase.WebSockets;
-using EchoPhase.WebSockets.Processors;
 
-namespace EchoPhase.Controllers
+namespace EchoPhase.Controllers.WebSockets.v1
 {
     [Route("/gateway")]
     [ApiController]

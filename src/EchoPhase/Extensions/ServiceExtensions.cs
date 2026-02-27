@@ -22,6 +22,7 @@ using EchoPhase.Scripting.Parsers;
 using EchoPhase.Scripting.Tokens;
 using EchoPhase.Security.Antiforgery;
 using EchoPhase.Security.Authentication;
+using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Security.Authorization.Factories;
 using EchoPhase.Security.Authorization.Handlers;
 using EchoPhase.Security.BitMasks;
@@ -30,8 +31,8 @@ using EchoPhase.Security.Cryptography;
 using EchoPhase.Security.Hashers;
 using EchoPhase.Services;
 using EchoPhase.Services.Events;
-using EchoPhase.WebHooks;
 using EchoPhase.Types.Result.Extensions;
+using EchoPhase.WebHooks;
 using EchoPhase.WebSockets;
 using EchoPhase.WebSockets.Processors;
 using EchoPhase.WebSockets.Processors.Handlers;
@@ -475,8 +476,9 @@ namespace EchoPhase.Extensions
             .AddCookie(options =>
                 options.CopyFrom(authCookie));
 
-            services.AddScoped<IJwtTokenService, JwtTokenService>();
-            services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+            services.AddScoped<IJwtTokenProvider, JwtTokenProvider>();
+            services.AddScoped<IRefreshTokenProvider, RefreshTokenProvider>();
+            services.AddScoped<IAuthService, AuthService>();
 
             return services;
         }

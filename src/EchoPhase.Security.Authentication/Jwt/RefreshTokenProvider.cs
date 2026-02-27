@@ -1,19 +1,23 @@
 using System.Security.Cryptography;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.DAL.Postgres.Repositories;
 
-namespace EchoPhase.Security.Authentication
+namespace EchoPhase.Security.Authentication.Jwt
 {
-    public class RefreshTokenService : IRefreshTokenService
+    public class RefreshTokenProvider : IRefreshTokenProvider
     {
+        private readonly IRefreshTokenRepository _repository;
         private readonly PostgresContext _db;
-        private readonly IJwtTokenService _jwtService;
+        private readonly IJwtTokenProvider _jwtService;
 
-        public RefreshTokenService(
+        public RefreshTokenProvider(
+            IRefreshTokenRepository repository,
             PostgresContext db,
-            IJwtTokenService jwtService
+            IJwtTokenProvider jwtService
         )
         {
+            _repository = repository;
             _db = db;
             _jwtService = jwtService;
         }
@@ -37,12 +41,10 @@ namespace EchoPhase.Security.Authentication
                 DeviceId = deviceId,
                 RefreshValue = GenerateSecureToken()
             };
-
             _db.RefreshTokens.Add(entry);
             await _db.SaveChangesAsync();
 
             var jwt = await _jwtService.GenerateTokenAsync(user, TimeSpan.FromMinutes(15));
-
             return new TokenPair
             {
                 AccessToken = jwt,
@@ -52,24 +54,25 @@ namespace EchoPhase.Security.Authentication
 
         public async Task<TokenPair> RefreshAsync(string deviceId, string refreshToken)
         {
-            var existing = _db.RefreshTokens
-                .FirstOrDefault(r =>
-                    r.DeviceId == deviceId &&
-                    r.RefreshValue == refreshToken);
+            var existing = _repository.Get(x =>
+            {
+                x.DeviceIds = [deviceId];
+                x.RefreshValues = [refreshToken];
+            }).FirstOrDefault();
 
             if (existing is null)
-                throw new NullReferenceException("Invalid refresh token.");
+            {
+                throw new UnauthorizedAccessException("Invalid refresh token.");
+            }
 
             if (existing.User is null)
-                throw new NullReferenceException("Invalid UserId.");
+                throw new InvalidOperationException("Invalid UserId.");
 
             existing.RefreshValue = GenerateSecureToken();
-
             _db.RefreshTokens.Update(existing);
             await _db.SaveChangesAsync();
 
             var jwt = await _jwtService.GenerateTokenAsync(existing.User, TimeSpan.FromMinutes(15));
-
             return new TokenPair
             {
                 AccessToken = jwt,
@@ -77,12 +80,14 @@ namespace EchoPhase.Security.Authentication
             };
         }
 
-        public async Task RevokeAsync(string deviceId, string refreshToken)
+        public async Task RevokeAsync(Guid userId, string deviceId, string refreshToken)
         {
-            var existing = _db.RefreshTokens
-                .FirstOrDefault(r =>
-                    r.DeviceId == deviceId &&
-                    r.RefreshValue == refreshToken);
+            var existing = _repository.Get(x =>
+            {
+                x.UserIds = [userId];
+                x.DeviceIds = [deviceId];
+                x.RefreshValues = [refreshToken];
+            }).FirstOrDefault();
 
             if (existing is not null)
             {
@@ -93,9 +98,15 @@ namespace EchoPhase.Security.Authentication
 
         public async Task RevokeAllAsync(Guid userId)
         {
-            var tokens = _db.RefreshTokens.Where(r => r.UserId == userId);
+            var tokens = _repository.Get(x => x.UserIds = [userId]);
             _db.RefreshTokens.RemoveRange(tokens);
             await _db.SaveChangesAsync();
+        }
+
+        public Task<IEnumerable<RefreshToken>> GetSessionsAsync(Guid userId)
+        {
+            var tokens = _repository.Get(x => x.UserIds = [userId]);
+            return Task.FromResult(tokens);
         }
     }
 }

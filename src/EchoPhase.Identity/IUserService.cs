@@ -6,7 +6,7 @@ using EchoPhase.Types.Service;
 
 namespace EchoPhase.Identity
 {
-    public interface IUserService : IDataServiceBase<UserRepository>
+    public interface IUserService : IDataServiceBase<User, UserRepository, UserOptions>
     {
         IEnumerable<User> Get(
             UserSearchOptions opts,

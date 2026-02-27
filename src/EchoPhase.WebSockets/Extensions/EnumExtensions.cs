@@ -1,5 +1,5 @@
-using EchoPhase.WebSockets.Constants;
 using EchoPhase.WebSockets.Attributes;
+using EchoPhase.WebSockets.Constants;
 
 namespace EchoPhase.WebSockets.Extensions
 {

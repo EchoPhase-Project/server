@@ -4,7 +4,7 @@ using EchoPhase.Types.Repository;
 
 namespace EchoPhase.DAL.Postgres.Repositories
 {
-    public interface IWebHookRepository : IRepositoryBase<WebHookOptions>
+    public interface IWebHookRepository : IRepositoryBase<WebHook, WebHookOptions>
     {
         public IEnumerable<WebHook> Get(
             WebHookSearchOptions options,

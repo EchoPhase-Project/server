@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EchoPhase.DAL.Postgres.Repositories
 {
-    public class DiscordTokenRepository : RepositoryBase<DiscordTokenOptions>
+    public class DiscordTokenRepository : RepositoryBase<DiscordToken, DiscordTokenOptions>
     {
         private readonly PostgresContext _dbContext;
         private readonly AesGcm _aes;
@@ -54,7 +54,7 @@ namespace EchoPhase.DAL.Postgres.Repositories
             IQueryable<DiscordToken> query = _dbContext.DiscordTokens;
 
             if (_options.IncludeUser)
-                query.Include(q => q.User);
+                query = query.Include(q => q.User);
 
             return query;
         }

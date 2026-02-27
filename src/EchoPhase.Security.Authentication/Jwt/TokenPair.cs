@@ -1,4 +1,4 @@
-namespace EchoPhase.Security.Authentication
+namespace EchoPhase.Security.Authentication.Jwt
 {
     public class TokenPair
     {

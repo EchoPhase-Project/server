@@ -13,7 +13,7 @@ using UserOptions = EchoPhase.DAL.Postgres.Repositories.Options.UserOptions;
 
 namespace EchoPhase.Identity
 {
-    public class UserService : DataServiceBase<UserRepository, UserOptions>, IUserService
+    public class UserService : DataServiceBase<User, UserRepository, UserOptions>, IUserService
     {
         private readonly PostgresContext _context;
         private readonly UserManager<User> _userManager;

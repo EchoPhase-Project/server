@@ -1,5 +1,5 @@
-using Newtonsoft.Json.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.EvalTests
 {
@@ -7,13 +7,13 @@ namespace EchoPhase.EvalTests
     {
         private readonly ILexer<Token> _lexer;
         private readonly IParser<Token> _parser;
-		private readonly ITestOutputHelper _output;
+        private readonly ITestOutputHelper _output;
 
         public ExecuteTests(Fixture fixture, ITestOutputHelper output)
         {
             _lexer = fixture.Provider.GetRequiredService<ILexer<Token>>();
             _parser = fixture.Provider.GetRequiredService<IParser<Token>>();
-			_output = output;
+            _output = output;
         }
 
         [Theory]
@@ -45,7 +45,7 @@ namespace EchoPhase.EvalTests
             var variables = new Dictionary<string, object>
             {
                 ["x"] = 2,
-				["items"] = new JArray(2, 5, 3),
+                ["items"] = new JArray(2, 5, 3),
                 ["user"] = JObject.Parse(@"{ 'name': 'Alice', 'age': 30, 'index': 0, 'i' : [1] }")
             };
 

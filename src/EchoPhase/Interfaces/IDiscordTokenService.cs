@@ -7,7 +7,7 @@ using EchoPhase.Types.Service;
 
 namespace EchoPhase.Interfaces
 {
-    public interface IDiscordTokenService : IDataServiceBase<DiscordTokenRepository>
+    public interface IDiscordTokenService : IDataServiceBase<DiscordToken, DiscordTokenRepository, DiscordTokenOptions>
     {
         IEnumerable<DiscordToken> Get(
             DiscordTokenSearchOptions opts,

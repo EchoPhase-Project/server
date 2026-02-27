@@ -1,6 +1,6 @@
 using EchoPhase.Hubs;
-using Microsoft.AspNetCore.SignalR;
 using EchoPhase.WebSockets;
+using Microsoft.AspNetCore.SignalR;
 
 namespace EchoPhase.Services.Internal
 {

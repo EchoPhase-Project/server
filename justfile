@@ -6,6 +6,9 @@ set dotenv-load
 # Import docker-specific tasks
 import 'just/docker.just'
 
+# Import helm-specific tasks
+import 'just/helm.just'
+
 # Show available commands
 default:
     @just --list
@@ -28,3 +31,7 @@ clean:
     @rm -rf frontend/dist/ frontend/build/ frontend/node_modules/.cache/
     @rm -rf src/bin/ src/obj/
     @echo "Clean complete!"
+
+# Full rebuild: clean registry, rebuild and redeploy
+rebuild: docker-clean helm-uninstall docker-publish-all helm-upgrade
+    @echo "Full rebuild complete!"

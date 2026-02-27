@@ -1,15 +1,15 @@
-using System.ComponentModel.DataAnnotations;
 using EchoPhase.Identity;
 using EchoPhase.Projection;
 using EchoPhase.Security.Antiforgery;
 using EchoPhase.Security.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using EchoPhase.Controllers.Api.v1.Dto.Auth;
 
-namespace EchoPhase.Controllers
+namespace EchoPhase.Controllers.Api.v1
 {
     [ApiController]
-    [Route("api/v1/[controller]")]
+    [Route("api/v1/auth")]
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
@@ -21,8 +21,7 @@ namespace EchoPhase.Controllers
             IAuthService authService,
             IAntiforgeryService antiforgeryService,
             IUserService userService,
-            Projector projector
-        )
+            Projector projector)
         {
             _authService = authService;
             _antiforgeryService = antiforgeryService;
@@ -42,7 +41,7 @@ namespace EchoPhase.Controllers
             if (!signInResult.Succeeded)
                 return Unauthorized();
 
-            return Ok();
+            return NoContent();
         }
 
         [HttpPost("login")]
@@ -52,25 +51,25 @@ namespace EchoPhase.Controllers
             var result = await _authService.AuthenticateAsync(dto.Username, dto.Password);
             if (!result.Succeeded)
                 return Unauthorized();
-            return Ok();
+
+            return NoContent();
         }
 
         [HttpGet("antiforgery")]
-        public IActionResult Csrf()
+        public IActionResult GetAntiforgeryToken()
         {
             _antiforgeryService.Set();
-            return Ok();
+            return NoContent();
         }
 
         [HttpGet("me")]
         public async Task<IActionResult> Me()
         {
             var user = await _userService.GetAsync(User);
-            if (user == null)
+            if (user is null)
                 return Unauthorized();
 
-
-            return Ok(_projector.Project(user, u => u.UserName, u => u.Id));
+            return Ok(_projector.Project(user, u => u.UserName, u => u.Id, u => u.Name));
         }
 
         [HttpPost("logout")]
@@ -78,33 +77,8 @@ namespace EchoPhase.Controllers
         public async Task<IActionResult> Logout()
         {
             await _authService.LogoutAsync();
-            return Ok();
+            _antiforgeryService.Remove();
+            return NoContent();
         }
-    }
-
-    public class LoginDto
-    {
-        [Required]
-        [MinLength(3)]
-        public string Username { get; set; } = default!;
-
-        [Required]
-        [MinLength(6)]
-        public string Password { get; set; } = default!;
-    }
-
-    public class RegisterDto
-    {
-        [Required]
-        [MinLength(2)]
-        public string Name { get; set; } = default!;
-
-        [Required]
-        [MinLength(3)]
-        public string Username { get; set; } = default!;
-
-        [Required]
-        [MinLength(6)]
-        public string Password { get; set; } = default!;
     }
 }

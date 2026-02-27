@@ -36,5 +36,7 @@ csharp_style_expression_bodied_properties = false:suggestion
 dotnet_remove_unnecessary_usings = true
 
 dotnet_diagnostic.IDE0005.severity = warning  # unused using
+dotnet_diagnostic.IDE0008.severity = none
 dotnet_diagnostic.IDE0044.severity = suggestion  # readonly modifier where possible
 dotnet_diagnostic.IDE0051.severity = warning  # unused private members
+dotnet_diagnostic.IDE0290.severity = none

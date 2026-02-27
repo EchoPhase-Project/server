@@ -11,32 +11,29 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
-namespace EchoPhase.Security.Authentication
+namespace EchoPhase.Security.Authentication.Jwt
 {
-    public class JwtTokenService : IJwtTokenService
+    public class JwtTokenProvider : IJwtTokenProvider
     {
         private readonly IRoleService _roleService;
         private readonly IRolesBitMask _rolesBitmask;
-        private readonly IAuthService _authService;
         private readonly AesGcm _aes;
-        private readonly ILogger<JwtTokenService> _logger;
+        private readonly ILogger<JwtTokenProvider> _logger;
         private readonly BearerSettings _settings;
 
         private byte[] _key;
 
-        public JwtTokenService(
+        public JwtTokenProvider(
             IRoleService roleService,
             IRolesBitMask rolesBitmask,
-            IAuthService authService,
             AesGcm aes,
-            ILogger<JwtTokenService> logger,
+            ILogger<JwtTokenProvider> logger,
             IOptions<AuthenticationSettings> settings,
             IKeyVault keyVault
         )
         {
             _roleService = roleService;
             _rolesBitmask = rolesBitmask;
-            _authService = authService;
             _aes = aes;
             _logger = logger;
             _settings = settings.Value.Schemes.Bearer;

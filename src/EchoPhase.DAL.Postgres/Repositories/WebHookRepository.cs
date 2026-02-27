@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EchoPhase.DAL.Postgres.Repositories
 {
-    public class WebHookRepository : RepositoryBase<WebHookOptions>, IWebHookRepository
+    public class WebHookRepository : RepositoryBase<WebHook, WebHookOptions>, IWebHookRepository
     {
         private readonly PostgresContext _dbContext;
         private readonly IIntentsBitMask _intentsService;
@@ -54,7 +54,7 @@ namespace EchoPhase.DAL.Postgres.Repositories
         {
             IQueryable<WebHook> query = _dbContext.WebHooks;
             if (_options.IncludeUser)
-                query.Include(q => q.User);
+                query = query.Include(q => q.User);
 
             return query;
         }

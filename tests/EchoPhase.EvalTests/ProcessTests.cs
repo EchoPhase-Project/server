@@ -6,13 +6,13 @@ namespace EchoPhase.EvalTests
     {
         private readonly ILexer<TemplateToken> _lexer;
         private readonly IParser<TemplateToken> _parser;
-		private readonly ITestOutputHelper _output;
+        private readonly ITestOutputHelper _output;
 
         public ProcessTests(Fixture fixture, ITestOutputHelper output)
         {
             _lexer = fixture.Provider.GetRequiredService<ILexer<TemplateToken>>();
             _parser = fixture.Provider.GetRequiredService<IParser<TemplateToken>>();
-			_output = output;
+            _output = output;
         }
 
         [Fact]
@@ -45,10 +45,10 @@ namespace EchoPhase.EvalTests
             var input = "Sum: @(a + b), product: @(a * b)";
             var expected = "Sum: 15, product: 50";
 
-			var result = Eval.Process<string>(_lexer, _parser, input, variables);
+            var result = Eval.Process<string>(_lexer, _parser, input, variables);
 
-			result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
-			result.OnSuccess(value => Assert.Equal(expected, value));
+            result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
+            result.OnSuccess(value => Assert.Equal(expected, value));
         }
 
         [Fact]

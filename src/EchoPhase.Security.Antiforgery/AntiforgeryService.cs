@@ -161,5 +161,27 @@ namespace EchoPhase.Security.Antiforgery
 
             await _antiforgery.ValidateRequestAsync(httpContext);
         }
+
+        /// <summary>
+        /// Removes the CSRF token cookie from the response.
+        /// </summary>
+        /// <param name="cookieName">
+        /// The name of the cookie to remove. Defaults to <c>CsrfCookieName</c>.
+        /// </param>
+        /// <exception cref="InvalidOperationException">Thrown if <see cref="HttpContext"/> is null.</exception>
+        public void Remove(string cookieName = CsrfCookieName)
+        {
+            var httpContext = _httpContextAccessor.HttpContext
+                ?? throw new InvalidOperationException("HttpContext is null.");
+
+            httpContext.Response.Cookies.Delete(cookieName, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = httpContext.Request.IsHttps,
+                SameSite = SameSiteMode.Strict,
+                Path = "/",
+                IsEssential = true
+            });
+        }
     }
 }

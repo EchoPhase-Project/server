@@ -1,0 +1,25 @@
+<Solution>
+  <Project Path="EchoPhase.Cli/EchoPhase.Cli.csproj" />
+  <Project Path="EchoPhase.Clients/EchoPhase.Clients.csproj" />
+  <Project Path="EchoPhase.Configuration/EchoPhase.Configuration.csproj" />
+  <Project Path="EchoPhase.DAL.Postgres/EchoPhase.DAL.Postgres.csproj" />
+  <Project Path="EchoPhase.DAL.Redis/EchoPhase.DAL.Redis.csproj" />
+  <Project Path="EchoPhase.DAL.Scylla/EchoPhase.DAL.Scylla.csproj" />
+  <Project Path="EchoPhase.Identity/EchoPhase.Identity.csproj" />
+  <Project Path="EchoPhase.Profilers/EchoPhase.Profilers.csproj" />
+  <Project Path="EchoPhase.Projection/EchoPhase.Projection.csproj" />
+  <Project Path="EchoPhase.QRCodes/EchoPhase.QRCodes.csproj" />
+  <Project Path="EchoPhase.Runners/EchoPhase.Runners.csproj" />
+  <Project Path="EchoPhase.Scheduling/EchoPhase.Scheduling.csproj" />
+  <Project Path="EchoPhase.Scripting/EchoPhase.Scripting.csproj" />
+  <Project Path="EchoPhase.Security.Antiforgery/EchoPhase.Security.Antiforgery.csproj" />
+  <Project Path="EchoPhase.Security.Authentication/EchoPhase.Security.Authentication.csproj" />
+  <Project Path="EchoPhase.Security.Authorization/EchoPhase.Security.Authorization.csproj" />
+  <Project Path="EchoPhase.Security.BitMasks/EchoPhase.Security.BitMasks.csproj" />
+  <Project Path="EchoPhase.Security.Cryptography/EchoPhase.Security.Cryptography.csproj" />
+  <Project Path="EchoPhase.Security.Hashers/EchoPhase.Security.Hashers.csproj" />
+  <Project Path="EchoPhase.Types/EchoPhase.Types.csproj" />
+  <Project Path="EchoPhase.WebHooks/EchoPhase.WebHooks.csproj" />
+  <Project Path="EchoPhase.WebSockets/EchoPhase.WebSockets.csproj" />
+  <Project Path="EchoPhase/EchoPhase.csproj" />
+</Solution>

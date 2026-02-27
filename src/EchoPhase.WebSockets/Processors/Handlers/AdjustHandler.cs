@@ -1,10 +1,10 @@
 using System.Net.WebSockets;
+using EchoPhase.Security.BitMasks;
+using EchoPhase.Types.Result.Extensions;
 using EchoPhase.WebSockets.Attributes;
 using EchoPhase.WebSockets.Constants;
 using EchoPhase.WebSockets.Exceptions;
 using EchoPhase.WebSockets.Processors.Payloads;
-using EchoPhase.Types.Result.Extensions;
-using EchoPhase.Security.BitMasks;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {

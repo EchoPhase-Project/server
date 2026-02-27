@@ -1,13 +1,16 @@
+using EchoPhase.Types.Validation;
 using EchoPhase.WebSockets.Attributes;
 using EchoPhase.WebSockets.Constants;
-using EchoPhase.Types.Validation;
 
 namespace EchoPhase.WebSockets.Processors.Payloads
 {
     [OpCodePayload(OpCodes.Handshake)]
     public class HandshakePayload : IPayload
     {
-        public string? Intents { get; set; }
+        public string? Intents
+        {
+            get; set;
+        }
 
         public HandshakePayload()
         {
