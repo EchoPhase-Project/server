@@ -1,0 +1,26 @@
+info:
+  name: Antiforgery
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{baseUrl}}/auth/antiforgery"
+  auth: inherit
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.headers["x-csrf-token"]
+        method: jsonq
+      variable:
+        name: X-CSRF-TOKEN
+        scope: runtime
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
