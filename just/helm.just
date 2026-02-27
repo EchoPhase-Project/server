@@ -18,6 +18,7 @@ helm-upgrade:
         --namespace {{HELM_NAMESPACE}} \
         --values {{HELM_DIR}}/{{HELM_VALUES}} \
         --create-namespace
+    kubectl rollout restart deployment -n {{HELM_NAMESPACE}}
 
 # Uninstall helm release and delete namespace
 helm-uninstall:
