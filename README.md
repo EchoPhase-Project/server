@@ -138,11 +138,6 @@ just docker-publish-all 1.0.0
 helm install echophase helm --namespace echophase --create-namespace
 ```
 
-**Launching default Docker Compose:**
-```bash
-cd compose && docker-compose up -d
-```
-
 ## Advanced Usage
 
 ### Custom Registry
