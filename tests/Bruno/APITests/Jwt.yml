@@ -1,0 +1,29 @@
+info:
+  name: Jwt
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{baseUrl}}/auth/jwt/@me"
+  headers:
+    - name: X-CSRF-TOKEN
+      value: "{{X-CSRF-TOKEN}}"
+  auth: inherit
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.{{Id}}
+        method: jsonq
+      variable:
+        name: Bearer
+        scope: runtime
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
