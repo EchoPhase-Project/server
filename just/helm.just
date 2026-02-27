@@ -21,5 +21,5 @@ helm-upgrade:
 
 # Uninstall helm release and delete namespace
 helm-uninstall:
-    helm uninstall {{HELM_RELEASE}} --namespace {{HELM_NAMESPACE}}
-    kubectl delete namespace {{HELM_NAMESPACE}}
+    helm uninstall {{HELM_RELEASE}} --namespace {{HELM_NAMESPACE}} --ignore-not-found
+    kubectl delete namespace {{HELM_NAMESPACE}} --ignore-not-found
