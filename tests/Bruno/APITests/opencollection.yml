@@ -17,7 +17,7 @@ config:
 request:
   variables:
     - name: baseUrl
-      value: localhost/api/v1
+      value: http://localhost/api/v1
 bundled: false
 extensions:
   bruno:
@@ -27,4 +27,4 @@ extensions:
     presets:
       request:
         type: http
-        url: localhost
+        url: "{{baseUrl}}"
