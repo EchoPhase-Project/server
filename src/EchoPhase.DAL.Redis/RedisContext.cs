@@ -1,4 +1,4 @@
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Database.Redis;
 using EchoPhase.DAL.Redis.Models;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;

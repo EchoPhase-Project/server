@@ -1,9 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Cryptography.Aes;
 using EchoPhase.Types.Result.Extensions;
 using Microsoft.Extensions.Options;
 using SystemAesGcm = System.Security.Cryptography.AesGcm;
+using EchoPhase.Security.Cryptography.Vaults;
 
 namespace EchoPhase.Security.Cryptography
 {

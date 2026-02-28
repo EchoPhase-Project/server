@@ -1,7 +1,8 @@
 using System.Text;
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Argon2;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Security.Cryptography;
+using EchoPhase.Security.Cryptography.Vaults;
 using EchoPhase.Security.Hashers.Extensions;
 using EchoPhase.Types.Result.Extensions;
 using Isopoh.Cryptography.Argon2;

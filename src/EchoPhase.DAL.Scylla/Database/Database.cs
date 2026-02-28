@@ -1,6 +1,6 @@
 using System.Reflection;
 using Cassandra;
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Database.Scylla;
 using EchoPhase.DAL.Scylla.Cql;
 using EchoPhase.DAL.Scylla.Enums;
 using EchoPhase.DAL.Scylla.Interfaces;

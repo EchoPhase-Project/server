@@ -1,4 +1,4 @@
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Database.Scylla;
 using Microsoft.Extensions.Options;
 
 namespace EchoPhase.DAL.Scylla

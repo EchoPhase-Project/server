@@ -2,8 +2,6 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using EchoPhase.Clients.Discord;
-using EchoPhase.Configuration.Settings;
-using EchoPhase.Configuration.Validators;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
@@ -29,8 +27,8 @@ using EchoPhase.Security.Authorization.Handlers;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Security.BitMasks.Constants;
 using EchoPhase.Security.Cryptography;
+using EchoPhase.Security.Cryptography.Vaults;
 using EchoPhase.Security.Hashers;
-using EchoPhase.Services;
 using EchoPhase.Services.Events;
 using EchoPhase.Types.Result.Extensions;
 using EchoPhase.WebHooks;
@@ -87,20 +85,17 @@ namespace EchoPhase.Extensions
 
         public static IServiceCollection AddDiscordClient(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.AddOptions<DiscordSettings>()
+            services.AddOptions<Configuration.Clients.Discord.DiscordSettings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<DiscordSettings>, DiscordSettingsValidator>();
-
-            services.AddScoped<DiscordTokenRepository>();
-            services.AddScoped<IDiscordTokenService, DiscordTokenService>();
+            services.AddSingleton<IValidateOptions<Configuration.Clients.Discord.DiscordSettings>, Configuration.Clients.Discord.DiscordSettingsValidator>();
 
             services.AddHttpClient<DiscordClient>("Discord", (serviceProvider, client) =>
                     {
                         var settings = serviceProvider
-                            .GetRequiredService<IOptions<DiscordSettings>>().Value;
+                            .GetRequiredService<IOptions<Configuration.Clients.Discord.DiscordSettings>>().Value;
 
                         client.BaseAddress = new Uri("https://discord.com/api/v10/");
 
@@ -127,21 +122,9 @@ namespace EchoPhase.Extensions
                 .NoOpAsync()
                 .AsAsyncPolicy<HttpResponseMessage>();
 
-        public static IServiceCollection AddAppSettings(this IServiceCollection services, IConfigurationSection configurationSection)
-        {
-            services.AddOptions<AppSettings>()
-                .Bind(configurationSection)
-                .ValidateDataAnnotations()
-                .ValidateOnStart();
-
-            services.AddSingleton<IValidateOptions<AppSettings>, AppSettingsValidator>();
-
-            return services;
-        }
-
         public static IServiceCollection AddPostgres(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.Configure<PostgresSettings>(options =>
+            services.Configure<Configuration.Database.Postgres.PostgresSettings>(options =>
             {
                 var pgHost = Environment.GetEnvironmentVariable("POSTGRES_HOST");
                 var pgPort = Environment.GetEnvironmentVariable("POSTGRES_PORT");
@@ -159,32 +142,31 @@ namespace EchoPhase.Extensions
                 }
             });
 
-            services.AddOptions<PostgresSettings>()
+            services.AddOptions<Configuration.Database.Postgres.PostgresSettings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<PostgresSettings>, PostgresSettingsValidator>();
+            services.AddSingleton<IValidateOptions<Configuration.Database.Postgres.PostgresSettings>, Configuration.Database.Postgres.PostgresSettingsValidator>();
 
             var serviceProvider = services.BuildServiceProvider();
             var settings = serviceProvider
-                .GetRequiredService<IOptions<PostgresSettings>>().Value;
+                .GetRequiredService<IOptions<Configuration.Database.Postgres.PostgresSettings>>().Value;
 
             services.AddDbContext<PostgresContext>(options =>
-                options
-                    .UseNpgsql(settings.ConnectionString,
-                        o =>
-                        {
-                            o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
-                            o.EnableRetryOnFailure(maxRetryCount: 3);
-                        }));
+                options.UseNpgsql(settings.ConnectionString, o =>
+                {
+                    o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                    o.EnableRetryOnFailure(maxRetryCount: 3);
+                    o.MigrationsHistoryTable("__EFMigrationsHistory", settings.Schema);
+                }));
 
             return services;
         }
 
         public static IServiceCollection AddScylla(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.Configure<ScyllaSettings>(options =>
+            services.Configure<Configuration.Database.Scylla.ScyllaSettings>(options =>
             {
                 var contactPoint = Environment.GetEnvironmentVariable("SCYLLA_CONTACT_POINT");
                 var keyspace = Environment.GetEnvironmentVariable("SCYLLA_KEYSPACE");
@@ -204,12 +186,12 @@ namespace EchoPhase.Extensions
                     options.Password = password;
             });
 
-            services.AddOptions<ScyllaSettings>()
+            services.AddOptions<Configuration.Database.Scylla.ScyllaSettings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<ScyllaSettings>, ScyllaSettingsValidator>();
+            services.AddSingleton<IValidateOptions<Configuration.Database.Scylla.ScyllaSettings>, Configuration.Database.Scylla.ScyllaSettingsValidator>();
 
             services.AddScoped<ScyllaContext>();
 
@@ -218,7 +200,7 @@ namespace EchoPhase.Extensions
 
         public static IServiceCollection AddRedisCache(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.Configure<RedisSettings>(options =>
+            services.Configure<Configuration.Database.Redis.RedisSettings>(options =>
             {
                 var valkeyHost = Environment.GetEnvironmentVariable("VALKEY_HOST");
                 var valkeyPort = Environment.GetEnvironmentVariable("VALKEY_PORT");
@@ -246,16 +228,16 @@ namespace EchoPhase.Extensions
                 }
             });
 
-            services.AddOptions<RedisSettings>()
+            services.AddOptions<Configuration.Database.Redis.RedisSettings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<RedisSettings>, RedisSettingsValidator>();
+            services.AddSingleton<IValidateOptions<Configuration.Database.Redis.RedisSettings>, Configuration.Database.Redis.RedisSettingsValidator>();
 
             var serviceProvider = services.BuildServiceProvider();
             var settings = serviceProvider
-                .GetRequiredService<IOptions<RedisSettings>>().Value;
+                .GetRequiredService<IOptions<Configuration.Database.Redis.RedisSettings>>().Value;
 
             services.AddStackExchangeRedisCache(options =>
             {
@@ -277,6 +259,7 @@ namespace EchoPhase.Extensions
 
             services.AddSingleton<ICacheContext, RedisContext>();
             services.AddTransient<IKeyVault, KeyVault>();
+            services.AddTransient<ISecretVault, SecretVault>();
 
             services.AddDistributedMemoryCache();
 
@@ -395,12 +378,12 @@ namespace EchoPhase.Extensions
 
         public static IServiceCollection AddAuthentication(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.AddOptions<AuthenticationSettings>()
+            services.AddOptions<Configuration.Authentication.AuthenticationSettings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<AuthenticationSettings>, AuthenticationSettingsValidator>();
+            services.AddSingleton<IValidateOptions<Configuration.Authentication.AuthenticationSettings>, Configuration.Authentication.AuthenticationSettingsValidator>();
 
             services.AddIdentity<User, UserRole>(options =>
             {
@@ -452,7 +435,7 @@ namespace EchoPhase.Extensions
                 {
                     var serviceProvider = services.BuildServiceProvider();
                     var settings = serviceProvider
-                        .GetRequiredService<IOptions<AuthenticationSettings>>().Value.Schemes.Bearer;
+                        .GetRequiredService<IOptions<Configuration.Authentication.AuthenticationSettings>>().Value.Bearer;
 
                     var keysService = serviceProvider
                         .GetRequiredService<IKeyVault>();
@@ -498,12 +481,12 @@ namespace EchoPhase.Extensions
             services.AddScoped<WebHookRepository>();
             services.AddScoped<WebHookService>();
 
-            services.AddOptions<WebSocketSettings>()
+            services.AddOptions<Configuration.WebSocket.WebSocketSettings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<WebSocketSettings>, WebSocketSettingsValidator>();
+            services.AddSingleton<IValidateOptions<Configuration.WebSocket.WebSocketSettings>, Configuration.WebSocket.WebSocketSettingsValidator>();
 
             services.AddSingleton<WebSocketConnectionManager>();
             services.AddScoped<WebSocketService>();
@@ -518,12 +501,12 @@ namespace EchoPhase.Extensions
 
         public static IServiceCollection AddAes(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.AddOptions<AesSettings>()
+            services.AddOptions<Configuration.Cryptography.Aes.AesSettings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<AesSettings>, AesSettingsValidator>();
+            services.AddSingleton<IValidateOptions<Configuration.Cryptography.Aes.AesSettings>, Configuration.Cryptography.Aes.AesSettingsValidator>();
 
             services.AddSingleton<AesGcm>();
 
@@ -532,12 +515,12 @@ namespace EchoPhase.Extensions
 
         public static IServiceCollection AddPasswordHasher(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.AddOptions<Argon2Settings>()
+            services.AddOptions<Configuration.Argon2.Argon2Settings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<Argon2Settings>, Argon2SettingsValidator>();
+            services.AddSingleton<IValidateOptions<Configuration.Argon2.Argon2Settings>, Configuration.Argon2.Argon2SettingsValidator>();
 
             services.AddSingleton<IPasswordHasher<User>, Argon2Hasher>();
 
@@ -546,12 +529,12 @@ namespace EchoPhase.Extensions
 
         public static IServiceCollection AddRunners(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.AddOptions<RunnersSettings>()
+            services.AddOptions<Configuration.Runner.RunnerSettings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<RunnersSettings>, RunnersSettingsValidator>();
+            services.AddSingleton<IValidateOptions<Configuration.Runner.RunnerSettings>, Configuration.Runner.RunnerSettingsValidator>();
 
             services.AddSingleton<ISecurityValidator, SecurityValidator>();
             services.AddTransient<RoslynRunner>();
@@ -641,12 +624,12 @@ namespace EchoPhase.Extensions
 
         public static IServiceCollection AddCrypto25519(this IServiceCollection services, IConfigurationSection configurationSection)
         {
-            services.AddOptions<Crypto25519Settings>()
+            services.AddOptions<Configuration.Cryptography.Crypto25519.Crypto25519Settings>()
                 .Bind(configurationSection)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddSingleton<IValidateOptions<Crypto25519Settings>, Crypto25519SettingsValidator>();
+            services.AddSingleton<IValidateOptions<Configuration.Cryptography.Crypto25519.Crypto25519Settings>, Configuration.Cryptography.Crypto25519.Crypto25519SettingsValidator>();
 
             services.AddSingleton<ICrypto25519, Crypto25519>();
             return services;

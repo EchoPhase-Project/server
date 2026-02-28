@@ -1,10 +1,12 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Authentication;
+using EchoPhase.Configuration.Authentication.Bearer;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Security.Cryptography;
+using EchoPhase.Security.Cryptography.Vaults;
 using EchoPhase.Types.Result.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Logging;
@@ -36,7 +38,7 @@ namespace EchoPhase.Security.Authentication.Jwt
             _rolesBitmask = rolesBitmask;
             _aes = aes;
             _logger = logger;
-            _settings = settings.Value.Schemes.Bearer;
+            _settings = settings.Value.Bearer;
 
             var result = keyVault.GetOrSet(_settings.Key);
 
@@ -59,7 +61,7 @@ namespace EchoPhase.Security.Authentication.Jwt
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = await this.GenerateClaimsAsync(user),
-                Expires = DateTime.UtcNow + (lifetime ?? TimeSpan.FromMinutes(_settings.LifetimeInMinutes)),
+                Expires = DateTime.UtcNow + (lifetime ?? _settings.Lifetime),
                 Issuer = _settings.Issuer,
                 Audience = _settings.Audience,
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(_key), SecurityAlgorithms.HmacSha256Signature)

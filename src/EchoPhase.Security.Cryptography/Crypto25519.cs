@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Cryptography.Crypto25519;
 using MessagePack;
 using Microsoft.Extensions.Options;
 using Org.BouncyCastle.Crypto.Agreement;

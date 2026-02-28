@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration;
 using EchoPhase.Types.Validation;
 
 namespace EchoPhase.Runners.Blocks.Params

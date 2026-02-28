@@ -33,7 +33,6 @@ namespace EchoPhase.Security.Antiforgery.Filters
         private static bool IsBearerAuthenticated(HttpContext httpContext)
         {
             var authenticationType = httpContext.User.Identity?.AuthenticationType;
-            Console.WriteLine(authenticationType);
             return authenticationType is not null && _tokenSchemes.Contains(authenticationType);
         }
     }

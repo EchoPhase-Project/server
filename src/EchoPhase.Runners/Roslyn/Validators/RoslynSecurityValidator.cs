@@ -1,4 +1,4 @@
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Runner;
 using EchoPhase.Runners.Roslyn.Analyzers;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,10 +13,10 @@ namespace EchoPhase.Runners.Roslyn.Validators
         private readonly ISet<string> _allowedTypes;
 
         public SecurityValidator(
-            IOptions<RunnersSettings> options
+            IOptions<RunnerSettings> options
         )
         {
-            RunnersSettings settings = options.Value;
+            RunnerSettings settings = options.Value;
 
             _allowedTypes = settings.Roslyn.Allow ?? new HashSet<string>
             {

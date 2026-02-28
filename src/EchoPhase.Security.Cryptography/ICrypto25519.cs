@@ -1,4 +1,4 @@
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Cryptography.Crypto25519;
 
 namespace EchoPhase.Security.Cryptography
 {

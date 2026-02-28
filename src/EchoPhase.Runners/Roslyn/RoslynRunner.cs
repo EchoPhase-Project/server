@@ -1,5 +1,5 @@
 using EchoPhase.Clients.Discord;
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Runner;
 using EchoPhase.Runners.Roslyn.Contexts;
 using EchoPhase.Runners.Roslyn.Validators;
 using Microsoft.CodeAnalysis;
@@ -14,13 +14,13 @@ namespace EchoPhase.Runners.Roslyn
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ISecurityValidator _validator;
-        private readonly RunnersSettings _settings;
+        private readonly RunnerSettings _settings;
 
         private readonly ISet<string> _imports;
 
         public RoslynRunner(
             IServiceProvider serviceProvider,
-            IOptions<RunnersSettings> settings,
+            IOptions<RunnerSettings> settings,
             ISecurityValidator validator
         )
         {

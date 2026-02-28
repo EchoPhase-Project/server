@@ -2,7 +2,6 @@ using EchoPhase.DAL.Abstractions;
 using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
 namespace EchoPhase.DAL.Postgres
 {
@@ -14,7 +13,7 @@ namespace EchoPhase.DAL.Postgres
             get;
         }
 
-        public PostgresContext(IConfiguration configuration, DbContextOptions<PostgresContext> options) : base(options)
+        public PostgresContext(DbContextOptions<PostgresContext> options) : base(options)
         {
             Schema = DefaultSchema;
         }
@@ -23,8 +22,6 @@ namespace EchoPhase.DAL.Postgres
 
         public DbSet<RefreshToken> RefreshTokens { get; set; } = default!;
         public DbSet<WebHook> WebHooks { get; set; } = default!;
-
-        public DbSet<DiscordToken> DiscordTokens { get; set; } = default!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -114,27 +111,6 @@ namespace EchoPhase.DAL.Postgres
                     .WithMany(u => u.RefreshTokens)
                     .HasForeignKey(t => t.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
-            });
-
-            builder.Entity<DiscordToken>(entity =>
-            {
-                entity.ToTable("ApiTokens");
-                entity.HasKey(e => e.Id);
-                entity.HasIndex(t => new { t.Name, t.UserId })
-                    .IsUnique();
-
-                entity.HasIndex(t => new { t.Token, t.UserId })
-                    .IsUnique();
-
-                entity.HasOne(t => t.User)
-                    .WithMany(u => u.DiscordTokens)
-                    .HasForeignKey(t => t.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.Property(e => e.Name)
-                    .IsRequired();
-                entity.Property(e => e.Token)
-                    .IsRequired();
             });
         }
 

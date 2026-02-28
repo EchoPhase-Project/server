@@ -1,5 +1,5 @@
 using System.Net.WebSockets;
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.WebSocket;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Types.Result.Extensions;
 using EchoPhase.WebSockets.Attributes;

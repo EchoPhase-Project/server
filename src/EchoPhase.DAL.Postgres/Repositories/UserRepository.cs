@@ -63,9 +63,6 @@ namespace EchoPhase.DAL.Postgres.Repositories
             if (_options.IncludeRefreshTokens)
                 query = query.Include(q => q.RefreshTokens);
 
-            if (_options.IncludeDiscordTokens)
-                query = query.Include(q => q.DiscordTokens);
-
             return query;
         }
 

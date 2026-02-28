@@ -1,5 +1,5 @@
 using System.Reflection;
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration.Database.Scylla;
 using EchoPhase.DAL.Scylla.Interfaces;
 
 namespace EchoPhase.DAL.Scylla

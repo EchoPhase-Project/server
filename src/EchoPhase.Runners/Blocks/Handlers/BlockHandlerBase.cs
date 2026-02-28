@@ -1,5 +1,5 @@
 using System.Text.Json;
-using EchoPhase.Configuration.Settings;
+using EchoPhase.Configuration;
 using EchoPhase.Runners.Blocks.Contexts;
 using EchoPhase.Runners.Blocks.Models;
 using Microsoft.Extensions.DependencyInjection;
