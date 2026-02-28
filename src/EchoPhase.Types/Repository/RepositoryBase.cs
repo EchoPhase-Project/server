@@ -1,13 +1,14 @@
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
+using EchoPhase.DAL.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace EchoPhase.Types.Repository
 {
     public abstract class RepositoryBase<TEntity, TO> : IRepositoryBase<TEntity, TO>
         where TO : class, new()
-        where TEntity : class
+        where TEntity : class, ITrackingEntity, IIdentifiable
     {
         private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _propsCache = new();
 
@@ -115,13 +116,16 @@ namespace EchoPhase.Types.Repository
             Func<TEntity, Guid> idSelector
         )
         {
-            var decodedId = CursorEncoder.Decode(cursor.After);
+            var decoded = CursorEncoder.Decode(cursor.After);
 
-            if (decodedId is not null)
-                query = query.Where(x => EF.Property<Guid>(x, "Id") > decodedId.Value);
+            if (decoded is not null)
+                query = query.Where(x =>
+                    x.CreatedAt > decoded.CreatedAt ||
+                    (x.CreatedAt == decoded.CreatedAt && EF.Property<Guid>(x, "Id") > decoded.Id));
 
             var items = query
-                .OrderBy(x => EF.Property<Guid>(x, "Id"))
+                .OrderBy(x => x.CreatedAt)
+                .ThenBy(x => EF.Property<Guid>(x, "Id"))
                 .Take(cursor.Limit + 1)
                 .ToList();
 
@@ -129,7 +133,7 @@ namespace EchoPhase.Types.Repository
             if (hasMore) items.RemoveAt(items.Count - 1);
 
             var nextCursor = hasMore
-                ? CursorEncoder.Encode(idSelector(items.Last()))
+                ? CursorEncoder.Encode(idSelector(items.Last()), items.Last().CreatedAt)
                 : null;
 
             return new CursorPage<TEntity>

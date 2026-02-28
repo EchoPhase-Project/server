@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using EchoPhase.DAL.Abstractions;
 
 namespace EchoPhase.DAL.Postgres.Models
 {
-    public class WebHook : ITrackingEntity, IConcurrentEntity
+    public class WebHook : ITrackingEntity, IConcurrentEntity, IIdentifiable
     {
         public Guid Id
         {

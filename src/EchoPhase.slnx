@@ -2,6 +2,7 @@
   <Project Path="EchoPhase.Cli/EchoPhase.Cli.csproj" />
   <Project Path="EchoPhase.Clients/EchoPhase.Clients.csproj" />
   <Project Path="EchoPhase.Configuration/EchoPhase.Configuration.csproj" />
+  <Project Path="EchoPhase.DAL.Abstractions/EchoPhase.DAL.Abstractions.csproj" />
   <Project Path="EchoPhase.DAL.Postgres/EchoPhase.DAL.Postgres.csproj" />
   <Project Path="EchoPhase.DAL.Redis/EchoPhase.DAL.Redis.csproj" />
   <Project Path="EchoPhase.DAL.Scylla/EchoPhase.DAL.Scylla.csproj" />

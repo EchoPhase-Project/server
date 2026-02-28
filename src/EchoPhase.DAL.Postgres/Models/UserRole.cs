@@ -1,3 +1,4 @@
+using EchoPhase.DAL.Abstractions;
 using Microsoft.AspNetCore.Identity;
 
 namespace EchoPhase.DAL.Postgres.Models

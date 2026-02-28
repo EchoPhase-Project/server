@@ -1,9 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
+using EchoPhase.DAL.Abstractions;
 
 namespace EchoPhase.DAL.Postgres.Models
 {
-    public class DiscordToken : IConcurrentEntity, ITrackingEntity
+    public partial class DiscordToken : IConcurrentEntity, ITrackingEntity, IIdentifiable
     {
         public Guid Id
         {
@@ -26,7 +27,5 @@ namespace EchoPhase.DAL.Postgres.Models
 
         [ConcurrencyCheck]
         public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
-
-        private static readonly Regex TokenRegex = new Regex(@"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$", RegexOptions.Compiled);
     }
 }

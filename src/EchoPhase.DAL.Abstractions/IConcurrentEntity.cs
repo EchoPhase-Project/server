@@ -1,4 +1,4 @@
-namespace EchoPhase.DAL.Postgres.Models
+namespace EchoPhase.DAL.Abstractions
 {
     public interface IConcurrentEntity
     {

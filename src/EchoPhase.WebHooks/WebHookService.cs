@@ -8,8 +8,8 @@ using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Postgres.Repositories.Options;
 using EchoPhase.Identity;
 using EchoPhase.Types.Extensions;
-using EchoPhase.Types.Service;
 using EchoPhase.Types.Repository;
+using EchoPhase.Types.Service;
 
 namespace EchoPhase.WebHooks
 {

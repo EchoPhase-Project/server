@@ -1,12 +1,12 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
-using EchoPhase.Types.Repository;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Postgres.Repositories.Options;
 using EchoPhase.DAL.Redis.Interfaces;
 using EchoPhase.DAL.Redis.Models;
+using EchoPhase.Types.Repository;
 using EchoPhase.Types.Service;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using EchoPhase.DAL.Abstractions;
 using EchoPhase.Projection.Attributes;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace EchoPhase.DAL.Postgres.Models
 {
     [Comment("Authorised User Model")]
-    public class User : IdentityUser<Guid>, ITrackingEntity, IDisposable
+    public class User : IdentityUser<Guid>, ITrackingEntity, IDisposable, IIdentifiable
     {
         [Expose]
         public string Name

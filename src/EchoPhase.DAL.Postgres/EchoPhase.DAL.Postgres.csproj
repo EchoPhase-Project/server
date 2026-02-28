@@ -18,6 +18,7 @@
     <ProjectReference Include="..\EchoPhase.Projection\EchoPhase.Projection.csproj" />
     <ProjectReference Include="..\EchoPhase.Security.Cryptography\EchoPhase.Security.Cryptography.csproj" />
     <ProjectReference Include="..\EchoPhase.Security.BitMasks\EchoPhase.Security.BitMasks.csproj" />
+    <ProjectReference Include="..\EchoPhase.DAL.Abstractions\EchoPhase.DAL.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

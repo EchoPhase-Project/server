@@ -10,4 +10,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\EchoPhase.DAL.Abstractions\EchoPhase.DAL.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>

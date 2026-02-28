@@ -1,8 +1,8 @@
 using System.Security.Claims;
-using EchoPhase.Types.Repository;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Postgres.Repositories.Options;
+using EchoPhase.Types.Repository;
 using EchoPhase.Types.Service;
 
 namespace EchoPhase.Identity

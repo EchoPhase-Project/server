@@ -7,9 +7,9 @@ using EchoPhase.Identity;
 using EchoPhase.Interfaces;
 using EchoPhase.Security.Cryptography;
 using EchoPhase.Types.Extensions;
+using EchoPhase.Types.Repository;
 using EchoPhase.Types.Result;
 using EchoPhase.Types.Service;
-using EchoPhase.Types.Repository;
 
 namespace EchoPhase.Services
 {
