@@ -5,26 +5,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.2" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-	<PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="xunit.v3" Version="3.0.1" />
-	<PackageVersion Include="xunit.v3.runner.console" Version="3.0.1" />
-    <ProjectReference Include="../../src/EchoPhase/EchoPhase.csproj" />
+	<PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" />
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Xunit" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <ProjectReference Include="..\..\src\EchoPhase\EchoPhase.csproj" />
     <ProjectReference Include="..\..\src\EchoPhase.Scheduling\EchoPhase.Scheduling.csproj" />
   </ItemGroup>
 

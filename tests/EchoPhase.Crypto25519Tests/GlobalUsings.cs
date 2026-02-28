@@ -1,1 +1,1 @@
-global using EchoPhase.Configuration.Settings;
+global using EchoPhase.Configuration.Cryptography.Crypto25519;
