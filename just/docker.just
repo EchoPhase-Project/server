@@ -2,8 +2,8 @@
 
 # Docker configuration from environment or defaults
 DOCKER_REGISTRY := env_var_or_default('DOCKER_REGISTRY', 'localhost:5000')
-FRONTEND_IMAGE := env_var_or_default('FRONTEND_IMAGE', 'echophase-frontend')
-BACKEND_IMAGE := env_var_or_default('BACKEND_IMAGE', 'echophase-backend')
+FRONTEND_IMAGE := env_var_or_default('FRONTEND_IMAGE', 'echophase/ui')
+BACKEND_IMAGE := env_var_or_default('BACKEND_IMAGE', 'echophase/server')
 DEFAULT_VERSION := env_var_or_default('VERSION', '1.0.0')
 
 # ========================================
@@ -100,10 +100,7 @@ docker-publish-all version=DEFAULT_VERSION: (docker-publish-frontend version) (d
 # Remove local Docker images
 docker-clean:
     @echo "Removing local Docker images..."
-    -docker rmi {{FRONTEND_IMAGE}} 2>/dev/null || true
-    -docker rmi {{DOCKER_REGISTRY}}/{{FRONTEND_IMAGE}}:latest 2>/dev/null || true
-    -docker rmi {{BACKEND_IMAGE}} 2>/dev/null || true
-    -docker rmi {{DOCKER_REGISTRY}}/{{BACKEND_IMAGE}}:latest 2>/dev/null || true
+    docker images --format {{ '{{.ID}} {{.Repository}}' }} | grep echophase | awk '{print $1}' | xargs docker rmi -f || true
     @echo "Docker images removed!"
 
 # Show Docker configuration
