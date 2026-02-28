@@ -14,7 +14,6 @@ using EchoPhase.RouteConstraints;
 using EchoPhase.Scheduling;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Services.Internal;
-using EchoPhase.Security.Authentication.Jwt;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.StaticFiles;
@@ -152,6 +151,7 @@ namespace EchoPhase
             services.AddRoles(Configuration.GetSection("Role"));
 
             services.AddPolicies();
+            services.AddProblemDetails();
 
             //services.AddTwitchClient(Configuration.GetSection("Twitch"));
             services.AddDiscordClient(Configuration.GetSection("Discord"));
@@ -205,7 +205,13 @@ namespace EchoPhase
             }
             else
             {
-                app.UseExceptionHandler("/error");
+                app.UseExceptionHandler(new ExceptionHandlerOptions
+                {
+                    AllowStatusCode404Response = true,
+                    StatusCodeSelector = ex => ex is TimeoutException
+                        ? StatusCodes.Status503ServiceUnavailable
+                        : StatusCodes.Status500InternalServerError
+                });
                 app.UseHsts();
             }
 
@@ -274,10 +280,9 @@ namespace EchoPhase
 
             app.UseRequestLocalization(localizationOptions.Value);
 
-            app.UseAntiforgery();
-
             app.UseAuthentication();
             app.UseAuthorization();
+            app.UseAntiforgery();
 
             app.UseWebSockets();
 
