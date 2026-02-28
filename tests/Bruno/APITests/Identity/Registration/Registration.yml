@@ -16,6 +16,12 @@ http:
         }
   auth: inherit
 
+runtime:
+  assertions:
+    - expression: res.statusCode
+      operator: gte
+      value: "200"
+
 settings:
   encodeUrl: true
   timeout: 0

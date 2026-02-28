@@ -1,0 +1,18 @@
+info:
+  name: Jwt
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{baseUrl}}/auth/jwt/@me"
+  headers:
+    - name: Authorization
+      value: Bearer {{Bearer}}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

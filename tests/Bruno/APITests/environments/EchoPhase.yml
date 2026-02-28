@@ -1,0 +1,8 @@
+name: EchoPhase
+variables:
+  - name: username
+    value: test
+  - secret: true
+    name: password
+  - name: name
+    value: Test
