@@ -21,6 +21,7 @@ using EchoPhase.Scripting.Lexers;
 using EchoPhase.Scripting.Parsers;
 using EchoPhase.Scripting.Tokens;
 using EchoPhase.Security.Antiforgery;
+using EchoPhase.Security.Antiforgery.Filters;
 using EchoPhase.Security.Authentication;
 using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Security.Authorization.Factories;
@@ -379,6 +380,7 @@ namespace EchoPhase.Extensions
             });
 
             services.AddScoped<IAntiforgeryService, AntiforgeryService>();
+            services.AddScoped<BearerOrValidateAntiForgeryTokenFilter>();
 
             return services;
         }
@@ -465,6 +467,7 @@ namespace EchoPhase.Extensions
 
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
+                        AuthenticationType = JwtBearerDefaults.AuthenticationScheme,
                         ValidateIssuer = true,
                         ValidateAudience = true,
                         ValidateLifetime = true,

@@ -30,8 +30,8 @@ csharp_space_around_binary_operators = before_and_after
 
 csharp_preserve_single_line_blocks = false
 
-csharp_style_expression_bodied_methods = false:suggestion
 csharp_style_expression_bodied_properties = false:suggestion
+csharp_style_expression_bodied_methods = never:suggestion
 
 dotnet_remove_unnecessary_usings = true
 

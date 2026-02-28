@@ -108,7 +108,8 @@ namespace EchoPhase.Security.Authentication.Jwt
         {
             var tokens = _repository.Get(
                 x => x.UserIds = [userId],
-                cursor is not null ? c => { c.Limit = cursor.Limit; c.After = cursor.After; } : null
+                cursor is not null ? c => { c.Limit = cursor.Limit; c.After = cursor.After; }
+            : null
             );
             return Task.FromResult(tokens);
         }

@@ -1,13 +1,15 @@
+using EchoPhase.Controllers.Api.v1.Dto.Auth;
 using EchoPhase.Identity;
 using EchoPhase.Security.Authentication.Jwt;
+using EchoPhase.Types.Repository;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using EchoPhase.Controllers.Api.v1.Dto.Auth;
-using EchoPhase.Types.Repository;
+using ParkSquare.AspNetCore.Sitemap;
 
 namespace EchoPhase.Controllers.Api.v1
 {
     [ApiController]
+    [SitemapExclude]
     [Route("api/v1/auth/refresh")]
     public class RefreshTokenController : ControllerBase
     {

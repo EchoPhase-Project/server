@@ -1,8 +1,9 @@
+using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
 using EchoPhase.Security.Authentication.Jwt;
-using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Mvc;
 using ParkSquare.AspNetCore.Sitemap;
+using EchoPhase.Security.Antiforgery.Attributes;
 
 namespace EchoPhase.Controllers.Api.v1
 {
@@ -21,7 +22,7 @@ namespace EchoPhase.Controllers.Api.v1
         }
 
         [HttpPost("@me")]
-        [ValidateAntiForgeryToken]
+        [BearerOrValidateAntiForgeryToken]
         public async Task<IActionResult> GenerateForSelf()
         {
             var user = await _userService.GetAsync(User);
@@ -32,7 +33,7 @@ namespace EchoPhase.Controllers.Api.v1
         }
 
         [HttpPost("{guid:guid}")]
-        [ValidateAntiForgeryToken]
+        [BearerOrValidateAntiForgeryToken]
         public async Task<IActionResult> GenerateById(Guid guid)
         {
             var users = _userService.Get(x => x.Ids = [guid]);
@@ -42,7 +43,7 @@ namespace EchoPhase.Controllers.Api.v1
         }
 
         [HttpPost("{username:username}")]
-        [ValidateAntiForgeryToken]
+        [BearerOrValidateAntiForgeryToken]
         public async Task<IActionResult> GenerateByUsername(string username)
         {
             if (string.IsNullOrWhiteSpace(username))
