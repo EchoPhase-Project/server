@@ -8,24 +8,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <ResolveStaticWebAssetsInputsDependsOn>RemoveIdentityAssets</ResolveStaticWebAssetsInputsDependsOn>
     <NoWarn>$(NoWarn);1591</NoWarn>
-    <DockerImageName>echophase</DockerImageName>
-    <DockerRegistry>localhost:5000</DockerRegistry>
-    <DockerTag>latest</DockerTag>
   </PropertyGroup>
-
-<Target Name="DockerBuildAndPush">
-  <Message Text="Building Docker image..." Importance="high" />
-
-  <Exec Command="docker build -t $(DockerImageName) ." ConsoleToMSBuild="true" StandardOutputImportance="high" StandardErrorImportance="high" />
-
-  <Message Text="Tagging Docker image..." Importance="high" />
-
-  <Exec Command="docker tag $(DockerImageName) $(DockerRegistry)/$(DockerImageName):$(DockerTag)" ConsoleToMSBuild="true" />
-
-  <Message Text="Pushing Docker image..." Importance="high" />
-
-  <Exec Command="docker push $(DockerRegistry)/$(DockerImageName):$(DockerTag)" ConsoleToMSBuild="true" />
-</Target>
 
 <Target Name="RemoveIdentityAssets">
     <ItemGroup>
