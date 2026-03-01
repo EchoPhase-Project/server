@@ -10,4 +10,13 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\EchoPhase.Security.Cryptography\EchoPhase.Security.Cryptography.csproj" />
+    <ProjectReference Include="..\EchoPhase.Configuration\EchoPhase.Configuration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StackExchange.Redis" />
+  </ItemGroup>
+
 </Project>

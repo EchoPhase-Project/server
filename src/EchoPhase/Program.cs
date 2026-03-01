@@ -32,7 +32,6 @@ namespace EchoPhase
                     config.SetBasePath(Directory.GetCurrentDirectory());
                     config.AddJsonFile("Configurations/appsettings.json", optional: false, reloadOnChange: true);
                     config.AddJsonFile($"Configurations/appsettings.{hostingContext.HostingEnvironment.EnvironmentName}.json", optional: true, reloadOnChange: true);
-                    config.AddJsonFile("Configurations/secrets.json", optional: true, reloadOnChange: true);
                     config.AddEnvironmentVariables();
                 })
                 .ConfigureWebHostDefaults(webBuilder =>

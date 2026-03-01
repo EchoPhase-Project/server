@@ -85,18 +85,9 @@ namespace EchoPhase.Extensions
 
         public static IServiceCollection AddDiscordClient(this IServiceCollection services)
         {
-            services.AddOptions<Configuration.Clients.Discord.DiscordOptions>()
-                .BindConfiguration(Configuration.Clients.Discord.DiscordOptions.SectionName)
-                .ValidateDataAnnotations()
-                .ValidateOnStart();
-
-            services.AddSingleton<IValidateOptions<Configuration.Clients.Discord.DiscordOptions>, Configuration.Clients.Discord.DiscordValidator>();
-
+            services.AddSingleton<IDiscordSecretVault, DiscordSecretVault>();
             services.AddHttpClient<DiscordClient>("Discord", (serviceProvider, client) =>
                     {
-                        var settings = serviceProvider
-                            .GetRequiredService<IOptions<Configuration.Clients.Discord.DiscordOptions>>().Value;
-
                         client.BaseAddress = new Uri("https://discord.com/api/v10/");
 
                         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
