@@ -25,7 +25,8 @@ namespace EchoPhase.Crypto25519Tests
             Configuration = builder.Build();
 
             var services = new ServiceCollection();
-            services.AddCrypto25519(Configuration.GetSection("Crypto25519"));
+            services.AddSingleton<IConfiguration>(Configuration);
+            services.AddCrypto25519();
             Provider = services.BuildServiceProvider();
         }
     }

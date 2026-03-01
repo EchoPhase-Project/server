@@ -9,7 +9,7 @@ namespace EchoPhase.DAL.Redis
     {
         public RedisContext(
             IDistributedCache cache,
-            IOptions<RedisSettings> settings
+            IOptions<RedisOptions> settings
         ) : base(cache, settings.Value)
         {
             RegisterSet<QrUserCache>("user:{{key}}:qr");

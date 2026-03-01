@@ -1,7 +1,8 @@
 namespace EchoPhase.Configuration.Database.Redis
 {
-    public class RedisSettings : IRedisSettings, IValidatable
+    public class RedisOptions : IRedisOptions, IValidatable
     {
+        public const string SectionName = "Database:Redis";
         public string ConnectionString { get; set; } = string.Empty;
         public string InstanceName { get; set; } = string.Empty;
         public Guid TenantId

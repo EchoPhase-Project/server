@@ -1,7 +1,8 @@
 namespace EchoPhase.Configuration.Database.Postgres
 {
-    public class PostgresSettings : IValidatable
+    public class PostgresOptions : IValidatable
     {
+        public const string SectionName = "Database:Postgres";
         public string ConnectionString { get; set; } = string.Empty;
         public string Schema { get; set; } = "public";
 

@@ -5,7 +5,7 @@ namespace EchoPhase.DAL.Scylla
 {
     public class ScyllaContext : DbContext
     {
-        public ScyllaContext(IOptions<ScyllaSettings> options) : base(options.Value)
+        public ScyllaContext(IOptions<ScyllaOptions> options) : base(options.Value)
         {
         }
 

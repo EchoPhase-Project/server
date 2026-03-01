@@ -1,7 +1,8 @@
 namespace EchoPhase.Configuration.Runner.Roslyn
 {
-    public class RoslynSettings : IValidatable
+    public class RoslynOptions : IValidatable
     {
+        public const string SectionName = "Runner:Roslyn";
         public ISet<string>? Import { get; set; } = null;
         public ISet<string>? Allow { get; set; } = null;
 

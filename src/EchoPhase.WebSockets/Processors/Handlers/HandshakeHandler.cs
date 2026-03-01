@@ -16,7 +16,7 @@ namespace EchoPhase.WebSockets.Processors.Handlers
         private readonly WebSocketService _webSocketService;
         private readonly WebSocketConnectionManager _connectionManager;
         private readonly IIntentsBitMask _intents;
-        private readonly WebSocketSettings _settings;
+        private readonly WebSocketOptions _settings;
 
         public HandshakeHandler(IServiceProvider serviceProvider)
         : base(serviceProvider)
@@ -24,7 +24,7 @@ namespace EchoPhase.WebSockets.Processors.Handlers
             _webSocketService = GetService<WebSocketService>();
             _connectionManager = GetService<WebSocketConnectionManager>();
             _intents = GetService<IIntentsBitMask>();
-            _settings = GetService<IOptions<WebSocketSettings>>().Value;
+            _settings = GetService<IOptions<WebSocketOptions>>().Value;
 
         }
 

@@ -117,9 +117,9 @@ namespace EchoPhase
             services.AddSingleton<FileHelper>();
             services.AddSingleton<Projector>();
 
-            services.AddAes(Configuration.GetSection("Aes"));
-            services.AddCrypto25519(Configuration.GetSection("Crypto25519"));
-            services.AddPasswordHasher(Configuration.GetSection("Argon2"));
+            services.AddAes();
+            services.AddCrypto25519();
+            services.AddPasswordHasher();
 
             services.AddSingleton<QRCodeService>();
             services.AddSingleton<IIntentsBitMask, IntentsBitMask>();
@@ -134,27 +134,27 @@ namespace EchoPhase
             services.AddExpressionEval();
             services.AddProfiler();
 
-            services.AddRunners(Configuration.GetSection("Runners"));
+            services.AddRunners();
 
             services.AddHostedService<ShutdownService>();
             services.AddSingleton<DelayedTaskScheduler>();
 
-            services.AddEventService(Configuration.GetSection("WebSocket"));
+            services.AddEventService();
 
             services.AddGrpc();
 
-            services.AddPostgres(Configuration.GetSection("Postgres"));
-            services.AddScylla(Configuration.GetSection("Scylla"));
-            services.AddRedisCache(Configuration.GetSection("Redis"));
-            services.AddAuthentication(Configuration.GetSection("Authentication"));
+            services.AddPostgres();
+            services.AddScylla();
+            services.AddRedisCache();
+            services.AddAuthentications();
 
-            services.AddRoles(Configuration.GetSection("Role"));
+            services.AddRoles();
 
             services.AddPolicies();
             services.AddProblemDetails();
 
             //services.AddTwitchClient(Configuration.GetSection("Twitch"));
-            services.AddDiscordClient(Configuration.GetSection("Discord"));
+            services.AddDiscordClient();
 
             services.AddHealthChecks()
                 .AddCheck("self", () => HealthCheckResult.Healthy());

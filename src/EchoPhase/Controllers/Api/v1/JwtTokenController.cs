@@ -1,9 +1,9 @@
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
+using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Jwt;
 using Microsoft.AspNetCore.Mvc;
 using ParkSquare.AspNetCore.Sitemap;
-using EchoPhase.Security.Antiforgery.Attributes;
 
 namespace EchoPhase.Controllers.Api.v1
 {

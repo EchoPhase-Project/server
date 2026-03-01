@@ -21,7 +21,7 @@ namespace EchoPhase.Security.Authentication.Jwt
         private readonly IRolesBitMask _rolesBitmask;
         private readonly AesGcm _aes;
         private readonly ILogger<JwtTokenProvider> _logger;
-        private readonly BearerSettings _settings;
+        private readonly BearerOptions _settings;
 
         private byte[] _key;
 
@@ -30,7 +30,7 @@ namespace EchoPhase.Security.Authentication.Jwt
             IRolesBitMask rolesBitmask,
             AesGcm aes,
             ILogger<JwtTokenProvider> logger,
-            IOptions<AuthenticationSettings> settings,
+            IOptions<AuthenticationOptions> settings,
             IKeyVault keyVault
         )
         {

@@ -12,7 +12,7 @@ namespace EchoPhase.WebSockets
 {
     public class WebSocketConnectionManager
     {
-        private readonly WebSocketSettings _settings;
+        private readonly WebSocketOptions _settings;
 
         private readonly ConcurrentDictionary<Guid, List<WebSocketConnection>> _connections = new();
         private readonly SemaphoreSlim _connectionLock = new(1, 1);
@@ -23,7 +23,7 @@ namespace EchoPhase.WebSockets
         public WebSocketConnectionManager(
             ICacheContext cacheContext,
             ILogger<WebSocketConnectionManager> logger,
-            IOptions<WebSocketSettings> settings)
+            IOptions<WebSocketOptions> settings)
         {
             _cacheContext = cacheContext;
             _logger = logger;

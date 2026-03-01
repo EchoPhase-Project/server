@@ -1,6 +1,6 @@
 namespace EchoPhase.Configuration.Database.Redis
 {
-    public class RedisSettingsValidator : ValidatorBase<RedisSettings>
+    public class RedisValidator : ValidatorBase<RedisOptions>
     {
     }
 }

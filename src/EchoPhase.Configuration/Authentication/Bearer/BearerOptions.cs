@@ -1,9 +1,10 @@
 namespace EchoPhase.Configuration.Authentication.Bearer
 {
-    public class BearerSettings : IValidatable
+    public class BearerOptions : IValidatable
     {
         private const int MinLifetimeMinutes = 5;
 
+        public const string SectionName = "Authentication:Bearer";
         public string Key { get; set; } = "jwt";
         public string Issuer { get; set; } = string.Empty;
         public string Audience { get; set; } = string.Empty;

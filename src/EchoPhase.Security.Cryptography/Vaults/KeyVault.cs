@@ -13,7 +13,7 @@ namespace EchoPhase.Security.Cryptography.Vaults
     public sealed class KeyVault : IKeyVault
     {
         private readonly IDatabase _db;
-        private readonly RedisSettings _settings;
+        private readonly RedisOptions _settings;
         private const string KeyPrefix = "key_";
 
         /// <summary>
@@ -23,7 +23,7 @@ namespace EchoPhase.Security.Cryptography.Vaults
         /// <param name="settings">Redis appsettings</param>
         public KeyVault(
             IConnectionMultiplexer redis,
-            IOptions<RedisSettings> settings
+            IOptions<RedisOptions> settings
         )
         {
             _db = redis.GetDatabase(); // Default DB (0)

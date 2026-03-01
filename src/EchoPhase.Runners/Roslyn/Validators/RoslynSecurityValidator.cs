@@ -13,10 +13,10 @@ namespace EchoPhase.Runners.Roslyn.Validators
         private readonly ISet<string> _allowedTypes;
 
         public SecurityValidator(
-            IOptions<RunnerSettings> options
+            IOptions<RunnerOptions> options
         )
         {
-            RunnerSettings settings = options.Value;
+            var settings = options.Value;
 
             _allowedTypes = settings.Roslyn.Allow ?? new HashSet<string>
             {

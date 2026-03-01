@@ -14,13 +14,13 @@ namespace EchoPhase.Runners.Roslyn
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ISecurityValidator _validator;
-        private readonly RunnerSettings _settings;
+        private readonly RunnerOptions _settings;
 
         private readonly ISet<string> _imports;
 
         public RoslynRunner(
             IServiceProvider serviceProvider,
-            IOptions<RunnerSettings> settings,
+            IOptions<RunnerOptions> settings,
             ISecurityValidator validator
         )
         {

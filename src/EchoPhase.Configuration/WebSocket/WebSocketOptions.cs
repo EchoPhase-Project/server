@@ -1,11 +1,13 @@
 namespace EchoPhase.Configuration.WebSocket
 {
-    public class WebSocketSettings : IValidatable
+    public class WebSocketOptions : IValidatable
     {
         private const int MinHeartbeatSeconds = 10;
         private const int MaxHeartbeatSeconds = 300;
         private const int MinCloseTimeoutSeconds = 1;
         private const int MaxCloseTimeoutSeconds = 60;
+
+        public const string SectionName = "WebSocket";
 
         /// <summary>
         /// Heartbeat interval. Format: "hh:mm:ss" or seconds. Default: 45 seconds.

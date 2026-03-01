@@ -2,9 +2,10 @@ using EchoPhase.Types.Validation.Extensions;
 
 namespace EchoPhase.Configuration.Runner
 {
-    public class RunnerSettings : IValidatable
+    public class RunnerOptions : IValidatable
     {
-        public Roslyn.RoslynSettings Roslyn { get; set; } = new();
+        public const string SectionName = "Runner";
+        public Roslyn.RoslynOptions Roslyn { get; set; } = new();
 
         public IValidationResult Validate()
         {

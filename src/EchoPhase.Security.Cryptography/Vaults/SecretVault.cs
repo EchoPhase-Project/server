@@ -1,9 +1,9 @@
+using System.Text;
+using System.Text.Json;
 using EchoPhase.Configuration.Database.Redis;
 using EchoPhase.Types.Result;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
-using System.Text.Json;
-using System.Text;
 
 namespace EchoPhase.Security.Cryptography.Vaults
 {
@@ -11,14 +11,14 @@ namespace EchoPhase.Security.Cryptography.Vaults
     {
         private readonly IDatabase _db;
         private readonly AesGcm _aesGcm;
-        private readonly RedisSettings _settings;
+        private readonly RedisOptions _settings;
         private readonly JsonSerializerOptions _jsonOptions;
         private const string KeyPrefix = "secret_";
 
         public SecretVault(
             IConnectionMultiplexer redis,
             AesGcm aesGcm,
-            IOptions<RedisSettings> settings,
+            IOptions<RedisOptions> settings,
             JsonSerializerOptions? jsonOptions = null)
         {
             _db = redis.GetDatabase();
@@ -152,8 +152,8 @@ namespace EchoPhase.Security.Cryptography.Vaults
             return value switch
             {
                 byte[] bytes => bytes,
-                string str   => Encoding.UTF8.GetBytes(str),
-                _            => Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, _jsonOptions))
+                string str => Encoding.UTF8.GetBytes(str),
+                _ => Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, _jsonOptions))
             };
         }
 

@@ -2,8 +2,9 @@ using System.Text.RegularExpressions;
 
 namespace EchoPhase.Configuration.Clients.Discord
 {
-    public partial class DiscordSettings : IValidatable
+    public partial class DiscordOptions : IValidatable
     {
+        public const string SectionName = "Clients:Discord";
         public string Token { get; set; } = string.Empty;
 
         [GeneratedRegex(@"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$")]

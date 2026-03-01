@@ -1,20 +1,20 @@
 using System.Security.Cryptography;
 using System.Text;
 using EchoPhase.Configuration.Cryptography.Aes;
+using EchoPhase.Security.Cryptography.Vaults;
 using EchoPhase.Types.Result.Extensions;
 using Microsoft.Extensions.Options;
 using SystemAesGcm = System.Security.Cryptography.AesGcm;
-using EchoPhase.Security.Cryptography.Vaults;
 
 namespace EchoPhase.Security.Cryptography
 {
     public class AesGcm
     {
-        private readonly AesSettings _settings;
+        private readonly AesOptions _settings;
         private byte[] _key;
 
         public AesGcm(
-            IOptions<AesSettings> settings,
+            IOptions<AesOptions> settings,
             IKeyVault keyVault
         )
         {

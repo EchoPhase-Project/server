@@ -1,6 +1,6 @@
+using EchoPhase.Security.Antiforgery.Filters;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.DependencyInjection;
-using EchoPhase.Security.Antiforgery.Filters;
 
 namespace EchoPhase.Security.Antiforgery.Attributes
 {

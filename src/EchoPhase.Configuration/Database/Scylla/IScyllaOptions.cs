@@ -1,6 +1,6 @@
 namespace EchoPhase.Configuration.Database.Scylla
 {
-    public interface IScyllaSettings
+    public interface IScyllaOptions
     {
         string ContactPoint
         {

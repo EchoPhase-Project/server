@@ -2,9 +2,10 @@ using EchoPhase.Types.Validation.Extensions;
 
 namespace EchoPhase.Configuration.Clients
 {
-    public class CryptographySettings : IValidatable
+    public class ClientsOptions : IValidatable
     {
-        public Discord.DiscordSettings Discord { get; set; } = new();
+        public const string SectionName = "Clients";
+        public Discord.DiscordOptions Discord { get; set; } = new();
 
         public IValidationResult Validate()
         {

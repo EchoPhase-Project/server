@@ -1,7 +1,8 @@
 namespace EchoPhase.Configuration.Cryptography.Crypto25519
 {
-    public class Crypto25519Settings : IValidatable
+    public class Crypto25519Options : IValidatable
     {
+        public const string SectionName = "Cryptography:Crypto25519";
         public AeadChoice AeadChoice { get; set; } = AeadChoice.ChaCha20Poly1305;
 
         public IValidationResult Validate()

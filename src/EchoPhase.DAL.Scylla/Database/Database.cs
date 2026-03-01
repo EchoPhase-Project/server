@@ -14,7 +14,7 @@ namespace EchoPhase.DAL.Scylla
     {
         private readonly Dictionary<Guid, TrackedEntity> _changeTracker = new();
         private readonly Stack<List<TrackedEntity>> _transactionStack = new();
-        private readonly IScyllaSettings _settings;
+        private readonly IScyllaOptions _settings;
         private readonly Dictionary<Type, IEntityBuilder> _builderCache = new();
         private readonly List<IMigration> _migrations = new();
         private readonly Stack<Transaction> _activeTransactions = new();
@@ -32,7 +32,7 @@ namespace EchoPhase.DAL.Scylla
             get;
         }
 
-        public Database(IScyllaSettings settings, IQueryLogger? logger = null)
+        public Database(IScyllaOptions settings, IQueryLogger? logger = null)
         {
             _settings = settings;
             ModelBuilder = new ModelBuilder();

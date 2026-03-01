@@ -1,8 +1,11 @@
 using System.Security.Cryptography;
+using EchoPhase.Configuration.Authentication;
+using EchoPhase.Configuration.Authentication.Refresh;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Types.Repository;
+using Microsoft.Extensions.Options;
 
 namespace EchoPhase.Security.Authentication.Jwt
 {
@@ -11,16 +14,19 @@ namespace EchoPhase.Security.Authentication.Jwt
         private readonly IRefreshTokenRepository _repository;
         private readonly PostgresContext _db;
         private readonly IJwtTokenProvider _jwtService;
+        private readonly RefreshOptions _settings;
 
         public RefreshTokenProvider(
             IRefreshTokenRepository repository,
             PostgresContext db,
-            IJwtTokenProvider jwtService
+            IJwtTokenProvider jwtService,
+            IOptions<AuthenticationOptions> settings
         )
         {
             _repository = repository;
             _db = db;
             _jwtService = jwtService;
+            _settings = settings.Value.Refresh;
         }
 
         private static string GenerateSecureToken(int size = 128)
@@ -45,7 +51,7 @@ namespace EchoPhase.Security.Authentication.Jwt
             _db.RefreshTokens.Add(entry);
             await _db.SaveChangesAsync();
 
-            var jwt = await _jwtService.GenerateTokenAsync(user, TimeSpan.FromMinutes(15));
+            var jwt = await _jwtService.GenerateTokenAsync(user, _settings.Lifetime);
             return new TokenPair
             {
                 AccessToken = jwt,
@@ -73,7 +79,7 @@ namespace EchoPhase.Security.Authentication.Jwt
             _db.RefreshTokens.Update(existing);
             await _db.SaveChangesAsync();
 
-            var jwt = await _jwtService.GenerateTokenAsync(existing.User, TimeSpan.FromMinutes(15));
+            var jwt = await _jwtService.GenerateTokenAsync(existing.User, _settings.Lifetime);
             return new TokenPair
             {
                 AccessToken = jwt,

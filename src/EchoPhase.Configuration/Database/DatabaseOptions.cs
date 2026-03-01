@@ -2,11 +2,12 @@ using EchoPhase.Types.Validation.Extensions;
 
 namespace EchoPhase.Configuration.Database
 {
-    public class DatabaseSettings : IValidatable
+    public class DatabaseOptions : IValidatable
     {
-        public Redis.RedisSettings Redis { get; set; }= new();
-        public Postgres.PostgresSettings Postgres { get; set; } = new();
-        public Scylla.ScyllaSettings Scylla { get; set; } = new();
+        public const string SectionName = "Database";
+        public Redis.RedisOptions Redis { get; set; } = new();
+        public Postgres.PostgresOptions Postgres { get; set; } = new();
+        public Scylla.ScyllaOptions Scylla { get; set; } = new();
 
         public IValidationResult Validate()
         {

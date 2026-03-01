@@ -8,11 +8,11 @@ namespace EchoPhase.DAL.Redis
     {
         private readonly Dictionary<Type, object> _sets = new();
         private readonly IDistributedCache _cache;
-        protected readonly IRedisSettings _settings;
+        protected readonly IRedisOptions _settings;
 
         public DbContext(
             IDistributedCache cache,
-            IRedisSettings settings
+            IRedisOptions settings
         )
         {
             _cache = cache;

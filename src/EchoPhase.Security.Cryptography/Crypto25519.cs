@@ -18,9 +18,9 @@ namespace EchoPhase.Security.Cryptography
     public sealed class Crypto25519 : ICrypto25519
     {
         private readonly SecureRandom _random;
-        private readonly Crypto25519Settings _settings;
+        private readonly Crypto25519Options _settings;
 
-        public Crypto25519(IOptions<Crypto25519Settings> settings)
+        public Crypto25519(IOptions<Crypto25519Options> settings)
         {
             _random = new SecureRandom(new CryptoApiRandomGenerator());
             _settings = settings.Value;

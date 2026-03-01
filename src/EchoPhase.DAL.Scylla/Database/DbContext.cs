@@ -14,7 +14,7 @@ namespace EchoPhase.DAL.Scylla
             get;
         }
 
-        public DbContext(IScyllaSettings options)
+        public DbContext(IScyllaOptions options)
         {
             Database = new Database(options);
             _queryProviderFactory = new QueryProviderFactory(this);

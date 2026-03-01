@@ -1,7 +1,8 @@
 namespace EchoPhase.Configuration.Database.Scylla
 {
-    public class ScyllaSettings : IScyllaSettings, IValidatable
+    public class ScyllaOptions : IScyllaOptions, IValidatable
     {
+        public const string SectionName = "Database:Scylla";
         public string ContactPoint { get; set; } = string.Empty;
         public string Keyspace { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;

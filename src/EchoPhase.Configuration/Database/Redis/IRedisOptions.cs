@@ -1,6 +1,6 @@
 namespace EchoPhase.Configuration.Database.Redis
 {
-    public interface IRedisSettings
+    public interface IRedisOptions
     {
         string ConnectionString
         {

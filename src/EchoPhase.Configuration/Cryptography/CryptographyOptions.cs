@@ -2,10 +2,11 @@ using EchoPhase.Types.Validation.Extensions;
 
 namespace EchoPhase.Configuration.Cryptography
 {
-    public class CryptographySettings : IValidatable
+    public class CryptographyOptions : IValidatable
     {
-        public Aes.AesSettings Aes { get; set; } = new();
-        public Crypto25519.Crypto25519Settings Crypto22519 { get; set; } = new();
+        public const string SectionName = "Cryptography";
+        public Aes.AesOptions Aes { get; set; } = new();
+        public Crypto25519.Crypto25519Options Crypto22519 { get; set; } = new();
 
         public IValidationResult Validate()
         {

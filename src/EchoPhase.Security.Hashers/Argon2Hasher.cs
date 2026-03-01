@@ -18,10 +18,10 @@ namespace EchoPhase.Security.Hashers
         private readonly int _threads = (1 + Environment.ProcessorCount) / 2;
 
         private readonly Argon2Config _config;
-        private readonly Argon2Settings _settings;
+        private readonly Argon2Options _settings;
 
         public Argon2Hasher(
-            IOptions<Argon2Settings> settings,
+            IOptions<Argon2Options> settings,
             IKeyVault keyVault,
             AesGcm aes
         )
