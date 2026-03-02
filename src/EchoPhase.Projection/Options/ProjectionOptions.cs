@@ -4,7 +4,7 @@ namespace EchoPhase.Projection.Options
     {
         public bool UseExpando { get; set; } = false;
         public bool IncludeSubPaths { get; set; } = true;
-        public bool IncludeOnlyExpose { get; set; } = false;
+        public bool IncludeOnlyExpose { get; set; } = true;
         public int? MaxDepth { get; set; } = null;
     }
 }
