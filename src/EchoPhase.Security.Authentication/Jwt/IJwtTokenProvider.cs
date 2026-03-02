@@ -6,6 +6,6 @@ namespace EchoPhase.Security.Authentication.Jwt
     public interface IJwtTokenProvider
     {
         Task<string> GenerateTokenAsync(User user, TimeSpan? lifetime = null);
-        ClaimsPrincipal? ValidateToken(string token);
+        Task<ClaimsPrincipal?> ValidateTokenAsync(string token);
     }
 }

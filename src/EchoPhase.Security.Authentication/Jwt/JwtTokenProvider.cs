@@ -22,6 +22,7 @@ namespace EchoPhase.Security.Authentication.Jwt
         private readonly AesGcm _aes;
         private readonly ILogger<JwtTokenProvider> _logger;
         private readonly BearerOptions _settings;
+        private readonly IUserService _userService;
 
         private byte[] _key;
 
@@ -31,7 +32,8 @@ namespace EchoPhase.Security.Authentication.Jwt
             AesGcm aes,
             ILogger<JwtTokenProvider> logger,
             IOptions<AuthenticationOptions> settings,
-            IKeyVault keyVault
+            IKeyVault keyVault,
+            IUserService userService
         )
         {
             _roleService = roleService;
@@ -39,6 +41,7 @@ namespace EchoPhase.Security.Authentication.Jwt
             _aes = aes;
             _logger = logger;
             _settings = settings.Value.Bearer;
+            _userService = userService;
 
             var result = keyVault.GetOrSet(_settings.Key);
 
@@ -73,7 +76,7 @@ namespace EchoPhase.Security.Authentication.Jwt
             return tokenString;
         }
 
-        public virtual ClaimsPrincipal? ValidateToken(string token)
+        public virtual async Task<ClaimsPrincipal?> ValidateTokenAsync(string token)
         {
             if (token is null)
                 throw new ArgumentNullException(nameof(token));
@@ -82,6 +85,7 @@ namespace EchoPhase.Security.Authentication.Jwt
 
             var tokenValidationParameters = new TokenValidationParameters
             {
+                AuthenticationType = JwtBearerDefaults.AuthenticationScheme,
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(_key),
                 ValidateIssuer = true,
@@ -92,7 +96,19 @@ namespace EchoPhase.Security.Authentication.Jwt
                 ClockSkew = TimeSpan.Zero
             };
 
-            return tokenHandler.ValidateToken(token, tokenValidationParameters, out _);
+            var claims = tokenHandler.ValidateToken(token, tokenValidationParameters, out _);
+
+            var user = await _userService.GetAsync(claims);
+
+            if (user is null)
+                throw new InvalidOperationException("Invalid user.");
+
+            var stamp = claims.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+
+            if (stamp != user.SecurityStamp)
+                throw new InvalidOperationException("Invalid token.");
+
+            return claims;
         }
 
         private async Task<ClaimsIdentity> GenerateClaimsAsync(User user)
@@ -103,6 +119,8 @@ namespace EchoPhase.Security.Authentication.Jwt
                 claims.AddClaim(new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()));
             if (user.UserName != null)
                 claims.AddClaim(new Claim(JwtRegisteredClaimNames.Name, user.UserName));
+            if (user.SecurityStamp != null)
+                claims.AddClaim(new Claim(JwtRegisteredClaimNames.Jti, user.SecurityStamp));
 
             var roles = (await _roleService.GetRolesAsync(user)).ToArray();
 

@@ -45,7 +45,7 @@ namespace EchoPhase.Security.Authentication.Extensions
                 .AddEntityFrameworkStores<PostgresContext>()
                 .AddDefaultTokenProviders();
 
-            CookieAuthenticationOptions authCookie = new CookieAuthenticationOptions()
+            var authCookie = new CookieAuthenticationOptions()
             {
                 LoginPath = "/login",
                 LogoutPath = "/logout",
@@ -65,38 +65,7 @@ namespace EchoPhase.Security.Authentication.Extensions
                 options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                 options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             })
-            .AddJwtBearer(options =>
-                {
-                    var serviceProvider = services.BuildServiceProvider();
-                    var settings = serviceProvider
-                        .GetRequiredService<IOptions<Configuration.Authentication.AuthenticationOptions>>().Value.Bearer;
-
-                    var keysService = serviceProvider
-                        .GetRequiredService<IKeyVault>();
-
-                    var result = keysService.GetOrSet(settings.Key);
-
-                    result.OnFailure(err =>
-                        throw new InvalidOperationException(err.Value));
-
-                    if (!result.TryGetValue(out var key))
-                        throw new InvalidOperationException($"Missing '{settings.Key}' key.");
-
-                    options.TokenValidationParameters = new TokenValidationParameters
-                    {
-                        AuthenticationType = JwtBearerDefaults.AuthenticationScheme,
-                        ValidateIssuer = true,
-                        ValidateAudience = true,
-                        ValidateLifetime = true,
-                        ValidateIssuerSigningKey = true,
-                        ValidIssuer = settings.ValidIssuer,
-                        ValidAudiences = settings.ValidAudiences,
-                        IssuerSigningKey = new SymmetricSecurityKey(key),
-                        ClockSkew = TimeSpan.Zero,
-                        NameClaimType = JwtRegisteredClaimNames.Name,
-                        RoleClaimType = RoleService.RoleClaim
-                    };
-                })
+            .AddCustomJwtBearer()
             .AddCookie(options =>
                 options.CopyFrom(authCookie));
 

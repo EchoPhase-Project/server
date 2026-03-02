@@ -42,6 +42,15 @@ namespace EchoPhase.Security.Authentication.Jwt
 
         public async Task<TokenPair> CreateAsync(User user, string deviceId)
         {
+            var existing = _repository.Get(x =>
+            {
+                x.UserIds = [user.Id];
+                x.DeviceIds = [deviceId];
+            }).Data.FirstOrDefault();
+
+            if (existing is not null)
+                throw new InvalidOperationException($"DeviceId {deviceId} is already in use.");
+
             var entry = new RefreshToken
             {
                 UserId = user.Id,
