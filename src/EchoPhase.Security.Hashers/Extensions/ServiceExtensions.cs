@@ -1,6 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
 using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Security.Hashers.Extensions
 {

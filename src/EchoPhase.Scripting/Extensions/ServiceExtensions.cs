@@ -1,7 +1,7 @@
-using Microsoft.Extensions.DependencyInjection;
 using EchoPhase.Scripting.Lexers;
 using EchoPhase.Scripting.Parsers;
 using EchoPhase.Scripting.Tokens;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Scripting.Extensions
 {

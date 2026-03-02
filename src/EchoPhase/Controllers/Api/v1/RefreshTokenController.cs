@@ -1,10 +1,10 @@
 using EchoPhase.Controllers.Api.v1.Dto.Auth;
 using EchoPhase.Identity;
+using EchoPhase.Projection;
 using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Types.Repository;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using EchoPhase.Projection;
 
 namespace EchoPhase.Controllers.Api.v1
 {

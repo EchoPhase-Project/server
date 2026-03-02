@@ -1,7 +1,7 @@
+using EchoPhase.Security.Authentication.Handlers;
+using EchoPhase.Security.Authentication.Options;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using EchoPhase.Security.Authentication.Options;
-using EchoPhase.Security.Authentication.Handlers;
 
 namespace EchoPhase.Security.Authentication.Extensions
 {

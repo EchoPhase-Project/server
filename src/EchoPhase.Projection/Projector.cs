@@ -175,9 +175,9 @@ namespace EchoPhase.Projection
                     string key = entry.Key?.ToString() ?? "";
                     if (includePaths != null && !includePaths.Contains(key))
                         continue;
-                        dict[key] = entry.Value is null
-                            ? null
-                            : ConvertToObject(entry.Value, includePaths, depth + 1, visited, recursion);
+                    dict[key] = entry.Value is null
+                        ? null
+                        : ConvertToObject(entry.Value, includePaths, depth + 1, visited, recursion);
                 }
                 visited.Remove(source);
                 return dict;

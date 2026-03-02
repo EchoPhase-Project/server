@@ -1,10 +1,10 @@
-using Microsoft.Extensions.DependencyInjection;
 using EchoPhase.Security.Authorization.Factories;
 using EchoPhase.Security.Authorization.Handlers;
 using EchoPhase.Security.BitMasks.Constants;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Security.Authorization.Extensions
 {

@@ -1,7 +1,7 @@
 using EchoPhase.Clients.Discord;
+using EchoPhase.Controllers.Api.v1.Dto.Discord;
 using EchoPhase.Identity;
 using Microsoft.AspNetCore.Mvc;
-using EchoPhase.Controllers.Api.v1.Dto.Discord;
 
 namespace EchoPhase.Controllers.Api.v1
 {

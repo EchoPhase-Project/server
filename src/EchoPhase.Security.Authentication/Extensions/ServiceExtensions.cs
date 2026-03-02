@@ -1,16 +1,9 @@
-using Microsoft.Extensions.DependencyInjection;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using EchoPhase.Security.Authentication.Jwt;
-using EchoPhase.Security.Cryptography.Vaults;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
-using EchoPhase.Types.Result.Extensions;
-using Microsoft.Extensions.Options;
-using System.IdentityModel.Tokens.Jwt;
-using EchoPhase.Identity;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Security.Authentication.Extensions
 {

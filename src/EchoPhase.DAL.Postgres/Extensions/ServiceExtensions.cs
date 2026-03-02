@@ -1,7 +1,7 @@
+using EchoPhase.DAL.Postgres.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Microsoft.EntityFrameworkCore;
-using EchoPhase.DAL.Postgres.Repositories;
 
 namespace EchoPhase.DAL.Postgres.Extensions
 {

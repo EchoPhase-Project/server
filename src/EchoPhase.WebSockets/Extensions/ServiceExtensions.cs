@@ -1,6 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
 using EchoPhase.WebSockets.Processors;
 using EchoPhase.WebSockets.Processors.Handlers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.WebSockets.Extensions
 {

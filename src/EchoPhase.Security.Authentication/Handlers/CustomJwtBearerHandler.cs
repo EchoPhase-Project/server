@@ -1,12 +1,12 @@
+using System.Security.Claims;
+using System.Text.Encodings.Web;
 using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Security.Authentication.Options;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Security.Claims;
-using Microsoft.AspNetCore.Http;
-using System.Text.Encodings.Web;
 
 namespace EchoPhase.Security.Authentication.Handlers
 {

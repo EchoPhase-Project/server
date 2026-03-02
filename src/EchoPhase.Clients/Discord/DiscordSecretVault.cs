@@ -1,9 +1,9 @@
 using System.Text.Json;
-using Microsoft.Extensions.Options;
 using EchoPhase.Configuration.Database;
 using EchoPhase.Security.Cryptography;
 using EchoPhase.Security.Cryptography.Vaults;
 using EchoPhase.Types.Result;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
 // --------------------------

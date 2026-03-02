@@ -19,7 +19,10 @@ namespace EchoPhase.Security.Cryptography.Vaults
         protected readonly AesGcm AesGcm;
         protected readonly RedisOptions Settings;
         protected readonly JsonSerializerOptions JsonOptions;
-        protected abstract string KeyPrefix { get; }
+        protected abstract string KeyPrefix
+        {
+            get;
+        }
 
         protected SecretVaultBase(
             IConnectionMultiplexer redis,

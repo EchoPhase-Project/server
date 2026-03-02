@@ -1,7 +1,7 @@
 using EchoPhase.DAL.Redis.Interfaces;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
 namespace EchoPhase.DAL.Redis.Extensions
