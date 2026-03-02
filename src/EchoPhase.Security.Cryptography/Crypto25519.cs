@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
+using EchoPhase.Configuration.Cryptography;
 using EchoPhase.Configuration.Cryptography.Crypto25519;
 using MessagePack;
 using Microsoft.Extensions.Options;
@@ -20,10 +21,10 @@ namespace EchoPhase.Security.Cryptography
         private readonly SecureRandom _random;
         private readonly Crypto25519Options _settings;
 
-        public Crypto25519(IOptions<Crypto25519Options> settings)
+        public Crypto25519(IOptions<CryptographyOptions> settings)
         {
             _random = new SecureRandom(new CryptoApiRandomGenerator());
-            _settings = settings.Value;
+            _settings = settings.Value.Crypto22519;
         }
 
         // ------------------ Key generation ------------------

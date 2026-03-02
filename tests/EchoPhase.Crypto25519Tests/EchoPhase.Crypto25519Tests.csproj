@@ -10,9 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\EchoPhase\EchoPhase.csproj" />
     <ProjectReference Include="..\..\src\EchoPhase.Configuration\EchoPhase.Configuration.csproj" />
     <ProjectReference Include="..\..\src\EchoPhase.Security.Cryptography\EchoPhase.Security.Cryptography.csproj" />
+    <ProjectReference Include="..\..\src\EchoPhase.Profilers\EchoPhase.Profilers.csproj" />
   </ItemGroup>
 
 </Project>

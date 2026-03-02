@@ -16,7 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\EchoPhase.Scripting\EchoPhase.Scripting.csproj" />
     <ProjectReference Include="..\..\src\EchoPhase.Types\EchoPhase.Types.csproj" />
-    <ProjectReference Include="..\..\src\EchoPhase\EchoPhase.csproj" />
+    <ProjectReference Include="..\..\src\EchoPhase.Profilers\EchoPhase.Profilers.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,8 @@
 using System.Reflection;
+using EchoPhase.DAL.Redis.Extensions;
 using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.DAL.Postgres.Repositories;
+using EchoPhase.DAL.Postgres.Extensions;
+using EchoPhase.DAL.Scylla.Extensions;
 using EchoPhase.Extensions;
 using EchoPhase.Helpers;
 using EchoPhase.Hubs;
@@ -8,12 +10,13 @@ using EchoPhase.Hubs.Managers;
 using EchoPhase.Identity;
 using EchoPhase.Interfaces;
 using EchoPhase.Middlewares;
-using EchoPhase.Projection;
+using EchoPhase.Security.Antiforgery.Extensions;
+using EchoPhase.Projection.Extensions;
 using EchoPhase.QRCodes;
 using EchoPhase.RouteConstraints;
-using EchoPhase.Scheduling;
-using EchoPhase.Security.BitMasks;
+using EchoPhase.Scheduling.Extensions;
 using EchoPhase.Services.Internal;
+using EchoPhase.Configuration.Extensions;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.StaticFiles;
@@ -21,7 +24,16 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
-using ParkSquare.AspNetCore.Sitemap;
+using EchoPhase.Security.Authentication.Extensions;
+using EchoPhase.WebSockets.Extensions;
+using EchoPhase.Security.BitMasks.Extensions;
+using EchoPhase.Scripting.Extensions;
+using EchoPhase.Profilers.Extensions;
+using EchoPhase.Security.Authorization.Extensions;
+using EchoPhase.Security.Cryptography.Extensions;
+using EchoPhase.Security.Hashers.Extensions;
+using EchoPhase.Runners.Extensions;
+using EchoPhase.QRCodes.Extensions;
 
 namespace EchoPhase
 {
@@ -53,8 +65,6 @@ namespace EchoPhase
         /// <param name="services">The service collection to configure.</param>
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddSitemap();
-
             services.AddLogging(builder =>
             {
                 builder.ClearProviders();
@@ -70,8 +80,7 @@ namespace EchoPhase
                 options.ConstraintMap.Add("username", typeof(UsernameRouteConstraint));
             });
 
-            TimeZoneInfo timeZone = TimeZoneInfo.Local;
-            services.AddSingleton(timeZone);
+            services.AddSingleton(TimeZoneInfo.Utc);
 
             services.AddSwaggerGen(o =>
             {
@@ -102,8 +111,9 @@ namespace EchoPhase
 
             services.AddPreparedMvc();
             services.AddCorsPolicies();
-            services.AddAntiforgeryOptions();
+            services.AddConfiguredAntiforgery();
             services.AddLocalizationOptions();
+            services.AddConfigurations();
 
             services.AddSignalR(options =>
             {
@@ -115,30 +125,27 @@ namespace EchoPhase
             services.AddSingleton<IUserConnectionManager, UserConnectionManager>();
 
             services.AddSingleton<FileHelper>();
-            services.AddSingleton<Projector>();
+            services.AddProjection();
 
-            services.AddAes();
-            services.AddCrypto25519();
+            services.AddCryptography();
             services.AddPasswordHasher();
+            services.AddBitMasks();
 
-            services.AddSingleton<QRCodeService>();
-            services.AddSingleton<IIntentsBitMask, IntentsBitMask>();
-
-            services.AddScoped<UserRepository>();
+            services.AddQRCodes();
 
             services.AddScoped<IUserService, UserService>();
 
             services.AddScoped<UserManager<User>, UserManager<User>>();
-            services.AddScoped<SignInManager<User>, SignInManager<User>>();
 
-            services.AddExpressionEval();
+            services.AddScripting();
             services.AddProfiler();
 
             services.AddRunners();
 
             services.AddHostedService<ShutdownService>();
-            services.AddSingleton<DelayedTaskScheduler>();
+            services.AddScheduling();
 
+            services.AddWebSocket();
             services.AddEventService();
 
             services.AddGrpc();
@@ -146,11 +153,11 @@ namespace EchoPhase
             services.AddPostgres();
             services.AddScylla();
             services.AddRedisCache();
-            services.AddAuthentications();
 
             services.AddRoles();
 
-            services.AddPolicies();
+            services.AddAuthentications();
+            services.AddAuthorizations();
             services.AddProblemDetails();
 
             //services.AddTwitchClient(Configuration.GetSection("Twitch"));
@@ -193,14 +200,7 @@ namespace EchoPhase
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-
                 app.UseSwagger();
-                app.UseSwaggerUI(o =>
-                {
-                    o.SwaggerEndpoint("/swagger/v1/swagger.json", "API V1");
-                    o.RoutePrefix = "swagger";
-                });
-
                 app.UseRequestLoggingMiddleware();
             }
             else
@@ -212,25 +212,20 @@ namespace EchoPhase
                         ? StatusCodes.Status503ServiceUnavailable
                         : StatusCodes.Status500InternalServerError
                 });
-                app.UseHsts();
+                app.UseHsts(hsts => hsts.MaxAge(365));
             }
 
-            app.Use(async (context, next) =>
-            {
-                context.Response.Headers.Append("Content-Security-Policy",
-                    "default-src 'self'; " +
-                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; " +
-                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unicons.iconscout.com; " +
-                    "img-src 'self' blob: https://upload.wikimedia.org ; " +
-                    "font-src 'self' https://fonts.gstatic.com https://unicons.iconscout.com; " +
-                    "connect-src 'self' https://api.cdnjs.com; " +
-                    "upgrade-insecure-requests; " +
-                    "block-all-mixed-content");
-                await next();
-            });
+            app.UseCsp(opts => opts
+                .DefaultSources(s => s.Self())
+                .ScriptSources(s => s.Self().UnsafeInline().UnsafeEval()
+                    .CustomSources("https://cdnjs.cloudflare.com"))
+                .StyleSources(s => s.Self().UnsafeInline()
+                    .CustomSources("https://fonts.googleapis.com"))
+                .FrameAncestors(s => s.None())
+            );
 
-            app.UseDefaultFiles();
-            app.UseStaticFiles();
+            app.UseXContentTypeOptions();
+            app.UseReferrerPolicy(opts => opts.NoReferrer());
 
             app.UseStaticFiles(new StaticFileOptions
             {
@@ -273,10 +268,13 @@ namespace EchoPhase
                 }
             });
 
+            app.UseXfo(xfo => xfo.Deny());
+            app.UseRedirectValidation();
+
             app.UseRouting();
             app.UseCookiePolicy();
 
-            //app.UseCors();
+            app.UseCors();
 
             app.UseRequestLocalization(localizationOptions.Value);
 
@@ -293,53 +291,12 @@ namespace EchoPhase
                     Predicate = check => check.Name == "self"
                 });
 
-                /*
-				endpoints.MapHealthChecks("/health", new HealthCheckOptions
-				{
-					Predicate = _ => true,
-					ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-				})
-					.RequireCors("AllowLocalhost")
-					.AllowAnonymous();
-
-				endpoints.MapHealthChecksUI(options =>
-				{
-					options.UIPath = "/health-ui";
-				})
-					.RequireCors("AllowLocalhost")
-					.RequireAuthorization("AdminOrDevOnly");
-				*/
-
                 endpoints.MapControllers()
                     .RequireAuthorization();
 
                 endpoints.MapHub<EventHub>("/eventHub")
                     .RequireAuthorization();
-
-                endpoints.MapFallback(async context =>
-                {
-                    if (context.Request.Method != HttpMethods.Get ||
-                        Path.HasExtension(context.Request.Path))
-                    {
-                        context.Response.StatusCode = StatusCodes.Status404NotFound;
-                        return;
-                    }
-
-                    var filePath = Path.Combine(env.WebRootPath ?? string.Empty, "index.html");
-
-                    if (!File.Exists(filePath))
-                    {
-                        context.Response.StatusCode = StatusCodes.Status404NotFound;
-                        await context.Response.WriteAsync("index.html file not found.");
-                        return;
-                    }
-
-                    context.Response.ContentType = "text/html";
-                    await context.Response.SendFileAsync(filePath);
-                });
             });
-
-            app.UseSitemap();
         }
     }
 }

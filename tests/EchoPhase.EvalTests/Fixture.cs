@@ -1,4 +1,5 @@
-using EchoPhase.Extensions;
+using EchoPhase.Profilers.Extensions;
+using EchoPhase.Scripting.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -26,7 +27,7 @@ namespace EchoPhase.EvalTests
 
             var services = new ServiceCollection();
             services.AddProfiler();
-            services.AddExpressionEval();
+            services.AddScripting();
             Provider = services.BuildServiceProvider();
         }
     }

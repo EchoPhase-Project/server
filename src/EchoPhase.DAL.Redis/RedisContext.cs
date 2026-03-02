@@ -1,4 +1,4 @@
-using EchoPhase.Configuration.Database.Redis;
+using EchoPhase.Configuration.Database;
 using EchoPhase.DAL.Redis.Models;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
@@ -9,8 +9,8 @@ namespace EchoPhase.DAL.Redis
     {
         public RedisContext(
             IDistributedCache cache,
-            IOptions<RedisOptions> settings
-        ) : base(cache, settings.Value)
+            IOptions<DatabaseOptions> settings
+        ) : base(cache, settings.Value.Redis)
         {
             RegisterSet<QrUserCache>("user:{{key}}:qr");
             RegisterSet<QrCache>("qr:{{key}}:user");

@@ -6,13 +6,11 @@ using EchoPhase.WebSockets.Processors;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ParkSquare.AspNetCore.Sitemap;
 
 namespace EchoPhase.Controllers.WebSockets.v1
 {
     [Route("/gateway")]
     [ApiController]
-    [SitemapExclude]
     public class GatewayController : ControllerBase
     {
         private readonly IUserService _userService;

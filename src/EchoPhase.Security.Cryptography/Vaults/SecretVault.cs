@@ -1,5 +1,5 @@
 using System.Text.Json;
-using EchoPhase.Configuration.Database.Redis;
+using EchoPhase.Configuration.Database;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
@@ -16,7 +16,7 @@ namespace EchoPhase.Security.Cryptography.Vaults
         public SecretVault(
             IConnectionMultiplexer redis,
             AesGcm aesGcm,
-            IOptions<RedisOptions> settings,
+            IOptions<DatabaseOptions> settings,
             JsonSerializerOptions? jsonOptions = null)
             : base(redis, aesGcm, settings, jsonOptions) { }
     }

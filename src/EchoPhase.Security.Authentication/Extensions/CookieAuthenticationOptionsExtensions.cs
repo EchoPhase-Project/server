@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 
-namespace EchoPhase.Extensions
+namespace EchoPhase.Security.Authentication.Extensions
 {
     public static class CookieAuthenticationOptionsExtensions
     {

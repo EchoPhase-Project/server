@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using EchoPhase.Configuration.Database;
 using EchoPhase.Configuration.Database.Redis;
 using EchoPhase.Types.Result;
 using Microsoft.Extensions.Options;
@@ -23,13 +24,13 @@ namespace EchoPhase.Security.Cryptography.Vaults
         protected SecretVaultBase(
             IConnectionMultiplexer redis,
             AesGcm aesGcm,
-            IOptions<RedisOptions> settings,
+            IOptions<DatabaseOptions> settings,
             JsonSerializerOptions? jsonOptions = null)
         {
             Redis = redis;
             Db = redis.GetDatabase();
             AesGcm = aesGcm;
-            Settings = settings.Value;
+            Settings = settings.Value.Redis;
             JsonOptions = jsonOptions ?? new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase

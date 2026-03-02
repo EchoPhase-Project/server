@@ -8,7 +8,7 @@ namespace EchoPhase.Configuration.Database.Redis
         public Guid TenantId
         {
             get; set;
-        }
+        } = Guid.Empty;
 
         public IValidationResult Validate()
         {

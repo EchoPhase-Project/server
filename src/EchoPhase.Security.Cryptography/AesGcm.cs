@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using EchoPhase.Configuration.Cryptography;
 using EchoPhase.Configuration.Cryptography.Aes;
 using EchoPhase.Security.Cryptography.Vaults;
 using EchoPhase.Types.Result.Extensions;
@@ -14,11 +15,11 @@ namespace EchoPhase.Security.Cryptography
         private byte[] _key;
 
         public AesGcm(
-            IOptions<AesOptions> settings,
+            IOptions<CryptographyOptions> settings,
             IKeyVault keyVault
         )
         {
-            _settings = settings.Value;
+            _settings = settings.Value.Aes;
 
             var result = keyVault.GetOrSet(_settings.Key);
 

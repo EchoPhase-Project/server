@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using EchoPhase.Configuration.Database;
 using EchoPhase.Configuration.Database.Redis;
 using EchoPhase.Types.Result;
 using Microsoft.Extensions.Options;
@@ -23,11 +24,11 @@ namespace EchoPhase.Security.Cryptography.Vaults
         /// <param name="settings">Redis appsettings</param>
         public KeyVault(
             IConnectionMultiplexer redis,
-            IOptions<RedisOptions> settings
+            IOptions<DatabaseOptions> settings
         )
         {
             _db = redis.GetDatabase(); // Default DB (0)
-            _settings = settings.Value;
+            _settings = settings.Value.Redis;
         }
 
         // --------------------------

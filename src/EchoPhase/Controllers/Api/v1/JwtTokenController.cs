@@ -3,12 +3,10 @@ using EchoPhase.Identity;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Jwt;
 using Microsoft.AspNetCore.Mvc;
-using ParkSquare.AspNetCore.Sitemap;
 
 namespace EchoPhase.Controllers.Api.v1
 {
     [ApiController]
-    [SitemapExclude]
     [Route("/api/v1/auth/jwt")]
     public class JwtTokenController : ControllerBase
     {

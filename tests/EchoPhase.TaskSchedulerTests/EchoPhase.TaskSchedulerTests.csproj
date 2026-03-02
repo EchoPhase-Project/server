@@ -13,7 +13,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\EchoPhase\EchoPhase.csproj" />
     <ProjectReference Include="..\..\src\EchoPhase.Scheduling\EchoPhase.Scheduling.csproj" />
   </ItemGroup>
 

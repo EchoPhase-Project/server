@@ -1,6 +1,7 @@
-using EchoPhase.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using EchoPhase.Security.Cryptography.Extensions;
+using EchoPhase.Configuration.Extensions;
 
 namespace EchoPhase.Crypto25519Tests
 {
@@ -26,7 +27,8 @@ namespace EchoPhase.Crypto25519Tests
 
             var services = new ServiceCollection();
             services.AddSingleton<IConfiguration>(Configuration);
-            services.AddCrypto25519();
+            services.AddConfigurations();
+            services.AddCryptography();
             Provider = services.BuildServiceProvider();
         }
     }

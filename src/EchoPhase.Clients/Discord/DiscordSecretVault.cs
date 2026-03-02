@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using EchoPhase.Configuration.Database.Redis;
+using EchoPhase.Configuration.Database;
 using EchoPhase.Security.Cryptography;
 using EchoPhase.Security.Cryptography.Vaults;
 using EchoPhase.Types.Result;
@@ -20,7 +20,7 @@ namespace EchoPhase.Clients.Discord
         public DiscordSecretVault(
             IConnectionMultiplexer redis,
             AesGcm aesGcm,
-            IOptions<RedisOptions> settings,
+            IOptions<DatabaseOptions> settings,
             JsonSerializerOptions? jsonOptions = null)
             : base(redis, aesGcm, settings, jsonOptions) { }
 

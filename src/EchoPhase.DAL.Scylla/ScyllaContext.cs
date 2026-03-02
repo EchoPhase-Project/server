@@ -1,11 +1,11 @@
-using EchoPhase.Configuration.Database.Scylla;
+using EchoPhase.Configuration.Database;
 using Microsoft.Extensions.Options;
 
 namespace EchoPhase.DAL.Scylla
 {
     public class ScyllaContext : DbContext
     {
-        public ScyllaContext(IOptions<ScyllaOptions> options) : base(options.Value)
+        public ScyllaContext(IOptions<DatabaseOptions> options) : base(options.Value.Scylla)
         {
         }
 
