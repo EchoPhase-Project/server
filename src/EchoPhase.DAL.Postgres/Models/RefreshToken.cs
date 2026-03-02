@@ -1,15 +1,18 @@
 using System.ComponentModel.DataAnnotations;
 using EchoPhase.DAL.Abstractions;
+using EchoPhase.Projection.Attributes;
 
 namespace EchoPhase.DAL.Postgres.Models
 {
     public class RefreshToken : ITrackingEntity, IConcurrentEntity, IIdentifiable
     {
+        [Expose]
         public Guid Id
         {
             get; set;
         }
 
+        [Expose]
         public Guid UserId
         {
             get; set;
@@ -18,6 +21,7 @@ namespace EchoPhase.DAL.Postgres.Models
 
         public string RefreshValue { get; set; } = string.Empty;
 
+        [Expose]
         public string? DeviceId
         {
             get; set;

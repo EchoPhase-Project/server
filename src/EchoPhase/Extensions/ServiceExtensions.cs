@@ -84,9 +84,6 @@ namespace EchoPhase.Extensions
             });
 
             services.AddMvc()
-                //.AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix)
-                //.AddDataAnnotationsLocalization()
-                //.AddRazorRuntimeCompilation()
                 .AddNewtonsoftJson(options =>
                     options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
                 );

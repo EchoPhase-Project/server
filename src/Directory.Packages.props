@@ -67,6 +67,7 @@
     <PackageVersion Include="System.Drawing.Common" Version="10.0.3" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
     <PackageVersion Include="System.IO.Hashing" Version="10.0.3" />
+    <PackageVersion Include="System.Net.Primitives" Version="4.3.1" />
     <PackageVersion Include="UUIDNext" Version="4.2.3" />
   </ItemGroup>
 </Project>

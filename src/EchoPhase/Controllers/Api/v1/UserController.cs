@@ -17,16 +17,6 @@ namespace EchoPhase.Controllers.Api.v1
             _projector = projector;
         }
 
-        [HttpGet("@me")]
-        public async Task<IActionResult> GetUser()
-        {
-            var user = await _userService.GetAsync(User);
-            if (user is null)
-                return Unauthorized();
-
-            return Ok(_projector.Project(user, u => u.UserName, u => u.Id, u => u.Name));
-        }
-
         [HttpGet("{username:username}")]
         public IActionResult GetUser(string username)
         {

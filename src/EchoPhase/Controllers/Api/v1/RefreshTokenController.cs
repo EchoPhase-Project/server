@@ -4,6 +4,7 @@ using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Types.Repository;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using EchoPhase.Projection;
 
 namespace EchoPhase.Controllers.Api.v1
 {
@@ -13,14 +14,29 @@ namespace EchoPhase.Controllers.Api.v1
     {
         private readonly IRefreshTokenProvider _refreshTokenProvider;
         private readonly IUserService _userService;
+        private readonly Projector _projector;
 
         public RefreshTokenController(
             IRefreshTokenProvider refreshTokenProvider,
-            IUserService userService
+            IUserService userService,
+            Projector projector
             )
         {
             _refreshTokenProvider = refreshTokenProvider;
             _userService = userService;
+            _projector = projector;
+        }
+
+        [HttpPost("new")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create([FromBody] CreateDto dto)
+        {
+            var user = await _userService.GetAsync(User);
+            if (user is null || user.Id == Guid.Empty)
+                return Unauthorized();
+
+            var tokenPair = await _refreshTokenProvider.CreateAsync(user, dto.DeviceId);
+            return Ok(tokenPair);
         }
 
         [HttpPost]
@@ -67,7 +83,8 @@ namespace EchoPhase.Controllers.Api.v1
                 After = after,
                 Limit = limit
             });
-            return Ok(sessions);
+
+            return Ok(_projector.Project(sessions));
         }
     }
 }

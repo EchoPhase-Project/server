@@ -19,17 +19,6 @@ namespace EchoPhase.Controllers.Api.v1
             _jwt = jwt;
         }
 
-        [HttpPost("@me")]
-        [BearerOrValidateAntiForgeryToken]
-        public async Task<IActionResult> GenerateForSelf()
-        {
-            var user = await _userService.GetAsync(User);
-            if (user is null)
-                return Unauthorized();
-
-            return Ok(await BuildTokenDictAsync([user]));
-        }
-
         [HttpPost("{guid:guid}")]
         [BearerOrValidateAntiForgeryToken]
         public async Task<IActionResult> GenerateById(Guid guid)
@@ -54,9 +43,10 @@ namespace EchoPhase.Controllers.Api.v1
 
         private async Task<IDictionary<Guid, string>> BuildTokenDictAsync(IEnumerable<User> users)
         {
-            var tasks = users.Select(async user => (user.Id, Token: await _jwt.GenerateTokenAsync(user)));
-            var results = await Task.WhenAll(tasks);
-            return results.ToDictionary(x => x.Id, x => x.Token);
+            var result = new Dictionary<Guid, string>();
+            foreach (var user in users.ToList())
+                result[user.Id] = await _jwt.GenerateTokenAsync(user);
+            return result;
         }
     }
 }

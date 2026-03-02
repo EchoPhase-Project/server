@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EchoPhase.DAL.Abstractions\EchoPhase.DAL.Abstractions.csproj" />
+    <ProjectReference Include="..\EchoPhase.Projection\EchoPhase.Projection.csproj" />
   </ItemGroup>
 
 </Project>
