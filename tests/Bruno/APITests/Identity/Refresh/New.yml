@@ -6,7 +6,38 @@ info:
 http:
   method: POST
   url: "{{baseUrl}}/auth/refresh/new"
+  headers:
+    - name: X-CSRF-TOKEN
+      value: "{{X-CSRF-TOKEN}}"
+  body:
+    type: json
+    data: |-
+      {
+        "DeviceId": "Linux x86, Chrome"
+      }
   auth: inherit
+
+runtime:
+  variables:
+    - name: ""
+      value: ""
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body["accessToken"]
+        method: jsonq
+      variable:
+        name: RefreshToken
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body["refreshToken"]
+        method: jsonq
+      variable:
+        name: AccessToken
+        scope: runtime
 
 settings:
   encodeUrl: true

@@ -6,6 +6,9 @@ info:
 http:
   method: GET
   url: "{{baseUrl}}/auth/refresh/sessions"
+  body:
+    type: json
+    data: ""
   auth: inherit
 
 settings:

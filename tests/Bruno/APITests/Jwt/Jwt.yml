@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/auth/jwt/@me"
+  url: "{{baseUrl}}/auth/jwt/{{Id}}"
   headers:
     - name: Authorization
       value: Bearer {{Bearer}}

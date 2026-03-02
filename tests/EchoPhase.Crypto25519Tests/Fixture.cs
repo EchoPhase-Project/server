@@ -1,7 +1,7 @@
+using EchoPhase.Configuration.Extensions;
+using EchoPhase.Security.Cryptography.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using EchoPhase.Security.Cryptography.Extensions;
-using EchoPhase.Configuration.Extensions;
 
 namespace EchoPhase.Crypto25519Tests
 {
