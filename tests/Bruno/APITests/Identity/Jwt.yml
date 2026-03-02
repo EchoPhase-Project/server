@@ -1,11 +1,11 @@
 info:
   name: Jwt
   type: http
-  seq: 1
+  seq: 2
 
 http:
   method: POST
-  url: "{{baseUrl}}/auth/jwt/@me"
+  url: "{{baseUrl}}/auth/jwt/{{Id}}"
   headers:
     - name: X-CSRF-TOKEN
       value: "{{X-CSRF-TOKEN}}"

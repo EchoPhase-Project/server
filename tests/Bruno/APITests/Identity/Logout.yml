@@ -1,11 +1,14 @@
 info:
   name: Logout
   type: http
-  seq: 6
+  seq: 5
 
 http:
   method: POST
   url: "{{baseUrl}}/auth/logout"
+  headers:
+    - name: X-CSRF-TOKEN
+      value: "{{X-CSRF-TOKEN}}"
   auth: inherit
 
 settings:
