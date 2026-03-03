@@ -28,7 +28,7 @@ namespace EchoPhase.Controllers.Api.v1
                 return NotFound();
 
             return Ok(users.Data.Select(user =>
-                _projector.Project(user, u => u.Id, u => u.Name, u => u.UserName)));
+                _projector.For(user).Include(u => u.Id, u => u.Name, u => u.UserName).Build()));
         }
     }
 }

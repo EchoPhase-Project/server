@@ -84,7 +84,11 @@ namespace EchoPhase.Controllers.Api.v1
                 Limit = limit
             });
 
-            return Ok(_projector.Project(sessions));
+            var projected = _projector
+                .For(sessions)
+                .Build();
+
+            return Ok(projected);
         }
     }
 }

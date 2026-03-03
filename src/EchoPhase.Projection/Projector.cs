@@ -1,7 +1,9 @@
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Dynamic;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using EchoPhase.Projection.Attributes;
 using EchoPhase.Projection.Options;
@@ -9,127 +11,107 @@ using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Projection
 {
-    /// <summary>
-    /// Provides functionality to project an object into a simplified structure such as a dictionary or ExpandoObject.
-    /// Supports inclusion of specific fields, nested paths, and attributes-based filtering.
-    /// </summary>
     public class Projector
     {
-        private ProjectionOptions _options = new();
+        internal readonly ProjectionOptions _defaultOptions;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ProjectionHelper"/> class with default options.
-        /// </summary>
-        public Projector()
-        {
-        }
+        private static readonly ConcurrentDictionary<Type, (PropertyInfo Prop, bool IsExposed)[]> _propCache = new();
+        private static readonly ConcurrentDictionary<Type, IReadOnlySet<string>> _exposePathCache = new();
 
-        /// <summary>
-        /// Sets the projection options to the specified instance.
-        /// </summary>
-        /// <param name="options">An instance of <see cref="ProjectionOptions"/> to use for projection.</param>
-        /// <returns>The current <see cref="ProjectionHelper"/> instance.</returns>
-        public Projector WithOptions(ProjectionOptions options)
-        {
-            _options = options;
-            return this;
-        }
+        public Projector() => _defaultOptions = new ProjectionOptions();
+        public Projector(ProjectionOptions defaultOptions) => _defaultOptions = defaultOptions;
 
-        /// <summary>
-        /// Configures the current projection options using the provided delegate.
-        /// </summary>
-        /// <param name="configure">An action that modifies the <see cref="ProjectionOptions"/> instance.</param>
-        /// <returns>The current <see cref="ProjectionHelper"/> instance.</returns>
-        public Projector WithOptions(Action<ProjectionOptions> configure)
-        {
-            configure(_options);
-            return this;
-        }
+        public ProjectionBuilder<T> For<T>(T source) =>
+            new(source, _defaultOptions.Clone());
 
-        /// <summary>
-        /// Projects the specified source object into a simplified representation,
-        /// including only the specified properties or those marked with <see cref="ExposeAttribute"/>.
-        /// </summary>
-        /// <typeparam name="T">The type of the source object.</typeparam>
-        /// <param name="source">The source object to project.</param>
-        /// <param name="includeProperties">
-        /// An optional list of expressions specifying which properties to include.
-        /// If empty, all properties are included unless <see cref="ProjectionOptions.IncludeOnlyExpose"/> is set.
-        /// </param>
-        /// <returns>
-        /// A simplified representation of the object, either as <see cref="ExpandoObject"/>
-        /// or <see cref="Dictionary{String, Object}"/>, depending on <see cref="ProjectionOptions.UseExpando"/>.
-        /// </returns>
-        public object Project<T>(
+        public CollectionProjectionBuilder<T> ForCollection<T>(IEnumerable<T> source) =>
+            new(source, _defaultOptions.Clone());
+
+        internal object? Execute<T>(
             T source,
-            params Expression<Func<T, object?>>[] includeProperties)
+            ProjectionOptions options,
+            IReadOnlyList<Expression<Func<T, object?>>> includeProperties,
+            IReadOnlyDictionary<string, CollectionConfig>? collectionConfigs = null)
         {
-            if (source == null) return null!;
+            if (source == null) return null;
 
-            var fields = includeProperties.Select(ExtractMemberPath).ToHashSet();
+            HashSet<string>? fields;
+            if (includeProperties.Count > 0)
+            {
+                fields = includeProperties.Select(ExtractMemberPath)
+                                          .ToHashSet(StringComparer.Ordinal);
+            }
+            else
+            {
+                fields = options.IncludeOnlyExpose
+                    ? new HashSet<string>(StringComparer.Ordinal)
+                    : null;
+            }
 
-            if (fields is { Count: 0 })
-                fields = _options.IncludeOnlyExpose ? new HashSet<string>() : null;
-
-            if (fields != null && _options.IncludeOnlyExpose)
-                CollectExposePaths(fields, typeof(T), "");
+            if (fields != null && options.IncludeOnlyExpose)
+            {
+                var cached = _exposePathCache.GetOrAdd(source.GetType(), t =>
+                {
+                    var set = new HashSet<string>(StringComparer.Ordinal);
+                    CollectExposePaths(set, t, "", new HashSet<Type>());
+                    return set;
+                });
+                foreach (var path in cached)
+                    fields.Add(path);
+            }
 
             var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            collectionConfigs ??= new Dictionary<string, CollectionConfig>();
 
-            return _options.UseExpando
-                ? (object)ProjectToExpando(source!, fields, 0, visited)
-                : (object)ProjectToDictionary(source!, fields, 0, visited);
+            return options.UseExpando
+                ? (object)ProjectToExpando(source!, fields, visited, options, collectionConfigs)
+                : ProjectToDictionary(source!, fields, visited, options, collectionConfigs);
         }
 
         private Dictionary<string, object?> ProjectToDictionary(
-            object source,
-            ISet<string>? includePaths,
-            int depth,
-            HashSet<object> visited)
+            object source, ISet<string>? includePaths,
+            HashSet<object> visited, ProjectionOptions options,
+            IReadOnlyDictionary<string, CollectionConfig> collectionConfigs)
         {
             var dict = new Dictionary<string, object?>();
-            FillDict(dict, source, includePaths, depth, visited,
-                (s, p, d, v) => ProjectToDictionary(s, p, d, v));
+            FillDict(dict, source, includePaths, visited, options, collectionConfigs,
+                (s, p, v) => ProjectToDictionary(s, p, v, options, collectionConfigs));
             return dict;
         }
 
         private ExpandoObject ProjectToExpando(
-            object source,
-            ISet<string>? includePaths,
-            int depth,
-            HashSet<object> visited)
+            object source, ISet<string>? includePaths,
+            HashSet<object> visited, ProjectionOptions options,
+            IReadOnlyDictionary<string, CollectionConfig> collectionConfigs)
         {
             var expando = new ExpandoObject();
-            FillDict((IDictionary<string, object?>)expando, source, includePaths, depth, visited,
-                (s, p, d, v) => ProjectToExpando(s, p, d, v));
+            FillDict((IDictionary<string, object?>)expando, source, includePaths, visited, options, collectionConfigs,
+                (s, p, v) => ProjectToExpando(s, p, v, options, collectionConfigs));
             return expando;
         }
 
         private object? ConvertToObject(
-            object source,
-            ISet<string>? includePaths,
-            int depth,
-            HashSet<object> visited,
-            Func<object, ISet<string>?, int, HashSet<object>, object?> recursion)
+            object? source, ISet<string>? includePaths,
+            HashSet<object> visited, ProjectionOptions options,
+            IReadOnlyDictionary<string, CollectionConfig> collectionConfigs,
+            Func<object, ISet<string>?, HashSet<object>, object?> recursion,
+            CollectionConfig? collectionConfig = null)
         {
-            if (source == null)
-                return null;
+            if (source == null) return null;
 
             if (source is JsonElement jsonElem)
             {
                 switch (jsonElem.ValueKind)
                 {
                     case JsonValueKind.Object:
-                        var dict = new Dictionary<string, object?>();
-                        FillDict(dict, jsonElem, includePaths, depth, visited, recursion);
-                        return dict;
-
+                        var jdict = new Dictionary<string, object?>();
+                        FillDict(jdict, jsonElem, includePaths, visited, options, collectionConfigs, recursion);
+                        return jdict;
                     case JsonValueKind.Array:
-                        var list = new List<object?>();
+                        var jlist = new List<object?>();
                         foreach (var item in jsonElem.EnumerateArray())
-                            list.Add(ConvertToObject(item, includePaths, depth + 1, visited, recursion));
-                        return list;
-
+                            jlist.Add(ConvertToObject(item, includePaths, visited, options, collectionConfigs, recursion));
+                        return jlist;
                     default:
                         return GetJsonSimpleValue(jsonElem);
                 }
@@ -140,44 +122,32 @@ namespace EchoPhase.Projection
                 switch (jtoken.Type)
                 {
                     case JTokenType.Object:
-                        var dict = new Dictionary<string, object?>();
-                        FillDict(dict, jtoken, includePaths, depth, visited, recursion);
-                        return dict;
-
+                        var jtdict = new Dictionary<string, object?>();
+                        FillDict(jtdict, jtoken, includePaths, visited, options, collectionConfigs, recursion);
+                        return jtdict;
                     case JTokenType.Array:
-                        var list = new List<object?>();
+                        var jtlist = new List<object?>();
                         foreach (var item in (JArray)jtoken)
-                            list.Add(ConvertToObject(item, includePaths, depth + 1, visited, recursion));
-                        return list;
-
+                            jtlist.Add(ConvertToObject(item, includePaths, visited, options, collectionConfigs, recursion));
+                        return jtlist;
                     case JTokenType.Null:
                         return null;
-
                     default:
-                        if (jtoken is JValue jval)
-                            return jval.Value;
-                        else
-                            return jtoken.ToString();
+                        return jtoken is JValue jval ? jval.Value : jtoken.ToString();
                 }
             }
 
             if (source is IDictionary rawDict && source is not string)
             {
-                if (!IsSimple(source.GetType()))
-                {
-                    if (!visited.Add(source))
-                        return null;
-                }
-
+                if (!visited.Add(source)) return null;
                 var dict = new Dictionary<string, object?>();
                 foreach (DictionaryEntry entry in rawDict)
                 {
-                    string key = entry.Key?.ToString() ?? "";
-                    if (includePaths != null && !includePaths.Contains(key))
-                        continue;
+                    var key = entry.Key?.ToString() ?? "";
+                    if (includePaths != null && !includePaths.Contains(key)) continue;
                     dict[key] = entry.Value is null
                         ? null
-                        : ConvertToObject(entry.Value, includePaths, depth + 1, visited, recursion);
+                        : ConvertToObject(entry.Value, includePaths, visited, options, collectionConfigs, recursion);
                 }
                 visited.Remove(source);
                 return dict;
@@ -187,17 +157,20 @@ namespace EchoPhase.Projection
             {
                 var list = new List<object?>();
                 foreach (var item in enumerable)
-                    list.Add(ConvertToObject(item, includePaths, depth + 1, visited, recursion));
+                {
+                    if (item == null) { list.Add(null); continue; }
+                    list.Add(collectionConfig != null
+                        ? collectionConfig.Apply(this, item).Build()
+                        : ConvertToObject(item, includePaths, visited, options, collectionConfigs, recursion));
+                }
                 return list;
             }
 
             if (!IsSimple(source.GetType()))
             {
-                if (!visited.Add(source))
-                    return null; // циклическая ссылка — обрываем
-
+                if (!visited.Add(source)) return null;
                 var dict = new Dictionary<string, object?>();
-                FillDict(dict, source, includePaths, depth, visited, recursion);
+                FillDict(dict, source, includePaths, visited, options, collectionConfigs, recursion);
                 visited.Remove(source);
                 return dict;
             }
@@ -207,23 +180,29 @@ namespace EchoPhase.Projection
 
         private void FillDict(
             IDictionary<string, object?> dict,
-            object source,
-            ISet<string>? includePaths,
-            int depth,
-            HashSet<object> visited,
-            Func<object, ISet<string>?, int, HashSet<object>, object?> recursion)
+            object source, ISet<string>? includePaths,
+            HashSet<object> visited, ProjectionOptions options,
+            IReadOnlyDictionary<string, CollectionConfig> collectionConfigs,
+            Func<object, ISet<string>?, HashSet<object>, object?> recursion)
         {
-            bool ShouldInclude(string path) =>
-                includePaths == null ||
-                includePaths.Contains(path) ||
-                (_options.IncludeSubPaths && includePaths.Any(p => p.StartsWith(path + ".")));
+            bool ShouldInclude(string path)
+            {
+                if (includePaths == null) return true;
+                if (includePaths.Contains(path)) return true;
+                if (!options.IncludeSubPaths) return false;
+                var needle = path + ".";
+                foreach (var p in includePaths)
+                    if (p.StartsWith(needle, StringComparison.Ordinal)) return true;
+                return false;
+            }
 
             if (source is JsonElement jsonElem)
             {
                 foreach (var prop in jsonElem.EnumerateObject())
                 {
                     if (!ShouldInclude(prop.Name)) continue;
-                    dict[prop.Name] = ConvertToObject(prop.Value, SubPaths(includePaths, prop.Name), depth + 1, visited, recursion);
+                    dict[prop.Name] = ConvertToObject(prop.Value, SubPaths(includePaths, prop.Name),
+                        visited, options, collectionConfigs, recursion);
                 }
                 return;
             }
@@ -233,146 +212,133 @@ namespace EchoPhase.Projection
                 foreach (var prop in jobject.Properties())
                 {
                     if (!ShouldInclude(prop.Name)) continue;
-                    dict[prop.Name] = ConvertToObject(prop.Value, SubPaths(includePaths, prop.Name), depth + 1, visited, recursion);
+                    dict[prop.Name] = ConvertToObject(prop.Value, SubPaths(includePaths, prop.Name),
+                        visited, options, collectionConfigs, recursion);
                 }
                 return;
             }
 
-            var type = source.GetType();
-            var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                           .Where(p => p.GetIndexParameters().Length == 0);
-
-            foreach (var prop in props)
+            foreach (var (prop, _) in GetCachedProperties(source.GetType()))
             {
                 if (!ShouldInclude(prop.Name)) continue;
+
                 var val = prop.GetValue(source);
-                dict[prop.Name] = ConvertToObject(val!, SubPaths(includePaths, prop.Name), depth + 1, visited, recursion);
+                if (val is null) { dict[prop.Name] = null; continue; }
+
+                collectionConfigs.TryGetValue(prop.Name, out var colConfig);
+                dict[prop.Name] = ConvertToObject(
+                    val, SubPaths(includePaths, prop.Name),
+                    visited, options, collectionConfigs, recursion,
+                    collectionConfig: colConfig);
             }
         }
 
-        private void CollectExposePaths(in ISet<string> fields, Type type, string basePath)
+        private void CollectExposePaths(ISet<string> fields, Type type, string basePath, HashSet<Type> visitedTypes)
         {
-            CollectExposePaths(fields, type, basePath, new HashSet<Type>());
-        }
+            if (!visitedTypes.Add(type)) return;
 
-        private void CollectExposePaths(in ISet<string> fields, Type type, string basePath, HashSet<Type> visitedTypes)
-        {
-            if (!visitedTypes.Add(type))
-                return;
-
-            foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            foreach (var (prop, isExposed) in GetCachedProperties(type))
             {
-                var path = string.IsNullOrEmpty(basePath) ? prop.Name : $"{basePath}.{prop.Name}";
-                var isExposed = Attribute.IsDefined(prop, typeof(ExposeAttribute));
+                var path = basePath.Length == 0
+                    ? prop.Name
+                    : string.Concat(basePath, ".", prop.Name);
 
-                if (isExposed)
-                    fields.Add(path);
+                if (isExposed) fields.Add(path);
+                if (!isExposed) continue;
 
                 var propType = prop.PropertyType;
                 var elementType = GetCollectionElementType(propType);
-                if (elementType != null)
-                    propType = elementType;
+                if (elementType != null) propType = elementType;
 
-                // Заходим вглубь только если само свойство exposed
-                if (isExposed && !IsSimple(propType))
+                if (!IsSimple(propType))
                     CollectExposePaths(fields, propType, path, visitedTypes);
             }
 
             visitedTypes.Remove(type);
         }
 
+        private static (PropertyInfo Prop, bool IsExposed)[] GetCachedProperties(Type type) =>
+            _propCache.GetOrAdd(type, t =>
+                t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                 .Where(p => p.GetIndexParameters().Length == 0)
+                 .Select(p => (p, Attribute.IsDefined(p, typeof(ExposeAttribute))))
+                 .ToArray());
+
         private static Type? GetCollectionElementType(Type type)
         {
-            if (type.IsArray)
-                return type.GetElementType();
-
+            if (type.IsArray) return type.GetElementType();
             if (type.IsGenericType)
             {
                 var def = type.GetGenericTypeDefinition();
-                if (def == typeof(IEnumerable<>) ||
-                    def == typeof(ICollection<>) ||
-                    def == typeof(IList<>) ||
-                    def == typeof(List<>))
+                if (def == typeof(IEnumerable<>) || def == typeof(ICollection<>) ||
+                    def == typeof(IList<>)        || def == typeof(List<>))
                     return type.GetGenericArguments()[0];
 
-                // IEnumerable<T> через интерфейс
-                var enumerable = type.GetInterfaces()
-                    .FirstOrDefault(i => i.IsGenericType &&
-                                         i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
-                if (enumerable != null)
-                    return enumerable.GetGenericArguments()[0];
+                var iface = type.GetInterfaces().FirstOrDefault(i =>
+                    i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+                if (iface != null) return iface.GetGenericArguments()[0];
             }
-
             return null;
         }
 
-        private string ExtractMemberPath<T>(Expression<Func<T, object?>> expr)
+        internal static string ExtractMemberPath<T>(Expression<Func<T, object?>> expr)
         {
             Expression body = expr.Body;
-
             while (body.NodeType == ExpressionType.Convert || body.NodeType == ExpressionType.ConvertChecked)
-            {
                 body = ((UnaryExpression)body).Operand;
-            }
 
             if (body is MemberExpression member)
             {
-                var names = new Stack<string>();
-                while (member != null)
-                {
-                    names.Push(member.Member.Name);
-                    if (member.Expression is MemberExpression parent)
-                        member = parent;
-                    else
-                        break;
-                }
-                var path = string.Join(".", names);
-                return path;
+                var sb = new StringBuilder();
+                BuildPath(member, sb);
+                return sb.ToString();
             }
 
             throw new InvalidOperationException("Unsupported expression: " + expr);
         }
 
-        private ISet<string>? SubPaths(ISet<string>? paths, string parent)
+        private static void BuildPath(MemberExpression member, StringBuilder sb)
+        {
+            if (member.Expression is MemberExpression parent)
+            {
+                BuildPath(parent, sb);
+                sb.Append('.');
+            }
+            sb.Append(member.Member.Name);
+        }
+
+        private static ISet<string>? SubPaths(ISet<string>? paths, string parent)
         {
             if (paths == null) return null;
 
             var prefix = parent + ".";
-            var sub = paths
-                .Where(p => p.StartsWith(prefix))
-                .Select(p => p[prefix.Length..])
-                .ToHashSet();
-
-            return sub;
-        }
-
-        private static bool IsSimple(Type type)
-        {
-            return
-                type.IsPrimitive ||
-                type.IsEnum ||
-                type == typeof(string) ||
-                type == typeof(decimal) ||
-                type == typeof(DateTime) ||
-                type == typeof(Guid) ||
-                type == typeof(DateTimeOffset) ||
-                type == typeof(TimeSpan);
-        }
-
-        private static object? GetJsonSimpleValue(JsonElement elem)
-        {
-            switch (elem.ValueKind)
+            HashSet<string>? result = null;
+            foreach (var p in paths)
             {
-                case JsonValueKind.String: return elem.GetString();
-                case JsonValueKind.Number:
-                    if (elem.TryGetInt64(out long l)) return l;
-                    if (elem.TryGetDouble(out double d)) return d;
-                    return elem.GetRawText();
-                case JsonValueKind.True: return true;
-                case JsonValueKind.False: return false;
-                case JsonValueKind.Null: return null;
-                default: return elem.GetRawText();
+                if (!p.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                result ??= new HashSet<string>(StringComparer.Ordinal);
+                result.Add(p[prefix.Length..]);
             }
+
+            return result ?? new HashSet<string>(StringComparer.Ordinal);
         }
+
+        private static bool IsSimple(Type type) =>
+            type.IsPrimitive    || type.IsEnum          ||
+            type == typeof(string)         || type == typeof(decimal)      ||
+            type == typeof(DateTime)       || type == typeof(Guid)         ||
+            type == typeof(DateTimeOffset) || type == typeof(TimeSpan);
+
+        private static object? GetJsonSimpleValue(JsonElement elem) => elem.ValueKind switch
+        {
+            JsonValueKind.String => elem.GetString(),
+            JsonValueKind.Number => elem.TryGetInt64(out long l) ? l
+                                  : elem.TryGetDouble(out double d) ? d
+                                  : (object?)elem.GetRawText(),
+            JsonValueKind.True  => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null  => null,
+            _                   => elem.GetRawText()
+        };
     }
 }

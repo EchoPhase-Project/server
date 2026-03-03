@@ -69,7 +69,12 @@ namespace EchoPhase.Controllers.Api.v1
             if (user is null)
                 return Unauthorized();
 
-            return Ok(_projector.Project(user, u => u.UserName, u => u.Id, u => u.Name));
+            var projected = _projector
+                .For(user)
+                .Include(u => u.UserName, u => u.Id)
+                .Build();
+
+            return Ok(projected);
         }
 
         [HttpPost("logout")]

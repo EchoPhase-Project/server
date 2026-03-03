@@ -28,7 +28,7 @@ namespace EchoPhase.Controllers.Api.v1
             var context = BlocksRunner.Create(request.StartIds, request.Blocks);
             context = await _runner.ExecuteAsync(context);
 
-            return Ok(_projector.Project(context, ctx => ctx.Errors, ctx => ctx.Output, ctx => ctx.Variables));
+            return Ok(_projector.For(context).Include(ctx => ctx.Errors, ctx => ctx.Output, ctx => ctx.Variables).Build());
         }
     }
 }
