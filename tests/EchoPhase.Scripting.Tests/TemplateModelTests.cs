@@ -1,26 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using EchoPhase.Scripting.Tests.Models;
 
-namespace EchoPhase.EvalTests
+namespace EchoPhase.Scripting.Tests
 {
-    public class Person
-    {
-        public string Name { get; set; } = "";
-        public int Age
-        {
-            get; set;
-        }
-        public Address Address { get; set; } = new();
-    }
-
-    public class Address
-    {
-        public string City { get; set; } = "";
-        public int Zip
-        {
-            get; set;
-        }
-    }
-
     public class TemplateModelTests : IClassFixture<Fixture>
     {
         private readonly ILexer<TemplateToken> _lexer;

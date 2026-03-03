@@ -1,11 +1,10 @@
-using EchoPhase.Profilers.Extensions;
-using EchoPhase.Scripting.Extensions;
+using EchoPhase.Projection.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace EchoPhase.EvalTests
+namespace EchoPhase.Projection.Tests
 {
-    public class Fixture
+    public class ConfiguredFixture
     {
         public ServiceProvider Provider
         {
@@ -16,7 +15,7 @@ namespace EchoPhase.EvalTests
             get;
         }
 
-        public Fixture()
+        public ConfiguredFixture()
         {
             var builder = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
@@ -26,8 +25,10 @@ namespace EchoPhase.EvalTests
             Configuration = builder.Build();
 
             var services = new ServiceCollection();
-            services.AddProfiler();
-            services.AddScripting();
+            services.AddProjection(opts =>
+                {
+                    opts.IncludeOnlyExpose = false;
+                });
             Provider = services.BuildServiceProvider();
         }
     }

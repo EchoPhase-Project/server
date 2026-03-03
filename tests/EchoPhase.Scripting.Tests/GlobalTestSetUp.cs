@@ -1,4 +1,4 @@
-namespace EvalTests
+namespace EchoPhase.Scripting
 {
     /*
     [SetUpFixture]

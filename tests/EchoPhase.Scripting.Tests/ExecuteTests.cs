@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 
-namespace EchoPhase.EvalTests
+namespace EchoPhase.Scripting.Tests
 {
     public class ExecuteTests : IClassFixture<Fixture>
     {

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace EchoPhase.EvalTests
+namespace EchoPhase.Scripting.Tests
 {
     public class ProcessTests : IClassFixture<Fixture>
     {

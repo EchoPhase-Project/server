@@ -1,7 +1,7 @@
 using EchoPhase.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace EchoPhase.TaskSchedulerTests
+namespace EchoPhase.Scheduling.Tests
 {
     public class ServiceTests : IDisposable
     {

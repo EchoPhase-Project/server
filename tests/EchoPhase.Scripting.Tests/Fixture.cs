@@ -1,9 +1,9 @@
-using EchoPhase.Configuration.Extensions;
-using EchoPhase.Security.Cryptography.Extensions;
+using EchoPhase.Profilers.Extensions;
+using EchoPhase.Scripting.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace EchoPhase.Crypto25519Tests
+namespace EchoPhase.Scripting.Tests
 {
     public class Fixture
     {
@@ -26,9 +26,8 @@ namespace EchoPhase.Crypto25519Tests
             Configuration = builder.Build();
 
             var services = new ServiceCollection();
-            services.AddSingleton<IConfiguration>(Configuration);
-            services.AddConfigurations();
-            services.AddCryptography();
+            services.AddProfiler();
+            services.AddScripting();
             Provider = services.BuildServiceProvider();
         }
     }
