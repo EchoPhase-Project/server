@@ -29,8 +29,8 @@ namespace EchoPhase.Projection.Options
         public ProjectionOptions Clone() => new()
         {
             IncludeOnlyExpose = IncludeOnlyExpose,
-            IncludeSubPaths   = IncludeSubPaths,
-            UseExpando        = UseExpando,
+            IncludeSubPaths = IncludeSubPaths,
+            UseExpando = UseExpando,
         };
     }
 }

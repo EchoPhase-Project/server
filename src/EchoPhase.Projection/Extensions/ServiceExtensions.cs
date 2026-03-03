@@ -1,5 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
 using EchoPhase.Projection.Options;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Projection.Extensions
 {
@@ -21,7 +21,7 @@ namespace EchoPhase.Projection.Extensions
 
         public static IServiceCollection AddProjection(this IServiceCollection services, Action<ProjectionOptions> configure)
         {
-            ProjectionOptions options = new ();
+            ProjectionOptions options = new();
             configure(options);
             services.AddSingleton<Projector>(sp => new Projector(options));
 

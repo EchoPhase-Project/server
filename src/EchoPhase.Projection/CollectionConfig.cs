@@ -5,12 +5,18 @@ namespace EchoPhase.Projection
     /// </summary>
     internal sealed class CollectionConfig
     {
-        public Type ItemType { get; }
+        public Type ItemType
+        {
+            get;
+        }
 
         /// <summary>
         /// Creates a configured ProjectionBuilder for a single collection element.
         /// </summary>
-        public Func<Projector, object, IProjectionBuilder> Apply { get; }
+        public Func<Projector, object, IProjectionBuilder> Apply
+        {
+            get;
+        }
 
         public CollectionConfig(Type itemType, Func<Projector, object, IProjectionBuilder> apply)
         {

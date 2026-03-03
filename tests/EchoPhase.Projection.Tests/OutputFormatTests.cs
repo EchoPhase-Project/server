@@ -1,6 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
-using EchoPhase.Projection.Tests.Models;
 using System.Dynamic;
+using EchoPhase.Projection.Tests.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Projection.Tests
 {
@@ -69,7 +69,7 @@ namespace EchoPhase.Projection.Tests
                     .Build());
 
             Assert.Equal(r1.Keys, r2.Keys);
-            Assert.Equal("First",  r1["Name"]);
+            Assert.Equal("First", r1["Name"]);
             Assert.Equal("Second", r2["Name"]);
         }
     }

@@ -271,7 +271,7 @@ namespace EchoPhase.Projection
             {
                 var def = type.GetGenericTypeDefinition();
                 if (def == typeof(IEnumerable<>) || def == typeof(ICollection<>) ||
-                    def == typeof(IList<>)        || def == typeof(List<>))
+                    def == typeof(IList<>) || def == typeof(List<>))
                     return type.GetGenericArguments()[0];
 
                 var iface = type.GetInterfaces().FirstOrDefault(i =>
@@ -324,9 +324,9 @@ namespace EchoPhase.Projection
         }
 
         private static bool IsSimple(Type type) =>
-            type.IsPrimitive    || type.IsEnum          ||
-            type == typeof(string)         || type == typeof(decimal)      ||
-            type == typeof(DateTime)       || type == typeof(Guid)         ||
+            type.IsPrimitive || type.IsEnum ||
+            type == typeof(string) || type == typeof(decimal) ||
+            type == typeof(DateTime) || type == typeof(Guid) ||
             type == typeof(DateTimeOffset) || type == typeof(TimeSpan);
 
         private static object? GetJsonSimpleValue(JsonElement elem) => elem.ValueKind switch
@@ -335,10 +335,10 @@ namespace EchoPhase.Projection
             JsonValueKind.Number => elem.TryGetInt64(out long l) ? l
                                   : elem.TryGetDouble(out double d) ? d
                                   : (object?)elem.GetRawText(),
-            JsonValueKind.True  => true,
+            JsonValueKind.True => true,
             JsonValueKind.False => false,
-            JsonValueKind.Null  => null,
-            _                   => elem.GetRawText()
+            JsonValueKind.Null => null,
+            _ => elem.GetRawText()
         };
     }
 }

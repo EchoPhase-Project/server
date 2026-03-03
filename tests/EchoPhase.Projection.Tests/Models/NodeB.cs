@@ -5,6 +5,9 @@ namespace EchoPhase.Projection.Tests.Models
     public class NodeB
     {
         [Expose] public string Label { get; set; } = "B";
-        public NodeA? Parent { get; set; }
+        public NodeA? Parent
+        {
+            get; set;
+        }
     }
 }

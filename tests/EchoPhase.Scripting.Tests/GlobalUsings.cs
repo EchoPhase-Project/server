@@ -1,4 +1,3 @@
-global using EchoPhase.Scripting;
 global using EchoPhase.Scripting.Lexers;
 global using EchoPhase.Scripting.Parsers;
 global using EchoPhase.Scripting.Tokens;

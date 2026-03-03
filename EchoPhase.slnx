@@ -26,8 +26,9 @@
     <Project Path="src/EchoPhase/EchoPhase.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/EchoPhase.Crypto25519Tests/EchoPhase.Crypto25519Tests.csproj" />
-    <Project Path="tests/EchoPhase.EvalTests/EchoPhase.EvalTests.csproj" />
-    <Project Path="tests/EchoPhase.TaskSchedulerTests/EchoPhase.TaskSchedulerTests.csproj" />
+    <Project Path="tests/EchoPhase.Security.Cryptography.Tests/EchoPhase.Security.Cryptography.Tests.csproj" />
+    <Project Path="tests/EchoPhase.Scripting.Tests/EchoPhase.Scripting.Tests.csproj" />
+    <Project Path="tests/EchoPhase.Projection.Tests/EchoPhase.Projection.Tests.csproj" />
+    <Project Path="tests/EchoPhase.Scheduling.Tests/EchoPhase.Scheduling.Tests.csproj" />
   </Folder>
 </Solution>

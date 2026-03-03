@@ -1,5 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
 using EchoPhase.Projection.Tests.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Projection.Tests
 {
@@ -83,14 +83,14 @@ namespace EchoPhase.Projection.Tests
             var user = new UserModel
             {
                 Tokens = new List<TokenModel> { new() { DeviceId = "Chrome" } },
-                Items  = new List<SimpleModel> { new() { Name = "Item1" } }
+                Items = new List<SimpleModel> { new() { Name = "Item1" } }
             };
 
             var result = AsDictionary(
                 _projector.For(user)
                     .Include(u => u.Id)
                     .IncludeCollection(u => u.Tokens, b => b.Include(t => t.DeviceId))
-                    .IncludeCollection(u => u.Items,  b => b.Include(i => i.Name))
+                    .IncludeCollection(u => u.Items, b => b.Include(i => i.Name))
                     .Build());
 
             var tokenDict = AsDictionary(AsList(result["Tokens"])[0]);

@@ -5,6 +5,9 @@ namespace EchoPhase.Projection.Tests.Models
     public class SelfRef
     {
         [Expose] public string Name { get; set; } = "me";
-        public SelfRef? Self { get; set; }
+        public SelfRef? Self
+        {
+            get; set;
+        }
     }
 }

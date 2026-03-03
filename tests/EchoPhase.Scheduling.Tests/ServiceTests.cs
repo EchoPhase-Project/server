@@ -1,4 +1,3 @@
-using EchoPhase.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Scheduling.Tests

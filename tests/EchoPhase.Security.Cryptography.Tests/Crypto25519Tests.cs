@@ -1,5 +1,4 @@
 using System.Text;
-using EchoPhase.Security.Cryptography;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Security.Cryptography.Tests

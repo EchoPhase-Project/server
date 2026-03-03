@@ -1,5 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
 using EchoPhase.Projection.Tests.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Projection.Tests
 {

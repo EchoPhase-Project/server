@@ -1,6 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
-using EchoPhase.Projection.Tests.Models;
 using EchoPhase.Projection.Attributes;
+using EchoPhase.Projection.Tests.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Projection.Tests
 {
@@ -13,12 +13,18 @@ namespace EchoPhase.Projection.Tests
 
         public interface IEntity
         {
-            Guid Id { get; set; }
+            Guid Id
+            {
+                get; set;
+            }
         }
 
         public interface INamedEntity : IEntity
         {
-            string Name { get; set; }
+            string Name
+            {
+                get; set;
+            }
         }
 
         public class ConcreteEntity : INamedEntity
@@ -130,7 +136,7 @@ namespace EchoPhase.Projection.Tests
         {
             IEntity source = new ConcreteEntity
             {
-                Id   = Guid.Parse("00000000-0000-0000-0000-000000000042"),
+                Id = Guid.Parse("00000000-0000-0000-0000-000000000042"),
                 Name = "Preserved"
             };
 

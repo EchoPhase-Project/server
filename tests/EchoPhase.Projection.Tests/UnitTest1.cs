@@ -1,4 +1,4 @@
-﻿namespace EchoPhase.Projection.Tests;
+namespace EchoPhase.Projection.Tests;
 
 public class UnitTest1
 {
