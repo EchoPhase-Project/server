@@ -1,10 +1,16 @@
 using EchoPhase.Controllers.Api.v1.Dto.Auth;
+using EchoPhase.Controllers.Api.v1.Dto;
 using EchoPhase.Identity;
 using EchoPhase.Projection;
-using EchoPhase.Security.Authentication.Jwt;
+using EchoPhase.Security.Authentication.Jwt.Providers;
 using EchoPhase.Types.Repository;
+using EchoPhase.Security.Authentication.Jwt.Claims;
+using EchoPhase.Security.Antiforgery.Attributes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using EchoPhase.Security.Authorization.Attributes;
+using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Security.Authentication.Extensions;
 
 namespace EchoPhase.Controllers.Api.v1
 {
@@ -28,14 +34,23 @@ namespace EchoPhase.Controllers.Api.v1
         }
 
         [HttpPost("new")]
-        [ValidateAntiForgeryToken]
+        [ValidateAntiForgery]
         public async Task<IActionResult> Create([FromBody] CreateDto dto)
         {
             var user = await _userService.GetAsync(User);
             if (user is null || user.Id == Guid.Empty)
                 return Unauthorized();
 
-            var tokenPair = await _refreshTokenProvider.CreateAsync(user, dto.DeviceId);
+            var tokenPair = dto.Claims is null
+                ? await _refreshTokenProvider.CreateAsync(user, dto.DeviceId)
+                : await _refreshTokenProvider.CreateAsync(user, dto.DeviceId, new ClaimsEnrichmentContext
+                  {
+                      User                 = user,
+                      RequestedScopes      = dto.Claims.Scopes      ?? [],
+                      RequestedIntents     = dto.Claims.Intents     ?? [],
+                      RequestedPermissions = dto.Claims.Permissions ?? new Dictionary<string, string[]>()
+                  });
+
             return Ok(tokenPair);
         }
 
@@ -43,45 +58,40 @@ namespace EchoPhase.Controllers.Api.v1
         [AllowAnonymous]
         public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
         {
-            var tokenPair = await _refreshTokenProvider.RefreshAsync(request.DeviceId, request.RefreshToken);
+            var tokenPair = await _refreshTokenProvider.RefreshAsync(request.RefreshId, request.RefreshToken);
             return Ok(tokenPair);
         }
 
         [HttpDelete]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Revoke([FromBody] RefreshRequest request)
+        [ValidateAntiForgery]
+        public async Task<IActionResult> Revoke([FromBody] DeleteRefreshRequest request)
         {
             var user = await _userService.GetAsync(User);
             if (user is null || user.Id == Guid.Empty)
                 return Unauthorized();
 
-            await _refreshTokenProvider.RevokeAsync(user.Id, request.DeviceId, request.RefreshToken);
+            await _refreshTokenProvider.RevokeAsync(user.Id, request.RefreshId);
+            await _userService.UpdateSecurityStampAsync(user);
             return NoContent();
         }
 
         [HttpDelete("all")]
-        [ValidateAntiForgeryToken]
+        [ValidateAntiForgery]
         public async Task<IActionResult> RevokeAll()
         {
-            var user = await _userService.GetAsync(User);
-            if (user is null || user.Id == Guid.Empty)
-                return Unauthorized();
-
-            await _refreshTokenProvider.RevokeAllAsync(user.Id);
+            var userId = User.GetUserId();
+            await _refreshTokenProvider.RevokeAllAsync(userId);
             return NoContent();
         }
 
         [HttpGet("sessions")]
-        public async Task<IActionResult> GetSessions([FromQuery] string? after, [FromQuery] int limit = 20)
+        public async Task<IActionResult> GetSessions([FromQuery] CursorDto dto)
         {
-            var user = await _userService.GetAsync(User);
-            if (user is null || user.Id == Guid.Empty)
-                return Unauthorized();
-
-            var sessions = await _refreshTokenProvider.GetSessionsAsync(user.Id, new CursorOptions
+            var userId = User.GetUserId();
+            var sessions = await _refreshTokenProvider.GetSessionsAsync(userId, new CursorOptions
             {
-                After = after,
-                Limit = limit
+                After = dto.After,
+                Limit = dto.Limit
             });
 
             var projected = _projector

@@ -8,7 +8,6 @@ using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Postgres.Repositories.Options;
 using EchoPhase.Identity;
 using EchoPhase.Types.Extensions;
-using EchoPhase.Types.Repository;
 using EchoPhase.Types.Service;
 
 namespace EchoPhase.WebHooks
@@ -32,24 +31,6 @@ namespace EchoPhase.WebHooks
             _httpClient = httpClient;
             _userService = userService;
             _roleService = roleService;
-        }
-
-        public CursorPage<WebHook> Get(
-            WebHookSearchOptions opts,
-            CursorOptions? cursor = null,
-            Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
-        )
-        {
-            return _repository.Get(opts, cursor, extraFilters);
-        }
-
-        public CursorPage<WebHook> Get(
-            Action<WebHookSearchOptions> configure,
-            Action<CursorOptions>? configureCursor = null,
-            Func<IQueryable<WebHook>, WebHookSearchOptions, IQueryable<WebHook>>? extraFilters = null
-        )
-        {
-            return _repository.Get(configure, configureCursor, extraFilters);
         }
 
         public async Task<IEnumerable<WebHook>> CreateAsync(params IEnumerable<WebHook> webhooks)

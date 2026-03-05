@@ -1,47 +1,58 @@
-using EchoPhase.Clients.Discord.Extensions;
 using EchoPhase.Clients.Discord.Models;
-using Microsoft.Extensions.Logging;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using EchoPhase.Clients.Abstractions;
 
 namespace EchoPhase.Clients.Discord
 {
-    public class DiscordClientBase : ClientBase
+    public abstract class DiscordClientBase
     {
-        private readonly HttpClient _client;
-        private readonly ILogger _logger;
+        private readonly HttpSender _sender;
 
-        public DiscordClientBase(
-            HttpClient client,
-            ILogger logger
-        ) : base(client)
+        private static readonly JsonSerializerOptions _jsonOptions =
+            new(JsonSerializerDefaults.Web);
+
+        protected DiscordClientBase(HttpClient client)
         {
-            _client = client;
-            _logger = logger;
+            _sender = new HttpSender(client);
         }
 
-        public void WithAuth(string token)
-        {
-            base.WithAuth("Bot", token);
-        }
-
-        protected async Task<IDiscordApiResponse<TR>> SendAsync<TQ, TB, TR>(
+        protected async Task<Result<TR>> SendAsync<TQ, TB, TR>(
             string uri,
             HttpMethod method,
             TQ? query,
-            TB? body
-        )
+            TB? body,
+            string botToken,
+            CancellationToken ct = default)
             where TQ : class
             where TB : class
             where TR : class
         {
-            _logger.LogInformation("Requested DiscordAPI {URI}", uri);
+            var (statusCode, stream) = await _sender.SendAsync(
+                uri, method, query, body,
+                new AuthenticationHeaderValue("Bot", botToken),
+                ct);
 
-            return (await base.SendAsync<TQ, TB, TR, DiscordApiError>(
-                uri,
-                method,
-                query,
-                body
-            ))
-                .ToDiscordApiResponse();
+            await using (stream)
+            {
+                if (statusCode >= HttpStatusCode.OK && statusCode < HttpStatusCode.MultipleChoices)
+                {
+                    var data = await JsonSerializer.DeserializeAsync<TR>(stream, _jsonOptions, ct);
+
+                    if (data is null)
+                        return Result<TR>.Fail(
+                            new ApiError((int)statusCode, "Response deserialization returned null."),
+                            statusCode);
+
+                    return Result<TR>.Ok(data, statusCode);
+                }
+
+                var error = await JsonSerializer.DeserializeAsync<DiscordApiError>(stream, _jsonOptions, ct);
+                return Result<TR>.Fail(
+                    new ApiError(error?.Code ?? (int)statusCode, error?.Message, error?.Errors),
+                    statusCode);
+            }
         }
     }
 }

@@ -19,13 +19,13 @@ namespace EchoPhase.WebSockets
         };
 
         private readonly IRoleService _roleService;
-        private readonly IIntentsBitMask _intentsBitmask;
+        private readonly IntentsBitMask _intentsBitmask;
         private readonly WebSocketConnectionManager _connectionManager;
         private readonly ILogger<WebSocketService> _logger;
 
         public WebSocketService(
             IRoleService roleService,
-            IIntentsBitMask intentsBitmask,
+            IntentsBitMask intentsBitmask,
             WebSocketConnectionManager connectionManager,
             ILogger<WebSocketService> logger)
         {

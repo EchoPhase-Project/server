@@ -1,12 +1,13 @@
 using EchoPhase.Configuration.Database.Redis;
 using EchoPhase.DAL.Redis.Interfaces;
 using Microsoft.Extensions.Caching.Distributed;
+using System.Collections.Concurrent;
 
 namespace EchoPhase.DAL.Redis
 {
     public class DbContext : ICacheContext
     {
-        private readonly Dictionary<Type, object> _sets = new();
+        private readonly ConcurrentDictionary<Type, object> _sets = new();
         private readonly IDistributedCache _cache;
         protected readonly IRedisOptions _settings;
 

@@ -19,13 +19,13 @@ namespace EchoPhase.DAL.Postgres.Extensions
                     {
                         o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
                         o.EnableRetryOnFailure(maxRetryCount: 3);
-                        o.MigrationsHistoryTable("__EFMigrationsHistory", settings.Schema);
+                        o.MigrationsHistoryTable("__EFMigrationsHistory", "public");
                     }));
             }
 
             services.AddScoped<WebHookRepository>();
             services.AddScoped<UserRepository>();
-            services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+            services.AddScoped<RefreshTokenRepository>();
 
             return services;
         }

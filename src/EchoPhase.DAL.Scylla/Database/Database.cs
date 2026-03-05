@@ -60,10 +60,10 @@ namespace EchoPhase.DAL.Scylla
                 Session = cluster.Connect(_settings.Keyspace);
             }
 
+            _queryLogger = logger ?? new ConsoleQueryLogger();
             _cqlGenerator = new CqlGenerator();
             _queryExecutor = new QueryExecutor(Session, _queryLogger);
             _saveStrategy = new DirectSaveStrategy(_cqlGenerator, _queryExecutor, GetBuilder);
-            _queryLogger = logger ?? new ConsoleQueryLogger();
 
             EnsureMigrationsTable();
             LoadMigrationsFromAssembly(Assembly.GetExecutingAssembly());
@@ -238,16 +238,18 @@ namespace EchoPhase.DAL.Scylla
         private void EnsureMigrationsTable()
         {
             var migration = new MigrationBuilder();
-
-            migration.CreateTable(table => table
-                .WithKeyspace(_settings.Keyspace)
-                .Text("migration_id", nullable: false)
-                .Timestamp("applied_at")
-                .PrimaryKey("migration_id"),
+            migration.CreateTable(
+                keyspace: _settings.Keyspace,
+                name: "schema_migrations",
+                buildAction: table => table
+                    .Text("migration_id")
+                    .Timestamp("applied_at")
+                    .PrimaryKey("migration_id"),
                 ifNotExists: true
             );
 
-            ExecuteQuery(migration.GetCommands().First());
+            var cql = migration.GetCommands().First();
+            ExecuteQuery(cql);
         }
 
         private void LoadMigrationsFromAssembly(Assembly assembly)

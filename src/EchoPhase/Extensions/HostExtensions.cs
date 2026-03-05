@@ -16,26 +16,6 @@ namespace EchoPhase.Extensions
                 config.PropagateExceptions();
                 config.ValidateExamples();
 
-                config.AddBranch<Commands.Permissions.PermissionsSettings>("permissions", permissions =>
-                {
-                    permissions.SetDescription("Permission utilities");
-                    permissions.SetDefaultCommand<Commands.Permissions.Deserialize.DeserializeCommand>();
-
-                    permissions.AddCommand<Commands.Permissions.Deserialize.DeserializeCommand>("deserialize")
-                        .WithDescription("Deserialize permissions")
-                        .WithExample(new[] { "permissions", "deserialize", "0:2049;1:128" });
-                });
-
-                config.AddBranch<Commands.Intents.IntentsSettings>("intents", permissions =>
-                {
-                    permissions.SetDescription("Intent utilities");
-                    permissions.SetDefaultCommand<Commands.Intents.Serialize.SerializeCommand>();
-
-                    permissions.AddCommand<Commands.Intents.Serialize.SerializeCommand>("serialize")
-                        .WithDescription("Serialize intents")
-                        .WithExample(new[] { "intents", "serialize", "login", "notification" });
-                });
-
                 config.AddBranch<Commands.User.UserSettings>("user", user =>
                 {
                     user.SetDescription("User management commands");
@@ -67,10 +47,6 @@ namespace EchoPhase.Extensions
                 config.AddCommand<Commands.Health.Check.CheckCommand>("healthcheck")
                     .WithDescription("Healthcheck")
                     .WithExample(new[] { "healthcheck" });
-#if DEBUG
-                config.PropagateExceptions();
-                config.ValidateExamples();
-#endif
             });
 
             return args.Count() > 0 ? await app.RunAsync(args) : -1;

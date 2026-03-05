@@ -20,38 +20,42 @@ namespace EchoPhase.Identity
         private readonly UserManager<User> _userManager;
         private readonly IWebHostEnvironment _environment;
         private readonly ICacheContext _cacheContext;
+        private readonly IRoleService _roleService;
 
         public UserService(
             PostgresContext context,
             UserRepository repository,
             UserManager<User> userManager,
             IWebHostEnvironment environment,
-            ICacheContext cacheContext
+            ICacheContext cacheContext,
+            IRoleService roleService
         ) : base(repository)
         {
             _context = context;
             _userManager = userManager;
             _environment = environment;
             _cacheContext = cacheContext;
+            _roleService = roleService;
         }
 
-        public CursorPage<User> Get(
-            UserSearchOptions opts,
-            CursorOptions? cursor = null,
-            Func<IQueryable<User>, UserSearchOptions, IQueryable<User>>? extraFilters = null
-        )
+        public async Task<IdentityResult> CreateUserAsync(
+            string name,
+            string username,
+            string password,
+            params string[] roles)
         {
-            return _repository.Get(opts, cursor, extraFilters);
+            var user = new User(name) { UserName = username };
+
+            var result = await _userManager.CreateAsync(user, password);
+
+            if (result.Succeeded)
+                await _roleService.AddToRolesAsync(user, roles);
+
+            return result;
         }
 
-        public CursorPage<User> Get(
-            Action<UserSearchOptions> configure,
-            Action<CursorOptions>? configureCursor = null,
-            Func<IQueryable<User>, UserSearchOptions, IQueryable<User>>? extraFilters = null
-        )
-        {
-            return _repository.Get(configure, configureCursor, extraFilters);
-        }
+        public Task<IdentityResult> DeleteUserAsync(User user)
+            => _userManager.DeleteAsync(user);
 
         public async Task<User> GetAsync(ClaimsPrincipal userPrincipal) =>
             await _userManager.GetUserAsync(userPrincipal) ??
@@ -147,6 +151,12 @@ namespace EchoPhase.Identity
             return (root)
                 ? Path.Combine(_environment.ContentRootPath, result)
                 : result;
+        }
+
+        public async Task<IdentityResult> UpdateSecurityStampAsync(User user)
+        {
+            await _cacheContext.Entry<SecurityStamp>(user.Id.ToString()).RemoveAsync();
+            return await _userManager.UpdateSecurityStampAsync(user);
         }
     }
 }

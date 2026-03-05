@@ -1,9 +1,9 @@
 namespace EchoPhase.Security.BitMasks.Constants
 {
-    public enum Resources
+    public class Resources : ConstantsBase<Resources>
     {
-        User,
-        WebSocket,
-        Tokens,
+        public const string User      = "user";
+        public const string WebSocket = "webSocket";
+        public const string Tokens    = "tokens";
     }
 }

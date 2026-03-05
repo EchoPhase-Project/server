@@ -21,6 +21,7 @@
     <ProjectReference Include="..\EchoPhase.Security.Cryptography\EchoPhase.Security.Cryptography.csproj" />
     <ProjectReference Include="..\EchoPhase.Identity\EchoPhase.Identity.csproj" />
     <ProjectReference Include="..\EchoPhase.Types\EchoPhase.Types.csproj" />
+    <ProjectReference Include="..\EchoPhase.Security.Antiforgery\EchoPhase.Security.Antiforgery.csproj" />
   </ItemGroup>
 
 </Project>

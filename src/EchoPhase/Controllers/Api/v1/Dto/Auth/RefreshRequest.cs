@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace EchoPhase.Controllers.Api.v1.Dto.Auth
 {
     public record RefreshRequest(
-        [Required] string DeviceId,
+        [Required] Guid RefreshId,
         [Required] string RefreshToken
     );
 }

@@ -17,7 +17,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("public")
+                .HasDefaultSchema("EchoPhase")
                 .HasAnnotation("ProductVersion", "10.0.3")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
@@ -57,16 +57,77 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.HasIndex("DeviceId", "UserId")
-                        .IsUnique();
-
-                    b.HasIndex("RefreshValue", "DeviceId")
-                        .IsUnique();
-
                     b.HasIndex("RefreshValue", "UserId")
                         .IsUnique();
 
-                    b.ToTable("RefreshTokens", "public");
+                    b.ToTable("RefreshTokens", "EchoPhase");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshTokenIntent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RefreshTokenId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RefreshTokenId", "Value")
+                        .IsUnique();
+
+                    b.ToTable("RefreshTokenIntents", "EchoPhase");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshTokenPermissionEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("RefreshTokenId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Resource")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RefreshTokenId", "Resource", "Permission")
+                        .IsUnique();
+
+                    b.ToTable("RefreshTokenPermissionEntries", "EchoPhase");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshTokenScope", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RefreshTokenId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RefreshTokenId", "Value")
+                        .IsUnique();
+
+                    b.ToTable("RefreshTokenScopes", "EchoPhase");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.User", b =>
@@ -154,7 +215,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
                     b.HasIndex("UserName")
                         .IsUnique();
 
-                    b.ToTable("Users", "public", t =>
+                    b.ToTable("Users", "EchoPhase", t =>
                         {
                             t.HasComment("Authorised User Model");
                         });
@@ -198,7 +259,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .IsUnique()
                         .HasDatabaseName("RoleNameIndex");
 
-                    b.ToTable("Roles", "public");
+                    b.ToTable("Roles", "EchoPhase");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WebHook", b =>
@@ -246,7 +307,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
                     b.HasIndex("Url", "UserId")
                         .IsUnique();
 
-                    b.ToTable("WebHooks", "public");
+                    b.ToTable("WebHooks", "EchoPhase");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -270,7 +331,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("AspNetRoleClaims", "public");
+                    b.ToTable("AspNetRoleClaims", "EchoPhase");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
@@ -294,7 +355,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AspNetUserClaims", "public");
+                    b.ToTable("AspNetUserClaims", "EchoPhase");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
@@ -315,7 +376,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AspNetUserLogins", "public");
+                    b.ToTable("AspNetUserLogins", "EchoPhase");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
@@ -330,7 +391,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("AspNetUserRoles", "public");
+                    b.ToTable("AspNetUserRoles", "EchoPhase");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
@@ -349,7 +410,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.HasKey("UserId", "LoginProvider", "Name");
 
-                    b.ToTable("AspNetUserTokens", "public");
+                    b.ToTable("AspNetUserTokens", "EchoPhase");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshToken", b =>
@@ -361,6 +422,39 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshTokenIntent", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.RefreshToken", "RefreshToken")
+                        .WithMany("Intents")
+                        .HasForeignKey("RefreshTokenId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RefreshToken");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshTokenPermissionEntry", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.RefreshToken", "RefreshToken")
+                        .WithMany("Permissions")
+                        .HasForeignKey("RefreshTokenId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RefreshToken");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshTokenScope", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.RefreshToken", "RefreshToken")
+                        .WithMany("Scopes")
+                        .HasForeignKey("RefreshTokenId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RefreshToken");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WebHook", b =>
@@ -423,6 +517,15 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshToken", b =>
+                {
+                    b.Navigation("Intents");
+
+                    b.Navigation("Permissions");
+
+                    b.Navigation("Scopes");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.User", b =>

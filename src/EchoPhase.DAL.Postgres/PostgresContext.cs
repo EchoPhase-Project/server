@@ -1,19 +1,21 @@
+using EchoPhase.Configuration.Database;
 using EchoPhase.DAL.Abstractions;
 using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EchoPhase.DAL.Postgres
 {
     public class PostgresContext : IdentityDbContext<User, UserRole, Guid>
     {
-        public static readonly string DefaultSchema = "public";
+        public const string DefaultSchema = "EchoPhase";
         public string Schema
         {
             get;
         }
 
-        public PostgresContext(DbContextOptions<PostgresContext> options) : base(options)
+        public PostgresContext(DbContextOptions<PostgresContext> options, IOptions<DatabaseOptions> settings) : base(options)
         {
             Schema = DefaultSchema;
         }
@@ -22,6 +24,9 @@ namespace EchoPhase.DAL.Postgres
 
         public DbSet<RefreshToken> RefreshTokens { get; set; } = default!;
         public DbSet<WebHook> WebHooks { get; set; } = default!;
+        public DbSet<RefreshTokenScope>           RefreshTokenScopes           { get; set; } = default!;
+        public DbSet<RefreshTokenIntent>          RefreshTokenIntents          { get; set; } = default!;
+        public DbSet<RefreshTokenPermissionEntry> RefreshTokenPermissionEntries { get; set; } = default!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -100,17 +105,47 @@ namespace EchoPhase.DAL.Postgres
             {
                 entity.ToTable("RefreshTokens");
                 entity.HasKey(e => e.Id);
-                entity.HasIndex(t => new { t.RefreshValue, t.UserId })
-                    .IsUnique();
-                entity.HasIndex(t => new { t.DeviceId, t.UserId })
-                    .IsUnique();
-                entity.HasIndex(t => new { t.RefreshValue, t.DeviceId })
-                    .IsUnique();
-
+                entity.HasIndex(t => new { t.RefreshValue, t.UserId }).IsUnique();
                 entity.HasOne(t => t.User)
-                    .WithMany(u => u.RefreshTokens)
-                    .HasForeignKey(t => t.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                      .WithMany(u => u.RefreshTokens)
+                      .HasForeignKey(t => t.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(t => t.Scopes)
+                      .WithOne(s => s.RefreshToken)
+                      .HasForeignKey(s => s.RefreshTokenId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(t => t.Intents)
+                      .WithOne(i => i.RefreshToken)
+                      .HasForeignKey(i => i.RefreshTokenId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(t => t.Permissions)
+                      .WithOne(p => p.RefreshToken)
+                      .HasForeignKey(p => p.RefreshTokenId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<RefreshTokenScope>(entity =>
+            {
+                entity.ToTable("RefreshTokenScopes");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.RefreshTokenId, e.Value }).IsUnique();
+            });
+
+            builder.Entity<RefreshTokenIntent>(entity =>
+            {
+                entity.ToTable("RefreshTokenIntents");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.RefreshTokenId, e.Value }).IsUnique();
+            });
+
+            builder.Entity<RefreshTokenPermissionEntry>(entity =>
+            {
+                entity.ToTable("RefreshTokenPermissionEntries");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.RefreshTokenId, e.Resource, e.Permission }).IsUnique();
             });
         }
 
@@ -144,7 +179,7 @@ namespace EchoPhase.DAL.Postgres
             {
                 if (entry.State == EntityState.Added)
                     entry.Entity.CreatedAt = now;
-                else if (entry.State == EntityState.Modified || entry.State == EntityState.Added)
+                else if (entry.State == EntityState.Modified)
                     entry.Entity.UpdatedAt = now;
             }
 

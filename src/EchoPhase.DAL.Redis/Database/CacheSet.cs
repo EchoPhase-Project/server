@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Caching.Distributed;
 using UUIDNext;
+using System.Collections.Concurrent;
 
 namespace EchoPhase.DAL.Redis
 {
@@ -8,6 +9,7 @@ namespace EchoPhase.DAL.Redis
         private readonly string _template;
         private readonly IDistributedCache _cache;
         private readonly Guid _tenantId;
+        private readonly ConcurrentDictionary<string, string> _keyCache = new();
 
         public CacheSet(
             IDistributedCache cache,
@@ -19,12 +21,9 @@ namespace EchoPhase.DAL.Redis
             _tenantId = tenantId;
         }
 
-        private string GenerateCacheKey(string key)
-        {
-            string raw = _template.Replace("{key}", key);
-            Guid uuidKey = Uuid.NewNameBased(_tenantId, raw);
-            return uuidKey.ToString();
-        }
+        private string GenerateCacheKey(string key) =>
+            _keyCache.GetOrAdd(key, k =>
+                Uuid.NewNameBased(_tenantId, _template.Replace("{key}", k)).ToString());
 
         public CacheEntry<T> this[string key]
         {

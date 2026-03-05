@@ -1,10 +1,10 @@
 using System.Net.WebSockets;
-using EchoPhase.Security.BitMasks;
 using EchoPhase.Types.Result.Extensions;
 using EchoPhase.WebSockets.Attributes;
 using EchoPhase.WebSockets.Constants;
 using EchoPhase.WebSockets.Exceptions;
 using EchoPhase.WebSockets.Processors.Payloads;
+using EchoPhase.Security.BitMasks;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {
@@ -13,12 +13,14 @@ namespace EchoPhase.WebSockets.Processors.Handlers
     {
         private readonly WebSocketService _webSocketService;
         private readonly WebSocketConnectionManager _connectionManager;
+        private readonly IntentsBitMask _intents;
 
         public AdjustHandler(IServiceProvider serviceProvider)
         : base(serviceProvider)
         {
             _webSocketService = GetService<WebSocketService>();
             _connectionManager = GetService<WebSocketConnectionManager>();
+            _intents = GetService<IntentsBitMask>();
         }
 
         public override async Task HandleAsync(WebSocket webSocket, AdjustPayload payload)
@@ -27,7 +29,7 @@ namespace EchoPhase.WebSockets.Processors.Handlers
             {
                 var connection = await _connectionManager.GetConnectionAsync(webSocket);
 
-                var result = IntentsBitMask.Deserialize(payload.Intents);
+                var result = _intents.Deserialize(payload.Intents);
 
                 if (result.TryGetError(out var error))
                 {

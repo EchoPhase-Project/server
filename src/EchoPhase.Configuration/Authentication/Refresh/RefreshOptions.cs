@@ -6,7 +6,7 @@ namespace EchoPhase.Configuration.Authentication.Refresh
 
         public const string SectionName = "Authentication:Refresh";
         public string Key { get; set; } = "refresh";
-        public TimeSpan Lifetime { get; set; } = TimeSpan.FromMinutes(15);
+        public TimeSpan Lifetime { get; set; } = TimeSpan.FromMinutes(120);
 
         public IValidationResult Validate()
         {

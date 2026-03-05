@@ -6,41 +6,91 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EchoPhase.Types.Repository
 {
-    public abstract class RepositoryBase<TEntity, TO> : IRepositoryBase<TEntity, TO>
-        where TO : class, new()
-        where TEntity : class, ITrackingEntity, IIdentifiable
+    public abstract class RepositoryBase<TEntity, TOptions, TSearchOptions> : IRepositoryBase<TEntity, TOptions>
+        where TOptions      : class, new()
+        where TSearchOptions : class, new()
+        where TEntity       : class, ITrackingEntity, IIdentifiable
     {
         private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _propsCache = new();
 
-        protected TO _options;
+        protected TOptions _options;
 
-        public RepositoryBase()
+        public RepositoryBase() => _options = new();
+        public RepositoryBase(TOptions options) => _options = options;
+
+        public void WithOptions(TOptions options) => _options = options;
+        public void WithOptions(Action<TOptions> configure) => configure(_options);
+
+        // ── Get ───────────────────────────────────────────────────────────────
+
+        public CursorPage<TEntity> Get(
+            TSearchOptions options,
+            CursorOptions? cursor = null,
+            Func<IQueryable<TEntity>, TSearchOptions, IQueryable<TEntity>>? extraFilters = null)
         {
-            _options = new();
+            var query = ApplySearchOptions<TEntity, TSearchOptions>(
+                Build(), options, (q, opts) =>
+                {
+                    q = ApplyExtraFilters(q, opts);
+                    if (extraFilters is not null)
+                        q = extraFilters(q, opts);
+                    return q;
+                });
+
+            if (cursor is not null)
+                return ApplyCursor(query, cursor);
+
+            return new CursorPage<TEntity> { Data = query };
         }
 
-        public RepositoryBase(TO options)
+        public CursorPage<TEntity> Get(
+            Action<TSearchOptions> configure,
+            CursorOptions? cursor = null,
+            Func<IQueryable<TEntity>, TSearchOptions, IQueryable<TEntity>>? extraFilters = null)
         {
-            _options = options;
+            var options = new TSearchOptions();
+            configure(options);
+            return Get(options, cursor, extraFilters);
         }
 
-        public void WithOptions(TO options)
+        public CursorPage<TEntity> Get(
+            TSearchOptions options,
+            Action<CursorOptions> configureCursor,
+            Func<IQueryable<TEntity>, TSearchOptions, IQueryable<TEntity>>? extraFilters = null)
         {
-            _options = options;
+            var cursor = new CursorOptions();
+            configureCursor(cursor);
+            return Get(options, cursor, extraFilters);
         }
 
-        public void WithOptions(Action<TO> configure)
+        public CursorPage<TEntity> Get(
+            Action<TSearchOptions> configure,
+            Action<CursorOptions> configureCursor,
+            Func<IQueryable<TEntity>, TSearchOptions, IQueryable<TEntity>>? extraFilters = null)
         {
-            configure(_options);
+            var options = new TSearchOptions();
+            configure(options);
+            var cursor = new CursorOptions();
+            configureCursor(cursor);
+            return Get(options, cursor, extraFilters);
         }
 
-        protected IQueryable<T> ApplySearchOptions<T, TOptions>(
+        // ── Abstracts ─────────────────────────────────────────────────────────
+
+        public abstract IQueryable<TEntity> Build();
+
+        protected virtual IQueryable<TEntity> ApplyExtraFilters(
+            IQueryable<TEntity> query,
+            TSearchOptions options) => query;
+
+        // ── ApplySearchOptions / ApplyCursor ──────────────────────────────────
+
+        protected IQueryable<T> ApplySearchOptions<T, TOpts>(
             IQueryable<T> query,
-            TOptions options,
-            Func<IQueryable<T>, TOptions, IQueryable<T>>? extraFilters = null
-        )
+            TOpts options,
+            Func<IQueryable<T>, TOpts, IQueryable<T>>? extraFilters = null)
         {
-            var props = _propsCache.GetOrAdd(typeof(TOptions), t => t.GetProperties());
+            var props = _propsCache.GetOrAdd(typeof(TOpts), t => t.GetProperties());
             var parameter = Expression.Parameter(typeof(T), "x");
             Expression? predicate = null;
 
@@ -52,7 +102,7 @@ namespace EchoPhase.Types.Repository
                 var targetProp = typeof(T).GetProperty(prop.Name);
                 if (targetProp is null) continue;
 
-                var left = Expression.Property(parameter, targetProp);
+                var left  = Expression.Property(parameter, targetProp);
                 Expression right;
 
                 if (targetProp.PropertyType == prop.PropertyType)
@@ -63,8 +113,7 @@ namespace EchoPhase.Types.Repository
                 {
                     right = Expression.Convert(
                         Expression.Constant(value, prop.PropertyType),
-                        targetProp.PropertyType
-                    );
+                        targetProp.PropertyType);
                 }
                 else
                 {
@@ -87,10 +136,7 @@ namespace EchoPhase.Types.Repository
             }
 
             if (predicate is not null)
-            {
-                var lambda = Expression.Lambda<Func<T, bool>>(predicate, parameter);
-                query = query.Where(lambda);
-            }
+                query = query.Where(Expression.Lambda<Func<T, bool>>(predicate, parameter));
 
             if (extraFilters is not null)
                 query = extraFilters(query, options);
@@ -98,30 +144,28 @@ namespace EchoPhase.Types.Repository
             return query;
         }
 
-        protected IQueryable<T> ApplySearchOptions<T, TOptions>(
+        protected IQueryable<T> ApplySearchOptions<T, TOpts>(
             IQueryable<T> query,
-            Action<TOptions> configure,
-            Func<IQueryable<T>, TOptions, IQueryable<T>>? extraFilters = null
-        )
-            where TOptions : class, new()
+            Action<TOpts> configure,
+            Func<IQueryable<T>, TOpts, IQueryable<T>>? extraFilters = null)
+            where TOpts : class, new()
         {
-            var options = new TOptions();
+            var options = new TOpts();
             configure(options);
             return ApplySearchOptions(query, options, extraFilters);
         }
 
         protected CursorPage<TEntity> ApplyCursor(
             IQueryable<TEntity> query,
-            CursorOptions cursor,
-            Func<TEntity, Guid> idSelector
-        )
+            CursorOptions cursor)
         {
             var decoded = CursorEncoder.Decode(cursor.After);
 
             if (decoded is not null)
                 query = query.Where(x =>
                     x.CreatedAt > decoded.CreatedAt ||
-                    (x.CreatedAt == decoded.CreatedAt && EF.Property<Guid>(x, "Id") > decoded.Id));
+                    (x.CreatedAt == decoded.CreatedAt &&
+                     EF.Property<Guid>(x, "Id") > decoded.Id));
 
             var items = query
                 .OrderBy(x => x.CreatedAt)
@@ -133,16 +177,10 @@ namespace EchoPhase.Types.Repository
             if (hasMore) items.RemoveAt(items.Count - 1);
 
             var nextCursor = hasMore
-                ? CursorEncoder.Encode(idSelector(items.Last()), items.Last().CreatedAt)
+                ? CursorEncoder.Encode(items.Last().Id, items.Last().CreatedAt)
                 : null;
 
-            return new CursorPage<TEntity>
-            {
-                Data = items,
-                NextCursor = nextCursor
-            };
+            return new CursorPage<TEntity> { Data = items, NextCursor = nextCursor };
         }
-
-        public abstract IQueryable<TEntity> Build();
     }
 }

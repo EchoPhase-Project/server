@@ -5,6 +5,8 @@ using EchoPhase.Configuration.Database.Redis;
 using EchoPhase.Types.Result;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using System.Collections.Concurrent;
+using UUIDNext;
 
 // --------------------------
 // Base
@@ -19,10 +21,9 @@ namespace EchoPhase.Security.Cryptography.Vaults
         protected readonly AesGcm AesGcm;
         protected readonly RedisOptions Settings;
         protected readonly JsonSerializerOptions JsonOptions;
-        protected abstract string KeyPrefix
-        {
-            get;
-        }
+        protected abstract string KeyPrefix { get; }
+
+        private static readonly ConcurrentDictionary<string, string> _keyCache = new();
 
         protected SecretVaultBase(
             IConnectionMultiplexer redis,
@@ -110,7 +111,9 @@ namespace EchoPhase.Security.Cryptography.Vaults
         // GetOrSet
         // --------------------------
 
-        public async Task<IServiceResult<T>> GetOrSetAsync<T>(string key, Func<Task<T>>? generator = null)
+        public async Task<IServiceResult<T>> GetOrSetAsync<T>(
+            string key,
+            Func<Task<T>>? generator = null)
         {
             if (await ExistsAsync(key))
                 return await GetAsync<T>(key);
@@ -154,29 +157,15 @@ namespace EchoPhase.Security.Cryptography.Vaults
             Db.KeyDelete(Prefixed(key));
 
         // --------------------------
-        // Keys
-        // --------------------------
-
-        public async IAsyncEnumerable<string> GetKeysAsync(string pattern)
-        {
-            var server = Redis.GetServer(Redis.GetEndPoints().First());
-            await foreach (var key in server.KeysAsync(pattern: Prefixed(pattern)))
-                yield return key.ToString();
-        }
-
-        // --------------------------
         // Serialization
         // --------------------------
 
-        protected byte[] Serialize<T>(T value)
+        protected byte[] Serialize<T>(T value) => value switch
         {
-            return value switch
-            {
-                byte[] bytes => bytes,
-                string str => Encoding.UTF8.GetBytes(str),
-                _ => Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, JsonOptions))
-            };
-        }
+            byte[] bytes => bytes,
+            string str   => Encoding.UTF8.GetBytes(str),
+            _            => Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, JsonOptions))
+        };
 
         protected IServiceResult<T> Deserialize<T>(string key, byte[] raw)
         {
@@ -207,7 +196,17 @@ namespace EchoPhase.Security.Cryptography.Vaults
             ServiceResult<T>.Failure(err =>
                 err.Set("KeyNotFound", $"Failed to retrieve '{key}' from storage."));
 
+        // --------------------------
+        // Key generation — UUID v5
+        // --------------------------
+
         protected string Prefixed(string key) =>
-            $"{Settings.InstanceName}{KeyPrefix}tenant:{Settings.TenantId}:{key}";
+            _keyCache.GetOrAdd(
+                $"{KeyPrefix}:{Settings.TenantId}:{key}",
+                raw =>
+                {
+                    var uuid = Uuid.NewNameBased(Settings.TenantId, raw);
+                    return $"{Settings.InstanceName}{uuid}";
+                });
     }
 }

@@ -1,9 +1,13 @@
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.Security.Authentication.Jwt;
+using EchoPhase.Security.Authentication.Jwt.Providers;
+using EchoPhase.Security.Authentication.Jwt.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using EchoPhase.Security.Authentication.Jwt;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace EchoPhase.Security.Authentication.Extensions
 {
@@ -11,7 +15,8 @@ namespace EchoPhase.Security.Authentication.Extensions
     {
         public static IServiceCollection AddAuthentications(this IServiceCollection services)
         {
-            services.AddScoped<SignInManager<User>, SignInManager<User>>();
+            services.AddScoped<IUserPrincipalFactory, UserPrincipalFactory>();
+            services.AddScoped<RefreshSignInManager>();
             services.AddIdentity<User, UserRole>(options =>
             {
                 options.SignIn.RequireConfirmedAccount = false;
@@ -34,6 +39,7 @@ namespace EchoPhase.Security.Authentication.Extensions
                 options.User.RequireUniqueEmail = false;
 
                 options.Tokens.AuthenticatorTokenProvider = TokenOptions.DefaultAuthenticatorProvider;
+                options.ClaimsIdentity.UserIdClaimType = JwtRegisteredClaimNames.Sub;
             })
                 .AddEntityFrameworkStores<PostgresContext>()
                 .AddDefaultTokenProviders();
@@ -54,17 +60,19 @@ namespace EchoPhase.Security.Authentication.Extensions
 
             services.AddAuthentication(options =>
             {
-                options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultSignInScheme       = JwtBearerDefaults.AuthenticationScheme;
             })
-            .AddCustomJwtBearer()
-            .AddCookie(options =>
-                options.CopyFrom(authCookie));
+                .AddRefresh()
+                .AddCookie(options =>
+                    options.CopyFrom(authCookie));
 
             services.AddScoped<IJwtTokenProvider, JwtTokenProvider>();
             services.AddScoped<IRefreshTokenProvider, RefreshTokenProvider>();
-            services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<IAuthenticationService, AuthenticationService>();
+
+            services.AddSingleton<IClaimsProviderRegistry, ClaimsProviderRegistry>();
 
             return services;
         }

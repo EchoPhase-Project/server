@@ -1,120 +1,114 @@
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http;
+using System.Security.Claims;
+using AesGcm = EchoPhase.Security.Cryptography.AesGcm;
+using System.Text;
+using System.Text.Json;
+using System.Security.Cryptography;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace EchoPhase.Security.Antiforgery
 {
-    /// <summary>
-    /// Provides methods for working with CSRF (Cross-Site Request Forgery) tokens,
-    /// including generating, storing, retrieving, and validating tokens via headers or cookies.
-    /// </summary>
     public class AntiforgeryService : IAntiforgeryService
     {
-        private readonly IAntiforgery _antiforgery;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly AesGcm               _aes;
+        private readonly IHttpContextAccessor _httpContext;
 
-        public const string CsrfFormName = "csrf_token";
-        public const string CsrfCookieName = "XSRF-TOKEN";
-        public const string CsrfHeaderName = "X-CSRF-TOKEN";
+        public const string CookieName = "XSRF-TOKEN";
+        public const string HeaderName = "X-CSRF-TOKEN";
 
-        public AntiforgeryService(IAntiforgery antiforgery, IHttpContextAccessor httpContextAccessor)
+        public AntiforgeryService(AesGcm aes, IHttpContextAccessor httpContext)
         {
-            _antiforgery = antiforgery ?? throw new ArgumentNullException(nameof(antiforgery));
-            _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+            _aes         = aes;
+            _httpContext = httpContext;
         }
 
-        /// <summary>
-        /// Generates and stores the CSRF token, then sets it both in the response cookie and response headers.
-        /// </summary>
-        public void Set(string cookieName = CsrfCookieName, string headerName = CsrfHeaderName)
+        public void Set()
         {
-            var httpContext = GetHttpContext();
-            var tokens = _antiforgery.GetAndStoreTokens(httpContext);
+            var context = GetContext();
+            var payload = new CsrfPayload(
+                UserId: context.User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "anonymous",
+                Random: Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
 
-            if (string.IsNullOrEmpty(tokens.RequestToken))
-                throw new InvalidOperationException("Request token is null or empty.");
+            var json = JsonSerializer.Serialize(payload);
+            var cookieToken = ToUrlSafeBase64(_aes.EncryptToBase64(json));
+            var headerToken = ToUrlSafeBase64(_aes.EncryptToBase64(json));
 
-            httpContext.Response.Headers[headerName] = tokens.RequestToken;
+            context.Response.Cookies.Append(CookieName, cookieToken, BuildCookieOptions(context));
+            context.Response.Headers[HeaderName] = headerToken;
+        }
 
-            if (!string.IsNullOrEmpty(tokens.CookieToken))
+        public void Remove()
+        {
+            var context = GetContext();
+            context.Response.Cookies.Delete(CookieName, BuildCookieOptions(context));
+        }
+
+        public Task ValidateAsync()
+        {
+            var context = GetContext();
+
+            if (!context.Request.Cookies.TryGetValue(CookieName, out var cookie) ||
+                string.IsNullOrEmpty(cookie))
+                throw new InvalidOperationException("CSRF cookie missing.");
+
+            var header = context.Request.Headers[HeaderName].FirstOrDefault();
+            if (string.IsNullOrEmpty(header))
+                throw new InvalidOperationException("CSRF header missing.");
+
+            if (string.Equals(cookie, header, StringComparison.Ordinal))
+                throw new InvalidOperationException("CSRF tokens must differ.");
+
+            CsrfPayload cookiePayload;
+            CsrfPayload headerPayload;
+            try
             {
-                httpContext.Response.Cookies.Append(
-                    cookieName,
-                    tokens.CookieToken,
-                    BuildCookieOptions(httpContext));
+                cookiePayload = Decrypt(cookie);
+                headerPayload = Decrypt(header);
             }
+            catch
+            {
+                throw new InvalidOperationException("CSRF token tampered or invalid.");
+            }
+
+            if (cookiePayload.UserId != headerPayload.UserId ||
+                cookiePayload.Random != headerPayload.Random)
+                throw new InvalidOperationException("CSRF token mismatch.");
+
+            var currentUserId = context.User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "anonymous";
+            if (cookiePayload.UserId != currentUserId)
+                throw new InvalidOperationException("CSRF token user mismatch.");
+
+            return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Retrieves the CSRF token from the request cookies.
-        /// </summary>
-        public string GetFromCookie(string name = CsrfCookieName)
+        private CsrfPayload Decrypt(string token)
         {
-            var httpContext = GetHttpContext();
-
-            if (!httpContext.Request.Cookies.TryGetValue(name, out var token))
-                throw new KeyNotFoundException($"Cookie '{name}' with token not found.");
-
-            return token;
+            var normalized = FromUrlSafeBase64(token);
+            var json = Encoding.UTF8.GetString(_aes.Decrypt(normalized));
+            return JsonSerializer.Deserialize<CsrfPayload>(json)
+                   ?? throw new InvalidOperationException("Invalid CSRF token.");
         }
 
-        /// <summary>
-        /// Retrieves the CSRF token from the request headers.
-        /// </summary>
-        public string GetFromHeader(string name = CsrfHeaderName)
-        {
-            var httpContext = GetHttpContext();
+        private static string ToUrlSafeBase64(string base64) =>
+            base64.TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-            if (!httpContext.Request.Headers.TryGetValue(name, out var tokenValues))
-                throw new KeyNotFoundException($"Header '{name}' with token not found.");
+        private static string FromUrlSafeBase64(string urlSafe) =>
+            urlSafe.Replace('-', '+').Replace('_', '/')
+            + new string('=', (4 - urlSafe.Length % 4) % 4);
 
-            return tokenValues.FirstOrDefault()
-                ?? throw new KeyNotFoundException("No token values found in the header.");
-        }
+        private HttpContext GetContext() =>
+            _httpContext.HttpContext
+            ?? throw new InvalidOperationException("HttpContext is not available.");
 
-        /// <summary>
-        /// Generates and stores a new CSRF token set in the current HTTP context.
-        /// </summary>
-        public AntiforgeryTokenSet Get()
-        {
-            var httpContext = GetHttpContext();
-
-            return _antiforgery.GetAndStoreTokens(httpContext)
-                ?? throw new InvalidOperationException("Failed to generate antiforgery token set.");
-        }
-
-        /// <summary>
-        /// Validates the CSRF token in the current HTTP request.
-        /// </summary>
-        public async Task ValidateAsync()
-        {
-            var httpContext = GetHttpContext();
-            await _antiforgery.ValidateRequestAsync(httpContext);
-        }
-
-        /// <summary>
-        /// Removes the CSRF token cookie from the response.
-        /// </summary>
-        public void Remove(string cookieName = CsrfCookieName)
-        {
-            var httpContext = GetHttpContext();
-            httpContext.Response.Cookies.Delete(cookieName, BuildCookieOptions(httpContext));
-        }
-
-        // -------------------------
-        // Private helpers
-        // -------------------------
-
-        private HttpContext GetHttpContext() =>
-            _httpContextAccessor.HttpContext
-                ?? throw new InvalidOperationException("HttpContext is not available.");
-
-        private static CookieOptions BuildCookieOptions(HttpContext httpContext) => new()
+        private static CookieOptions BuildCookieOptions(HttpContext context) => new()
         {
             HttpOnly = true,
-            Secure = httpContext.Request.IsHttps,
+            Secure   = context.Request.IsHttps,
             SameSite = SameSiteMode.Strict,
-            Path = "/",
+            Path     = "/",
             IsEssential = true
         };
+
+        private record CsrfPayload(string UserId, string Random);
     }
 }

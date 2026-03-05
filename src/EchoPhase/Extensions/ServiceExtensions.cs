@@ -39,7 +39,7 @@ namespace EchoPhase.Extensions
         public static IServiceCollection AddDiscordClient(this IServiceCollection services)
         {
             services.AddSingleton<IDiscordSecretVault, DiscordSecretVault>();
-            services.AddHttpClient<DiscordClient>("Discord", (serviceProvider, client) =>
+            services.AddHttpClient<IDiscordClient, DiscordClient>("Discord", (serviceProvider, client) =>
                     {
                         client.BaseAddress = new Uri("https://discord.com/api/v10/");
 

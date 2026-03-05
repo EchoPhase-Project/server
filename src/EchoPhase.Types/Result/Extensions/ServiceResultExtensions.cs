@@ -89,5 +89,13 @@ namespace EchoPhase.Types.Result.Extensions
                 return action(err);
             return Task.CompletedTask;
         }
+
+        public static T GetValueOrThrow<T>(this IServiceResult<T> result)
+        {
+            if (result.TryGetValue(out var value))
+                return value;
+            throw new InvalidOperationException(
+                result.TryGetError(out var err) ? $"{err.Code}: {err.Message}" : "Operation failed.");
+        }
     }
 }

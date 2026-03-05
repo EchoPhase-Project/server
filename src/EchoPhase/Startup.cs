@@ -279,7 +279,6 @@ namespace EchoPhase
 
             app.UseAuthentication();
             app.UseAuthorization();
-            app.UseAntiforgery();
 
             app.UseWebSockets();
 

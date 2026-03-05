@@ -1,11 +1,13 @@
 using EchoPhase.Clients.Discord.Dto;
-using EchoPhase.Clients.Discord.Models;
+using EchoPhase.Clients.Abstractions;
 
 namespace EchoPhase.Clients.Discord
 {
     public interface IDiscordClient
     {
-        void WithAuth(string token);
-        Task<IDiscordApiResponse<IEnumerable<DiscordUserGuildsResponseDto>>> GetUserGuildsAsync(DiscordUserGuildsQueryDto query);
+        Task<Result<IEnumerable<DiscordUserGuildsResponseDto>>> GetUserGuildsAsync(
+            DiscordUserGuildsQueryDto query,
+            string botToken,
+            CancellationToken ct = default);
     }
 }

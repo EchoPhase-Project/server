@@ -31,8 +31,51 @@ namespace EchoPhase.Clients.Discord
         private string UserKey(string userId, string keyName) =>
             $"discord:{userId}:{keyName}";
 
+        // Index хранится по UUID ключу — Prefixed шифрует путь
         private string IndexKey(string userId) =>
             Prefixed($"discord:{userId}{IndexSuffix}");
+
+        // --------------------------
+        // Index helpers — содержимое шифруется через AesGcm
+        // --------------------------
+
+        private async Task<HashSet<string>> IndexGetAsync(string userId)
+        {
+            var raw = await Db.StringGetAsync(IndexKey(userId));
+            if (!raw.HasValue) return new HashSet<string>();
+
+            try
+            {
+                var decrypted = AesGcm.Decrypt((byte[])raw!);
+                return JsonSerializer.Deserialize<HashSet<string>>(decrypted)
+                    ?? new HashSet<string>();
+            }
+            catch
+            {
+                return new HashSet<string>();
+            }
+        }
+
+        private async Task IndexSaveAsync(string userId, HashSet<string> index)
+        {
+            var encrypted = AesGcm.Encrypt(
+                JsonSerializer.SerializeToUtf8Bytes(index));
+            await Db.StringSetAsync(IndexKey(userId), encrypted);
+        }
+
+        private async Task IndexAddAsync(string userId, string keyName)
+        {
+            var index = await IndexGetAsync(userId);
+            if (index.Add(keyName))
+                await IndexSaveAsync(userId, index);
+        }
+
+        private async Task IndexRemoveAsync(string userId, string keyName)
+        {
+            var index = await IndexGetAsync(userId);
+            if (index.Remove(keyName))
+                await IndexSaveAsync(userId, index);
+        }
 
         // --------------------------
         // Exists
@@ -67,11 +110,10 @@ namespace EchoPhase.Clients.Discord
             When when = When.Always,
             CommandFlags flags = CommandFlags.None)
         {
-            var key = UserKey(userId, keyName);
-            var result = await SetAsync(key, value, expiry, keepTtl, when, flags);
+            var result = await SetAsync(UserKey(userId, keyName), value, expiry, keepTtl, when, flags);
 
             if (result)
-                await Db.SetAddAsync(IndexKey(userId), keyName);
+                await IndexAddAsync(userId, keyName);
 
             return result;
         }
@@ -85,11 +127,11 @@ namespace EchoPhase.Clients.Discord
             When when = When.Always,
             CommandFlags flags = CommandFlags.None)
         {
-            var key = UserKey(userId, keyName);
-            var result = Set(key, value, expiry, keepTtl, when, flags);
+            var result = Set(UserKey(userId, keyName), value, expiry, keepTtl, when, flags);
 
             if (result)
-                Db.SetAdd(IndexKey(userId), keyName);
+                // Синхронный Set — запускаем async index через GetAwaiter
+                IndexAddAsync(userId, keyName).GetAwaiter().GetResult();
 
             return result;
         }
@@ -103,11 +145,10 @@ namespace EchoPhase.Clients.Discord
             string keyName,
             Func<Task<T>>? generator = null)
         {
-            var key = UserKey(userId, keyName);
-            var result = await GetOrSetAsync(key, generator);
+            var result = await GetOrSetAsync(UserKey(userId, keyName), generator);
 
             if (result.Successful)
-                await Db.SetAddAsync(IndexKey(userId), keyName);
+                await IndexAddAsync(userId, keyName);
 
             return result;
         }
@@ -127,7 +168,7 @@ namespace EchoPhase.Clients.Discord
             var result = await DeleteAsync(UserKey(userId, keyName));
 
             if (result)
-                await Db.SetRemoveAsync(IndexKey(userId), keyName);
+                await IndexRemoveAsync(userId, keyName);
 
             return result;
         }
@@ -137,7 +178,7 @@ namespace EchoPhase.Clients.Discord
             var result = Delete(UserKey(userId, keyName));
 
             if (result)
-                Db.SetRemove(IndexKey(userId), keyName);
+                IndexRemoveAsync(userId, keyName).GetAwaiter().GetResult();
 
             return result;
         }
@@ -148,10 +189,10 @@ namespace EchoPhase.Clients.Discord
 
         public async Task DeleteAllAsync(string userId)
         {
-            var members = await Db.SetMembersAsync(IndexKey(userId));
+            var index = await IndexGetAsync(userId);
 
-            var keys = members
-                .Select(m => (RedisKey)Prefixed(UserKey(userId, m.ToString())))
+            var keys = index
+                .Select(keyName => (RedisKey)Prefixed(UserKey(userId, keyName)))
                 .Append((RedisKey)IndexKey(userId))
                 .ToArray();
 
@@ -159,14 +200,11 @@ namespace EchoPhase.Clients.Discord
         }
 
         // --------------------------
-        // Get all user keys
+        // Get all user key names
         // --------------------------
 
-        public async Task<IEnumerable<string>> GetUserKeyNamesAsync(string userId)
-        {
-            var members = await Db.SetMembersAsync(IndexKey(userId));
-            return members.Select(m => m.ToString());
-        }
+        public async Task<IEnumerable<string>> GetUserKeyNamesAsync(string userId) =>
+            await IndexGetAsync(userId);
 
         // --------------------------
         // Get all user secrets

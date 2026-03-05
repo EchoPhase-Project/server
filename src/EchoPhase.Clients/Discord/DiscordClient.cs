@@ -1,29 +1,21 @@
 using EchoPhase.Clients.Discord.Dto;
-using EchoPhase.Clients.Discord.Models;
-using Microsoft.Extensions.Logging;
+using EchoPhase.Clients.Abstractions;
 
 namespace EchoPhase.Clients.Discord
 {
     public class DiscordClient : DiscordClientBase, IDiscordClient
     {
-        private readonly HttpClient _client;
-        private readonly ILogger<DiscordClient> _logger;
+        public DiscordClient(HttpClient client) : base(client) { }
 
-        public DiscordClient(
-            HttpClient client, ILogger<DiscordClient> logger
-        ) : base(client, logger)
+        public async Task<Result<IEnumerable<DiscordUserGuildsResponseDto>>> GetUserGuildsAsync(
+            DiscordUserGuildsQueryDto query,
+            string botToken,
+            CancellationToken ct = default)
         {
-            _client = client;
-            _logger = logger;
-        }
+            var result = await SendAsync<DiscordUserGuildsQueryDto, object, List<DiscordUserGuildsResponseDto>>(
+                "users/@me/guilds", HttpMethod.Get, query, null, botToken, ct);
 
-        public async Task<IDiscordApiResponse<IEnumerable<DiscordUserGuildsResponseDto>>> GetUserGuildsAsync(
-            DiscordUserGuildsQueryDto query
-        ) => await SendAsync<DiscordUserGuildsQueryDto, object, List<DiscordUserGuildsResponseDto>>(
-                "users/@me/guilds",
-                HttpMethod.Get,
-                query,
-                null
-            );
+            return result.Map(list => list.AsEnumerable());
+        }
     }
 }

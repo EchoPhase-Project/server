@@ -1,24 +1,25 @@
+using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Identity;
 
 namespace EchoPhase.Cli.Commands.User.Roles.Remove
 {
     public class RemoveCommand : AsyncCommand<RemoveSettings>
     {
-        private readonly IUserService _userService;
+        private readonly UserRepository _userRepository;
         private readonly IRoleService _roleService;
 
         public RemoveCommand(
-            IUserService userService,
+            UserRepository userRepository,
             IRoleService roleService
         )
         {
+            _userRepository = userRepository;
             _roleService = roleService;
-            _userService = userService;
         }
 
         public override async Task<int> ExecuteAsync(CommandContext context, RemoveSettings settings, CancellationToken cancellationToken)
         {
-            var users = _userService.Get(opts =>
+            var users = _userRepository.Get(opts =>
             {
                 opts.UserNames = new HashSet<string> { settings.Username };
             }).Data.ToHashSet();

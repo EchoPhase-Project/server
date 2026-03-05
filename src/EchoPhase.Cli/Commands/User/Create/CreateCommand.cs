@@ -1,18 +1,18 @@
 using System.Text;
-using EchoPhase.Security.Authentication;
+using EchoPhase.Identity;
 using EchoPhase.Types.Extensions;
 
 namespace EchoPhase.Cli.Commands.User.Create
 {
     public class CreateCommand : AsyncCommand<CreateSettings>
     {
-        private readonly IAuthService _authService;
+        private readonly IUserService _userService;
 
         public CreateCommand(
-            IAuthService authService
+                IUserService userService
         )
         {
-            _authService = authService;
+            _userService = userService;
         }
 
         public override async Task<int> ExecuteAsync(CommandContext context, CreateSettings settings, CancellationToken cancellationToken)
@@ -21,7 +21,7 @@ namespace EchoPhase.Cli.Commands.User.Create
             if (password.TryFromBase64String(out var bytes))
                 password = Encoding.UTF8.GetString(bytes);
 
-            var result = await _authService.CreateUserAsync(settings.Name, settings.Username, password, settings.Roles);
+            var result = await _userService.CreateUserAsync(settings.Name, settings.Username, password, settings.Roles);
 
             if (!result.Succeeded)
             {

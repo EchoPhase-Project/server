@@ -1,3 +1,4 @@
+using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Identity;
 using EchoPhase.Projection;
 using Microsoft.AspNetCore.Mvc;
@@ -9,11 +10,17 @@ namespace EchoPhase.Controllers.Api.v1
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly UserRepository _userRepository;
         private readonly Projector _projector;
 
-        public UserController(IUserService userService, Projector projector)
+        public UserController(
+            IUserService userService,
+            UserRepository userRepository,
+            Projector projector
+        )
         {
             _userService = userService;
+            _userRepository = userRepository;
             _projector = projector;
         }
 
@@ -23,7 +30,7 @@ namespace EchoPhase.Controllers.Api.v1
             if (string.IsNullOrWhiteSpace(username))
                 return BadRequest("Username is required.");
 
-            var users = _userService.Get(x => x.UserNames = [username]);
+            var users = _userRepository.Get(x => x.UserNames = [username]);
             if (!users.Data.Any())
                 return NotFound();
 

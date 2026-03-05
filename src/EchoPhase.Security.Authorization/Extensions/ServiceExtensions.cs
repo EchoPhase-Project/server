@@ -1,10 +1,10 @@
-using EchoPhase.Security.Authorization.Factories;
 using EchoPhase.Security.Authorization.Handlers;
-using EchoPhase.Security.BitMasks.Constants;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
+using Microsoft.Extensions.Options;
 
 namespace EchoPhase.Security.Authorization.Extensions
 {
@@ -12,45 +12,12 @@ namespace EchoPhase.Security.Authorization.Extensions
     {
         public static IServiceCollection AddAuthorizations(this IServiceCollection services)
         {
-            services.AddSingleton<IRolesFactory, RolesFactory>();
-            services.AddSingleton<IPermissionsFactory, PermissionsFactory>();
-
-            services.AddSingleton<IAuthorizationHandler, PermissionsAuthorizationHandler>();
-            services.AddSingleton<IAuthorizationHandler, RolesAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, RoleAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, ScopeAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
             services.AddAuthorization(options =>
             {
-                var provider = services.BuildServiceProvider();
-                var permissionFactory = provider.GetRequiredService<IPermissionsFactory>();
-                var roleFactory = provider.GetRequiredService<IRolesFactory>();
-
-                options.AddPolicy("AdminOnly", policy =>
-                {
-                    var req = roleFactory.Requirement(
-                        Roles.Admin
-                    );
-
-                    policy.Requirements.Add(req);
-                });
-
-                options.AddPolicy("DevOrHigher", policy =>
-                {
-                    var req = roleFactory.Requirement(
-                        Roles.Admin, Roles.Dev
-                    );
-
-                    policy.Requirements.Add(req);
-                });
-
-                options.AddPolicy("TrustedOnly", policy =>
-                {
-                    var req = roleFactory.Requirement(
-                        Roles.Admin, Roles.Dev, Roles.Staff
-                    );
-
-                    policy.Requirements.Add(req);
-                });
-
                 options.AddPolicy("Any", policy =>
                 {
                     policy.RequireAuthenticatedUser();
@@ -61,17 +28,6 @@ namespace EchoPhase.Security.Authorization.Extensions
                     policy.RequireAssertion(context => false);
                 });
 
-                options.AddPolicy("CanEdit", policy =>
-                {
-                    var req = permissionFactory.Requirement(
-                        (Resources.User, new[] { Permissions.Add, Permissions.Edit }),
-                        (Resources.WebSocket, new[] { Permissions.Connect, Permissions.Execute }),
-                        (Resources.Tokens, new[] { Permissions.Import, Permissions.Export })
-                    );
-
-                    policy.Requirements.Add(req);
-                });
-
                 options.DefaultPolicy = new AuthorizationPolicyBuilder()
                     .AddAuthenticationSchemes(
                             IdentityConstants.ApplicationScheme,
@@ -79,6 +35,25 @@ namespace EchoPhase.Security.Authorization.Extensions
                     .RequireAuthenticatedUser()
                     .Build();
             });
+
+            services.AddDynamicPolicyProvider();
+
+            return services;
+        }
+
+        public static IServiceCollection AddDynamicPolicyProvider(
+            this IServiceCollection services,
+            params Assembly[] assemblies)
+        {
+            var targets = assemblies.Length > 0
+                ? assemblies
+                : AppDomain.CurrentDomain.GetAssemblies();
+
+            services.AddSingleton<IAuthorizationPolicyProvider>(sp =>
+                new DynamicPolicyProvider(
+                    sp.GetRequiredService<IOptions<AuthorizationOptions>>(),
+                    sp,
+                    targets));
 
             return services;
         }

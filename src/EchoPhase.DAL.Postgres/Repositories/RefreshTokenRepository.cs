@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EchoPhase.DAL.Postgres.Repositories
 {
-    public class RefreshTokenRepository : RepositoryBase<RefreshToken, RefreshTokenOptions>, IRefreshTokenRepository
+    public class RefreshTokenRepository
+        : RepositoryBase<RefreshToken, RefreshTokenOptions, RefreshTokenSearchOptions>
     {
         private readonly PostgresContext _dbContext;
 
@@ -14,67 +15,27 @@ namespace EchoPhase.DAL.Postgres.Repositories
             _dbContext = dbContext;
         }
 
-        public CursorPage<RefreshToken> Get(
-            RefreshTokenSearchOptions options,
-            CursorOptions? cursor = null,
-            Func<IQueryable<RefreshToken>, RefreshTokenSearchOptions, IQueryable<RefreshToken>>? extraFilters = null
-        )
-        {
-            var query = ApplySearchOptions<RefreshToken, RefreshTokenSearchOptions>(
-                Build(), options, (query, opts) =>
-                {
-                    query = ExtraFilters(query, opts);
-                    if (extraFilters is not null)
-                        query = extraFilters(query, opts);
-                    return query;
-                });
-
-            if (cursor is not null)
-                return ApplyCursor(query, cursor, x => x.Id);
-
-            return new CursorPage<RefreshToken> { Data = query };
-        }
-
-        public CursorPage<RefreshToken> Get(
-            Action<RefreshTokenSearchOptions> configure,
-            Action<CursorOptions>? configureCursor = null,
-            Func<IQueryable<RefreshToken>, RefreshTokenSearchOptions, IQueryable<RefreshToken>>? extraFilters = null
-        )
-        {
-            var options = new RefreshTokenSearchOptions();
-            configure(options);
-
-            CursorOptions? cursor = null;
-            if (configureCursor is not null)
-            {
-                cursor = new CursorOptions();
-                configureCursor(cursor);
-            }
-
-            return Get(options, cursor, extraFilters);
-        }
-
         public override IQueryable<RefreshToken> Build()
         {
             IQueryable<RefreshToken> query = _dbContext.RefreshTokens;
             if (_options.IncludeUser)
                 query = query.Include(q => q.User);
+            if (_options.IncludeClaims)
+                query = query
+                    .Include(q => q.Scopes)
+                    .Include(q => q.Intents)
+                    .Include(q => q.Permissions);
             return query;
         }
 
-        private IQueryable<RefreshToken> ExtraFilters(
+        protected override IQueryable<RefreshToken> ApplyExtraFilters(
             IQueryable<RefreshToken> query,
-            RefreshTokenSearchOptions opts
-        )
+            RefreshTokenSearchOptions opts)
         {
-            if (opts.Ids is { Count: > 0 })
-                query = query.Where(x => opts.Ids.Contains(x.Id));
-            if (opts.UserIds is { Count: > 0 })
-                query = query.Where(x => opts.UserIds.Contains(x.UserId));
-            if (opts.DeviceIds is { Count: > 0 })
-                query = query.Where(x => x.DeviceId != null && opts.DeviceIds.Contains(x.DeviceId));
-            if (opts.RefreshValues is { Count: > 0 })
-                query = query.Where(x => x.RefreshValue != null && opts.RefreshValues.Contains(x.RefreshValue));
+            if (opts.Ids           is { Count: > 0 }) query = query.Where(x => opts.Ids.Contains(x.Id));
+            if (opts.UserIds       is { Count: > 0 }) query = query.Where(x => opts.UserIds.Contains(x.UserId));
+            if (opts.DeviceIds     is { Count: > 0 }) query = query.Where(x => x.DeviceId != null && opts.DeviceIds.Contains(x.DeviceId));
+            if (opts.RefreshValues is { Count: > 0 }) query = query.Where(x => x.RefreshValue != null && opts.RefreshValues.Contains(x.RefreshValue));
             return query;
         }
     }

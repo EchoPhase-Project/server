@@ -4,6 +4,9 @@ using EchoPhase.Configuration.Database.Redis;
 using EchoPhase.Types.Result;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using UUIDNext;
+using System.Collections.Concurrent;
+
 
 namespace EchoPhase.Security.Cryptography.Vaults
 {
@@ -16,6 +19,7 @@ namespace EchoPhase.Security.Cryptography.Vaults
         private readonly IDatabase _db;
         private readonly RedisOptions _settings;
         private const string KeyPrefix = "key_";
+        private static readonly ConcurrentDictionary<string, string> _keyCache = new();
 
         /// <summary>
         /// Initializes the Redis keys service using the default Redis database (0).
@@ -234,6 +238,12 @@ namespace EchoPhase.Security.Cryptography.Vaults
         /// </summary>
         /// <param name="key">Logical key</param>
         /// <returns>Prefixed Redis key</returns>
-        private string Prefixed(string key) => $"{_settings.InstanceName}{KeyPrefix}tenant:{_settings.TenantId}:{key}";
+        private string Prefixed(string key) =>
+            _keyCache.GetOrAdd(key, k =>
+            {
+                var raw = $"{KeyPrefix}tenant:{_settings.TenantId}:{k}";
+                var uuid = Uuid.NewNameBased(_settings.TenantId, raw);
+                return $"{_settings.InstanceName}{uuid}";
+            });
     }
 }

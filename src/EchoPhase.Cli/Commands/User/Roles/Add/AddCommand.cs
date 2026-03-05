@@ -1,24 +1,25 @@
+using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Identity;
 
 namespace EchoPhase.Cli.Commands.User.Roles.Add
 {
     public class AddCommand : AsyncCommand<AddSettings>
     {
-        private readonly IUserService _userService;
+        private readonly UserRepository _userRepository;
         private readonly IRoleService _roleService;
 
         public AddCommand(
-            IUserService userService,
+            UserRepository userRepository,
             IRoleService roleService
         )
         {
             _roleService = roleService;
-            _userService = userService;
+            _userRepository = userRepository;
         }
 
         public override async Task<int> ExecuteAsync(CommandContext context, AddSettings settings, CancellationToken cancellationToken)
         {
-            var users = _userService.Get(opts =>
+            var users = _userRepository.Get(opts =>
             {
                 opts.UserNames = new HashSet<string> { settings.Username };
             }).Data.ToHashSet();

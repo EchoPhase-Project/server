@@ -1,39 +1,36 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Security.Antiforgery.Filters
 {
-    public class BearerOrValidateAntiForgeryTokenFilter : IAsyncActionFilter, IOrderedFilter
+    public class ValidateAntiForgeryFilter : IAsyncActionFilter, IOrderedFilter
     {
         private readonly IAntiforgeryService _antiforgeryService;
 
         public int Order { get; set; } = int.MinValue;
 
-        public BearerOrValidateAntiForgeryTokenFilter(IAntiforgeryService antiforgeryService)
+        public ValidateAntiForgeryFilter(IAntiforgeryService antiforgeryService)
         {
             _antiforgeryService = antiforgeryService;
         }
 
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
-            if (!IsBearerAuthenticated(context.HttpContext))
+            try
             {
                 await _antiforgeryService.ValidateAsync();
             }
+            catch (InvalidOperationException ex)
+            {
+                context.Result = new ObjectResult(new { error = ex.Message })
+                {
+                    StatusCode = StatusCodes.Status403Forbidden
+                };
+                return;
+            }
 
             await next();
-        }
-
-        private static readonly HashSet<string> _tokenSchemes =
-        [
-            JwtBearerDefaults.AuthenticationScheme
-        ];
-
-        private static bool IsBearerAuthenticated(HttpContext httpContext)
-        {
-            var authenticationType = httpContext.User.Identity?.AuthenticationType;
-            return authenticationType is not null && _tokenSchemes.Contains(authenticationType);
         }
     }
 }

@@ -62,7 +62,6 @@ namespace EchoPhase.DAL.Redis
                     throw new InvalidOperationException($"Unable to deserialize result for tenant {_tenantId}, key {_key}.");
                 if (result is null)
                     throw new NullReferenceException($"Data is null for tenant {_tenantId}, key {_key}.");
-                await _cache.RefreshAsync(_cacheKey);
                 return result;
             }
             catch (JsonException ex)

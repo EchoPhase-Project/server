@@ -1,6 +1,7 @@
 using EchoPhase.Controllers.Api.v1.Dto.Blocks;
 using EchoPhase.Projection;
 using EchoPhase.Runners.Blocks;
+using EchoPhase.Security.Antiforgery.Attributes;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Controllers.Api.v1
@@ -19,7 +20,7 @@ namespace EchoPhase.Controllers.Api.v1
         }
 
         [HttpPost("run")]
-        [ValidateAntiForgeryToken]
+        [ValidateAntiForgery]
         public async Task<IActionResult> RunBlocks([FromBody] RunBlocksRequest request)
         {
             if (request.Blocks.Count == 0)

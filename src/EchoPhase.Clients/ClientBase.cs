@@ -7,86 +7,62 @@ using EchoPhase.Clients.Models;
 
 namespace EchoPhase.Clients
 {
-    public class ClientBase
+    public abstract class ClientBase
     {
         private readonly HttpClient _client;
         private readonly QueryStringBuilder _queryStringBuilder;
-        private readonly JsonSerializerOptions _options;
+        private static readonly JsonSerializerOptions _jsonOptions =
+            new(JsonSerializerDefaults.Web);
 
-        public ClientBase(
-            HttpClient client
-        )
+        protected ClientBase(HttpClient client)
         {
             _client = client;
             _queryStringBuilder = new QueryStringBuilder();
-            _options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            };
         }
-
-        protected void Configure(Action<HttpClient> action)
-        {
-            action(_client);
-        }
-
-        protected Task ConfigureAsync(Func<HttpClient, Task> action)
-        {
-            return action(_client);
-        }
-
-        protected void WithAuth(string scheme, string token)
-        {
-            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(scheme, token);
-        }
+        protected AuthenticationHeaderValue WithAuth(string scheme, string token) =>
+            new AuthenticationHeaderValue(scheme, token);
 
         protected async Task<IClientResponse<TR, TE>> SendAsync<TQ, TB, TR, TE>(
             string uri,
             HttpMethod method,
             TQ? query,
-            TB? body
-        )
+            TB? body,
+            AuthenticationHeaderValue? auth = null,
+            CancellationToken ct = default)
             where TQ : class
             where TB : class
             where TR : class
             where TE : class
         {
-            var baseUri = _client.BaseAddress ?? throw new InvalidOperationException("HttpClient.BaseAddress is not set.");
+            var baseUri = _client.BaseAddress
+                ?? throw new InvalidOperationException("HttpClient.BaseAddress is not set.");
 
-            var fullUri = new Uri(baseUri, uri);
-            UriBuilder uriBuilder = new UriBuilder(fullUri);
+            string url = query != null
+                ? new UriBuilder(new Uri(baseUri, uri)) { Query = _queryStringBuilder.Build(query) }.ToString()
+                : new Uri(baseUri, uri).ToString();
 
-            if (query != null)
-            {
-                uriBuilder.Query = _queryStringBuilder.Build(query);
-            }
+            using var httpRequest = new HttpRequestMessage(method, url);
 
-            string url = uriBuilder.ToString();
-
-            var httpRequest = new HttpRequestMessage(method, url);
+            if (auth != null)
+                httpRequest.Headers.Authorization = auth;
 
             if (body != null)
             {
-                var serializedBody = JsonSerializer.Serialize<TB>(body);
                 httpRequest.Content = new StringContent(
-                    serializedBody,
+                    JsonSerializer.Serialize(body, _jsonOptions),
                     Encoding.UTF8,
-                    MediaTypeNames.Application.Json
-                );
+                    MediaTypeNames.Application.Json);
             }
 
-            var response = await _client.SendAsync(httpRequest);
-            string responseString = await response.Content.ReadAsStringAsync();
+            using var response = await _client.SendAsync(httpRequest, ct);
+            var apiResponse = new ClientResponse<TR, TE> { StatusCode = response.StatusCode };
 
-            ClientResponse<TR, TE> apiResponse = new ClientResponse<TR, TE>()
-            {
-                StatusCode = response.StatusCode
-            };
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
 
             if (response.IsSuccessStatusCode)
-                apiResponse.Data = JsonSerializer.Deserialize<TR>(responseString, _options);
+                apiResponse.Data = await JsonSerializer.DeserializeAsync<TR>(stream, _jsonOptions, ct);
             else
-                apiResponse.Error = JsonSerializer.Deserialize<TE>(responseString, _options);
+                apiResponse.Error = await JsonSerializer.DeserializeAsync<TE>(stream, _jsonOptions, ct);
 
             return apiResponse;
         }

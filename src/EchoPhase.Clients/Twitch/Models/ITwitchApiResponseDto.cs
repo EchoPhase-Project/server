@@ -12,4 +12,3 @@ namespace EchoPhase.Clients.Twitch.Models
         }
     }
 }
-
