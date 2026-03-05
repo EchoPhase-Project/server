@@ -1,0 +1,12 @@
+info:
+  name: Cursor Test
+  type: folder
+  seq: 1
+
+request:
+  auth: inherit
+  variables:
+    - name: DeviceId1
+      value: Linux x86, Chrome
+    - name: DeviceId2
+      value: Linux x86, Firefox

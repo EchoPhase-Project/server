@@ -6,3 +6,5 @@ variables:
     name: password
   - name: name
     value: Test
+  - name: DeviceId
+    value: Linux x86, Chrome

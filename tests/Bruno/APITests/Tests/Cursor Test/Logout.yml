@@ -1,0 +1,18 @@
+info:
+  name: Logout
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{baseUrl}}/auth/logout"
+  headers:
+    - name: X-CSRF-TOKEN
+      value: "{{X-CSRF-TOKEN}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

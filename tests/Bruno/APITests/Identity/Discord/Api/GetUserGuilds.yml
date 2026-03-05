@@ -1,0 +1,22 @@
+info:
+  name: GetUserGuilds
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/discord/api/users/@me/guilds?keyName={{DiscordKeyName}}"
+  headers:
+    - name: X-CSRF-TOKEN
+      value: "{{X-CSRF-TOKEN}}"
+  params:
+    - name: keyName
+      value: "{{DiscordKeyName}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

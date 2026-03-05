@@ -1,14 +1,14 @@
 info:
-  name: Jwt
+  name: GetAll
   type: http
-  seq: 4
+  seq: 2
 
 http:
-  method: POST
-  url: "{{baseUrl}}/auth/jwt/{{Id}}"
+  method: GET
+  url: "{{baseUrl}}/discord/vault"
   headers:
-    - name: Authorization
-      value: Bearer {{Bearer}}
+    - name: X-CSRF-TOKEN
+      value: "{{X-CSRF-TOKEN}}"
   auth: inherit
 
 settings:

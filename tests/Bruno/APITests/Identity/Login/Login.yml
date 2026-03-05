@@ -22,6 +22,15 @@ runtime:
         test("Status is 2xx", () => {
             expect(res.getStatus()).to.be.within(200, 299);
         });
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.headers["x-csrf-token"]
+        method: jsonq
+      variable:
+        name: X-CSRF-TOKEN
+        scope: runtime
 
 settings:
   encodeUrl: true

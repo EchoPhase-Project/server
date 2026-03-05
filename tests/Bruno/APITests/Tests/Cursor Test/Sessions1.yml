@@ -1,11 +1,18 @@
 info:
-  name: Antiforgery
+  name: Sessions1
   type: http
-  seq: 2
+  seq: 6
 
 http:
   method: GET
-  url: "{{baseUrl}}/auth/antiforgery"
+  url: "{{baseUrl}}/auth/refresh/sessions?limit=1"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+  body:
+    type: json
+    data: ""
   auth: inherit
 
 runtime:
@@ -13,10 +20,10 @@ runtime:
     - type: set-variable
       phase: after-response
       selector:
-        expression: res.headers["x-csrf-token"]
+        expression: res.body["NextCursor"]
         method: jsonq
       variable:
-        name: X-CSRF-TOKEN
+        name: after
         scope: runtime
 
 settings:

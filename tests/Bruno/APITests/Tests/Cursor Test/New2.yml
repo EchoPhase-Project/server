@@ -1,0 +1,55 @@
+info:
+  name: New2
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{baseUrl}}/auth/refresh/new"
+  headers:
+    - name: X-CSRF-TOKEN
+      value: "{{X-CSRF-TOKEN}}"
+  body:
+    type: json
+    data: |-
+      {
+        "DeviceId": "{{DeviceId2}}",
+        "claims": {
+          "scopes": ["api"],
+          "intents": ["login"],
+          "permissions": {
+            "user":      ["read", "list"],
+            "tokens":    ["read", "create", "delete"],
+            "webSocket": ["connect"]
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: ""
+      value: ""
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body["accessToken"]
+        method: jsonq
+      variable:
+        name: AccessToken2
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body["refreshToken"]
+        method: jsonq
+      variable:
+        name: RefreshToken2
+        scope: runtime
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -16,6 +16,17 @@ http:
         }
   auth: inherit
 
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.headers["x-csrf-token"]
+        method: jsonq
+      variable:
+        name: X-CSRF-TOKEN
+        scope: runtime
+
 settings:
   encodeUrl: true
   timeout: 0

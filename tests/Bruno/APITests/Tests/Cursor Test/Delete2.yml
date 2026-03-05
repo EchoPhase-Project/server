@@ -1,0 +1,24 @@
+info:
+  name: Delete2
+  type: http
+  seq: 9
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/auth/refresh"
+  headers:
+    - name: X-CSRF-TOKEN
+      value: "{{X-CSRF-TOKEN}}"
+  body:
+    type: json
+    data: |-
+      {
+        "DeviceId": "{{DeviceId2}}"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

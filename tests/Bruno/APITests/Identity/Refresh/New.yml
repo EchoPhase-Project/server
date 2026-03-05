@@ -13,7 +13,16 @@ http:
     type: json
     data: |-
       {
-        "DeviceId": "Linux x86, Chrome"
+        "DeviceId": "{{DeviceId}}",
+        "claims": {
+          "scopes": ["api"],
+          "intents": ["login"],
+          "permissions": {
+            "user":      ["read", "list"],
+            "tokens":    ["read", "create", "delete"],
+            "webSocket": ["connect"]
+          }
+        }
       }
   auth: inherit
 
@@ -25,18 +34,26 @@ runtime:
     - type: set-variable
       phase: after-response
       selector:
-        expression: res.body["accessToken"]
+        expression: res.body["id"]
         method: jsonq
       variable:
-        name: RefreshToken
+        name: RefreshId
         scope: runtime
     - type: set-variable
       phase: after-response
       selector:
-        expression: res.body["refreshToken"]
+        expression: res.body["tokens"]["accessToken"]
         method: jsonq
       variable:
         name: AccessToken
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body["tokens"]["refreshToken"]
+        method: jsonq
+      variable:
+        name: RefreshToken
         scope: runtime
 
 settings:
