@@ -2,13 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Net.WebSockets;
-using EchoPhase.WebSockets.Attributes;
 using EchoPhase.WebSockets.Constants;
 using EchoPhase.WebSockets.Processors.Payloads;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {
-    [OpCodeHandler(OpCodes.Ping)]
     public class PingHandler : OpCodeHandlerBase<PingPayload>
     {
         private readonly WebSocketService _webSocketService;

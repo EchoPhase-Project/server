@@ -5,7 +5,6 @@ using System.Net.WebSockets;
 using EchoPhase.Configuration.WebSocket;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Types.Result.Extensions;
-using EchoPhase.WebSockets.Attributes;
 using EchoPhase.WebSockets.Constants;
 using EchoPhase.WebSockets.Exceptions;
 using EchoPhase.WebSockets.Processors.Payloads;
@@ -13,7 +12,6 @@ using Microsoft.Extensions.Options;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {
-    [OpCodeHandler(OpCodes.Handshake)]
     public class HandshakeHandler : OpCodeHandlerBase<HandshakePayload>
     {
         private readonly WebSocketService _webSocketService;

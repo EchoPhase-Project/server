@@ -198,7 +198,6 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
                 .Include(t => t.Scopes)
                 .Include(t => t.Permissions);
 
-
             if (cursor is not null)
                 query.WithCursor(cursor);
 

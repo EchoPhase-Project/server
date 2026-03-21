@@ -93,34 +93,14 @@ namespace EchoPhase.WebSockets
             T message,
             ISet<string> requiredIntents)
         {
-            if (!_connectionManager.TryGetConnections(userId, out var connections) ||
-                connections is null ||
-                connections.Count == 0)
+            var eligible = GetEligibleConnections(userId, requiredIntents);
+            if (eligible.Count == 0)
             {
-                _logger.LogDebug("No active connections for UserId: {UserId}", userId);
+                _logger.LogDebug("No connections with required intents for UserId: {UserId}", userId);
                 return;
             }
 
-            var tasks = connections
-                .Select(async connection =>
-                {
-                    try
-                    {
-                        await SendMessageAsync(connection, message, requiredIntents);
-                    }
-                    catch (MissingIntentsException)
-                    {
-                        // Connection doesn't have required intents, skip
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex,
-                            "Error sending message to connection {ConnectionId}",
-                            connection.Id);
-                    }
-                });
-
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(eligible.Select(c => TrySendAsync(c, message)));
         }
 
         public async Task SendMessageToUserAsync<T, TShardId>(
@@ -130,27 +110,19 @@ namespace EchoPhase.WebSockets
             TShardId shardId)
             where TShardId : struct
         {
-            if (!_connectionManager.TryGetConnections(userId, out var connections) ||
-                connections is null ||
-                connections.Count == 0)
+            var eligible = GetEligibleConnections(userId, requiredIntents);
+            if (eligible.Count == 0)
             {
-                _logger.LogDebug("No active connections for UserId: {UserId}", userId);
+                _logger.LogDebug(
+                    "No connections with required intents for UserId: {UserId}, Intents: {Intents}",
+                    userId, string.Join(", ", requiredIntents));
                 return;
             }
 
-            var shardIndex = CalculateShardIndex(shardId, connections.Count);
-            var connection = connections[shardIndex];
+            var shardIndex = CalculateShardIndex(shardId, eligible.Count);
+            var connection = eligible[shardIndex];
 
-            try
-            {
-                await SendMessageAsync(connection, message, requiredIntents);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "Error sending sharded message to connection {ConnectionId} (shard {Shard}/{Total})",
-                    connection.Id, shardIndex, connections.Count);
-            }
+            await TrySendAsync(connection, message, shardIndex, eligible.Count);
         }
 
         public async Task SendMessageToUsersAsync<T>(
@@ -235,6 +207,51 @@ namespace EchoPhase.WebSockets
             var usersWithRole = await _roleService.GetUsersInRolesAsync(roles);
             var userIds = usersWithRole.Select(u => u.Id).ToHashSet();
             await SendMessageToUsersAsync(userIds, message, requiredIntents, shardId);
+        }
+
+        private List<WebSocketConnection> GetEligibleConnections(
+            Guid userId,
+            ISet<string> requiredIntents)
+        {
+            if (!_connectionManager.TryGetConnections(userId, out var connections) ||
+                connections is null)
+                return [];
+
+            return connections
+                .Where(c => _intentsBitmask.Has(c.Intents, requiredIntents.ToArray()))
+                .ToList();
+        }
+
+        private async Task TrySendAsync<T>(WebSocketConnection connection, T message)
+        {
+            try
+            {
+                await SendMessageAsync(connection, message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Error sending message to connection {ConnectionId}",
+                    connection.Id);
+            }
+        }
+
+        private async Task TrySendAsync<T>(
+            WebSocketConnection connection,
+            T message,
+            int shardIndex,
+            int total)
+        {
+            try
+            {
+                await SendMessageAsync(connection, message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Error sending sharded message to connection {ConnectionId} (shard {Shard}/{Total})",
+                    connection.Id, shardIndex, total);
+            }
         }
 
         private int CalculateShardIndex<T>(T value, int shardCount) where T : struct

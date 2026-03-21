@@ -2,11 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Concurrent;
-using System.Reflection;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.Authorization.Builders;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace EchoPhase.Security.Authorization
@@ -14,64 +12,45 @@ namespace EchoPhase.Security.Authorization
     public class DynamicPolicyProvider : IAuthorizationPolicyProvider
     {
         private readonly DefaultAuthorizationPolicyProvider _fallback;
-        private readonly IServiceProvider _services;
-
-        private readonly ConcurrentDictionary<string, Lazy<IPolicyBuilder>> _builders;
+        private readonly IReadOnlyDictionary<string, IPolicyBuilder> _builders;
+        private readonly ConcurrentDictionary<string, AuthorizationPolicy?> _cache = new();
 
         public DynamicPolicyProvider(
             IOptions<AuthorizationOptions> options,
-            IServiceProvider services,
-            IEnumerable<Assembly> assemblies)
+            IEnumerable<IPolicyBuilder> builders)
         {
             _fallback = new DefaultAuthorizationPolicyProvider(options);
-            _services = services;
-            _builders = new ConcurrentDictionary<string, Lazy<IPolicyBuilder>>(
-                StringComparer.Ordinal);
 
-            RegisterFromAssemblies(assemblies);
-        }
-
-        private void RegisterFromAssemblies(IEnumerable<Assembly> assemblies)
-        {
-            foreach (var assembly in assemblies)
-            {
-                var types = assembly.GetTypes()
-                    .Where(t =>
-                        t is { IsClass: true, IsAbstract: false } &&
-                        typeof(IPolicyBuilder).IsAssignableFrom(t) &&
-                        t.IsDefined(typeof(PolicyPrefixAttribute), inherit: false));
-
-                foreach (var type in types)
+            _builders = builders
+                .Select(b =>
                 {
-                    var prefix = type
-                        .GetCustomAttribute<PolicyPrefixAttribute>()!
-                        .Prefix;
+                    var prefix = b.GetType()
+                        .GetCustomAttributes(typeof(PolicyPrefixAttribute), inherit: false)
+                        .OfType<PolicyPrefixAttribute>()
+                        .FirstOrDefault()
+                        ?.Prefix
+                        ?? throw new InvalidOperationException(
+                            $"'{b.GetType().Name}' is missing required [PolicyPrefix] attribute.");
 
-                    if (!_builders.TryAdd(prefix, new Lazy<IPolicyBuilder>(
-                        () => (IPolicyBuilder)ActivatorUtilities.CreateInstance(_services, type),
-                        LazyThreadSafetyMode.ExecutionAndPublication)))
-                    {
-                        var existing = _builders[prefix].Value.GetType().Name;
-                        throw new InvalidOperationException(
-                            $"Policy prefix '{prefix}' is already registered by '{existing}'. " +
-                            $"Cannot register '{type.Name}' with the same prefix.");
-                    }
-                }
-            }
+                    return (Prefix: prefix, Builder: b);
+                })
+                .ToDictionary(x => x.Prefix, x => x.Builder, StringComparer.Ordinal);
         }
 
         public async Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
         {
-            foreach (var (prefix, lazy) in _builders)
+            return _cache.GetOrAdd(policyName, name =>
             {
-                if (!policyName.StartsWith(prefix, StringComparison.Ordinal))
-                    continue;
+                foreach (var (prefix, builder) in _builders)
+                {
+                    if (!name.StartsWith(prefix, StringComparison.Ordinal))
+                        continue;
 
-                var body = policyName[prefix.Length..];
-                return lazy.Value.Build(body);
-            }
+                    return builder.Build(name[prefix.Length..]);
+                }
 
-            return await _fallback.GetPolicyAsync(policyName);
+                return null;
+            }) ?? await _fallback.GetPolicyAsync(policyName);
         }
 
         public Task<AuthorizationPolicy> GetDefaultPolicyAsync() =>

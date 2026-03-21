@@ -8,9 +8,9 @@ using QRCoder;
 
 namespace EchoPhase.QRCodes.Generators
 {
-    [QRFormat(MediaTypeNames.Image.Svg)]
     public class SvgQRCodeGenerator : IQRCodeGenerator
     {
+        public static string Format = MediaTypeNames.Image.Svg;
         private int _size = 14;
         private HashSet<string> _cssClasses = new();
 

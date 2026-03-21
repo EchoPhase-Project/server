@@ -5,6 +5,7 @@ using System.Text;
 using EchoPhase.Clients;
 using EchoPhase.Clients.Discord;
 using EchoPhase.Clients.Discord.Dto;
+using EchoPhase.Clients.Providers;
 using EchoPhase.Identity;
 using EchoPhase.Security.Antiforgery.Attributes;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +19,6 @@ namespace EchoPhase.Controllers.Api.v1
         private readonly IDiscordClient _discord;
         private readonly IExternalTokenService _tokenService;
         private readonly IUserService _userService;
-        private readonly string _providerName = "Discord";
 
         public DiscordController(
             IDiscordClient discord,
@@ -53,7 +53,7 @@ namespace EchoPhase.Controllers.Api.v1
             if (user is null)
                 return Unauthorized();
 
-            var (token, error) = await ResolveTokenAsync(user.Id, _providerName, tokenName);
+            var (token, error) = await ResolveTokenAsync(user.Id, DiscordTokenProvider.ProviderName, tokenName);
             if (error is not null) return error;
 
             if (token is not null)

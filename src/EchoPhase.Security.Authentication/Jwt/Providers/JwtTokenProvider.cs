@@ -19,7 +19,6 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
 {
     public class JwtTokenProvider : IJwtTokenProvider
     {
-        private readonly IClaimsProviderRegistry _registry;
         private readonly ILogger<JwtTokenProvider> _logger;
         private readonly BearerOptions _settings;
         private readonly IUserService _userService;
@@ -27,7 +26,6 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
         private readonly byte[] _key;
 
         public JwtTokenProvider(
-            IClaimsProviderRegistry registry,
             ILogger<JwtTokenProvider> logger,
             IOptions<AuthenticationOptions> settings,
             IKeyVault keyVault,
@@ -35,7 +33,6 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             IUserPrincipalFactory principalFactory
         )
         {
-            _registry = registry;
             _logger = logger;
             _settings = settings.Value.Bearer;
             _userService = userService;

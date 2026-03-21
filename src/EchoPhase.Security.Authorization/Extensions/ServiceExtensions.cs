@@ -1,13 +1,11 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Reflection;
+using EchoPhase.Security.Authorization.Builders;
 using EchoPhase.Security.Authorization.Handlers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace EchoPhase.Security.Authorization.Extensions
 {
@@ -32,31 +30,16 @@ namespace EchoPhase.Security.Authorization.Extensions
                 });
 
                 options.DefaultPolicy = new AuthorizationPolicyBuilder()
-                    .AddAuthenticationSchemes(
-                            IdentityConstants.ApplicationScheme,
-                            JwtBearerDefaults.AuthenticationScheme)
+                    .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
                     .RequireAuthenticatedUser()
                     .Build();
             });
 
-            services.AddDynamicPolicyProvider();
+            services.AddSingleton<IPolicyBuilder, RolePolicyBuilder>();
+            services.AddSingleton<IPolicyBuilder, ScopePolicyBuilder>();
+            services.AddSingleton<IPolicyBuilder, PermissionPolicyBuilder>();
 
-            return services;
-        }
-
-        public static IServiceCollection AddDynamicPolicyProvider(
-            this IServiceCollection services,
-            params Assembly[] assemblies)
-        {
-            var targets = assemblies.Length > 0
-                ? assemblies
-                : AppDomain.CurrentDomain.GetAssemblies();
-
-            services.AddSingleton<IAuthorizationPolicyProvider>(sp =>
-                new DynamicPolicyProvider(
-                    sp.GetRequiredService<IOptions<AuthorizationOptions>>(),
-                    sp,
-                    targets));
+            services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
             return services;
         }

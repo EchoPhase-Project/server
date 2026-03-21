@@ -3,7 +3,6 @@
 
 using System.Net.WebSockets;
 using EchoPhase.WebSockets.Constants;
-using EchoPhase.WebSockets.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
@@ -21,9 +20,6 @@ namespace EchoPhase.WebSockets.Processors.Handlers
         {
             if (!Enum.IsDefined(typeof(OpCodes), opCode))
                 throw new NotSupportedException($"Unsupported OpCode {opCode} value.");
-
-            if (opCode.IsIgnored())
-                throw new NotSupportedException($"Ignored OpCode {opCode} value.");
 
             return _serviceProvider.GetKeyedService<IOpCodeHandler>(opCode)
                 ?? throw new NotSupportedException($"No handler registered for OpCode {opCode}.");

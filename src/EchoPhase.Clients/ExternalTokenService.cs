@@ -11,12 +11,12 @@ namespace EchoPhase.Clients
     {
         private readonly ExternalTokenRepository _repository;
         private readonly IClientTokenProviderRegistry _registry;
-        private readonly ClientSecretVault _vault;
+        private readonly IClientSecretVault _vault;
 
         public ExternalTokenService(
             ExternalTokenRepository repository,
             IClientTokenProviderRegistry registry,
-            ClientSecretVault vault)
+            IClientSecretVault vault)
         {
             _repository = repository;
             _registry = registry;

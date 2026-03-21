@@ -4,17 +4,18 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.Security.Authentication.Jwt.Claims.Providers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace EchoPhase.Security.Authentication.Jwt.Claims
 {
     public class UserPrincipalFactory : IUserPrincipalFactory
     {
-        private readonly IClaimsProviderRegistry _registry;
+        private readonly IEnumerable<IClaimsProvider> _providers;
 
-        public UserPrincipalFactory(IClaimsProviderRegistry registry)
+        public UserPrincipalFactory(IEnumerable<IClaimsProvider> providers)
         {
-            _registry = registry;
+            _providers = providers;
         }
 
         public async Task<ClaimsPrincipal> CreateAsync(User user, ClaimsEnrichmentContext? context = null)
@@ -32,7 +33,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Claims
             if (user.SecurityStamp != null)
                 identity.AddClaim(new Claim(JwtRegisteredClaimNames.Jti, user.SecurityStamp));
 
-            foreach (var provider in _registry.GetProviders())
+            foreach (var provider in _providers)
                 await provider.EnrichAsync(identity, context);
 
             return new ClaimsPrincipal(identity);

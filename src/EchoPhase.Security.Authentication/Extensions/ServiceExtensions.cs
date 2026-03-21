@@ -6,6 +6,7 @@ using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Security.Authentication.Jwt.Claims;
+using EchoPhase.Security.Authentication.Jwt.Claims.Providers;
 using EchoPhase.Security.Authentication.Jwt.Providers;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -75,7 +76,10 @@ namespace EchoPhase.Security.Authentication.Extensions
             services.AddScoped<IRefreshTokenProvider, RefreshTokenProvider>();
             services.AddScoped<IAuthenticationService, AuthenticationService>();
 
-            services.AddSingleton<IClaimsProviderRegistry, ClaimsProviderRegistry>();
+            services.AddScoped<IClaimsProvider, RolesClaimsProvider>();
+            services.AddScoped<IClaimsProvider, ScopesClaimsProvider>();
+            services.AddScoped<IClaimsProvider, IntentsClaimsProvider>();
+            services.AddScoped<IClaimsProvider, ResourcePermissionsClaimsProvider>();
 
             return services;
         }

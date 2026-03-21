@@ -4,14 +4,12 @@
 using System.Net.WebSockets;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Types.Result.Extensions;
-using EchoPhase.WebSockets.Attributes;
 using EchoPhase.WebSockets.Constants;
 using EchoPhase.WebSockets.Exceptions;
 using EchoPhase.WebSockets.Processors.Payloads;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {
-    [OpCodeHandler(OpCodes.Adjust)]
     public class AdjustHandler : OpCodeHandlerBase<AdjustPayload>
     {
         private readonly WebSocketService _webSocketService;

@@ -3,6 +3,7 @@
 
 using System.Text;
 using EchoPhase.Clients;
+using EchoPhase.Clients.Providers;
 using EchoPhase.Controllers.Api.v1.Dto.Discord;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
@@ -17,7 +18,6 @@ namespace EchoPhase.Controllers.Api.v1
     {
         private readonly IExternalTokenService _tokenService;
         private readonly IUserService _userService;
-        private readonly string _providerName = "Discord";
 
         public DiscordVaultController(
             IExternalTokenService tokenService,
@@ -49,7 +49,7 @@ namespace EchoPhase.Controllers.Api.v1
             var entity = new ExternalToken
             {
                 UserId = user.Id,
-                ProviderName = _providerName,
+                ProviderName = DiscordTokenProvider.ProviderName,
                 TokenName = dto.Name,
                 Value = Encoding.UTF8.GetBytes(dto.Value)
             };
@@ -66,7 +66,7 @@ namespace EchoPhase.Controllers.Api.v1
             if (user is null)
                 return Unauthorized();
 
-            var deleted = await _tokenService.DeleteAsync(user.Id, _providerName, dto.Name);
+            var deleted = await _tokenService.DeleteAsync(user.Id, DiscordTokenProvider.ProviderName, dto.Name);
             if (!deleted)
                 return NotFound();
 

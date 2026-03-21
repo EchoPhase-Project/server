@@ -6,9 +6,9 @@ using QRCoder;
 
 namespace EchoPhase.QRCodes.Generators
 {
-    [QRFormat(MediaTypeNames.Image.Png)]
     public class PngQRCodeGenerator : IQRCodeGenerator
     {
+        public static string Format = MediaTypeNames.Image.Png;
         private int _size = 14;
 
         public PngQRCodeGenerator()
@@ -35,10 +35,10 @@ namespace EchoPhase.QRCodes.Generators
 
         public byte[] GenerateBytes(string content)
         {
-            using QRCodeGenerator qrGenerator = new QRCodeGenerator();
+            using QRCodeGenerator qrGenerator = new();
             QRCodeData qrCodeData = qrGenerator.CreateQrCode(content, QRCodeGenerator.ECCLevel.Q);
 
-            using PngByteQRCode qrCode = new PngByteQRCode(qrCodeData);
+            using PngByteQRCode qrCode = new(qrCodeData);
             return qrCode.GetGraphic(_size);
         }
     }
