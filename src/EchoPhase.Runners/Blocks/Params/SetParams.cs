@@ -1,7 +1,10 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using EchoPhase.Configuration;
 using EchoPhase.Types.Validation;
-using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Runners.Blocks.Params
 {
@@ -11,7 +14,7 @@ namespace EchoPhase.Runners.Blocks.Params
         public string Name { get; set; } = string.Empty;
 
         [JsonPropertyName("value")]
-        public JToken Value { get; set; } = JValue.CreateNull();
+        public JsonElement Value { get; set; } = default;
 
         [JsonPropertyName("next")]
         public IEnumerable<int> Next { get; set; } = new HashSet<int>();
@@ -21,7 +24,6 @@ namespace EchoPhase.Runners.Blocks.Params
             if (string.IsNullOrWhiteSpace(Name))
                 return ValidationResult.Failure(error =>
                     error.Set(nameof(Name), "Name cannot be empty."));
-
             return ValidationResult.Success();
         }
     }

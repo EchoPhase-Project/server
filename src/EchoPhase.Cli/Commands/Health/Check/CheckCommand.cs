@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 namespace EchoPhase.Cli.Commands.Health.Check
 {
     public class CheckCommand : AsyncCommand<CheckSettings>
@@ -6,7 +9,7 @@ namespace EchoPhase.Cli.Commands.Health.Check
         {
         }
 
-        public async override Task<int> ExecuteAsync(CommandContext context, CheckSettings settings, CancellationToken cancellationToken)
+        public override async Task<int> ExecuteAsync(CommandContext context, CheckSettings settings, CancellationToken cancellationToken)
         {
             var url = "http://localhost:8080/health/live";
 

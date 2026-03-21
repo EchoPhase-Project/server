@@ -1,9 +1,12 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Reflection;
 using EchoPhase.Security.Authorization.Handlers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
-using System.Reflection;
 using Microsoft.Extensions.Options;
 
 namespace EchoPhase.Security.Authorization.Extensions

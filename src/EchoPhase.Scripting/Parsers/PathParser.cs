@@ -1,10 +1,13 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Collections;
+using System.Text.Json;
 using EchoPhase.Profilers;
 using EchoPhase.Scripting.Lexers;
 using EchoPhase.Scripting.Tokens;
 using EchoPhase.Types.Result.Extensions;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Scripting.Parsers
 {
@@ -35,13 +38,11 @@ namespace EchoPhase.Scripting.Parsers
             if (_tokens.Count == 0)
                 return null;
 
-            object? current = null;
-
             if (_tokens[_pos].Type != PathTokenType.Identifier)
                 throw new InvalidOperationException("Path must start with variable name.");
 
             string varName = _tokens[_pos++].Value;
-            if (!_variables.TryGetValue(varName, out current))
+            if (!_variables.TryGetValue(varName, out var current))
                 throw new KeyNotFoundException($"Variable '{varName}' not found.");
 
             while (_pos < _tokens.Count)
@@ -56,15 +57,13 @@ namespace EchoPhase.Scripting.Parsers
 
                     string propName = next.Value;
 
-                    if (current is JObject jObj)
-                        current = jObj[propName];
-                    else if (current is JToken jTok)
-                        current = jTok[propName];
+                    if (current is IDictionary<string, object?> dict)
+                        current = dict.TryGetValue(propName, out var v) ? v : null;
+                    else if (current is JsonElement jsonElem && jsonElem.ValueKind == JsonValueKind.Object)
+                        current = jsonElem.TryGetProperty(propName, out var prop) ? GetJsonSimpleValue(prop) : null;
                     else
                     {
-                        var prop = current?.GetType().GetProperty(propName);
-                        if (prop == null)
-                            throw new KeyNotFoundException($"Property '{propName}' not found.");
+                        var prop = (current?.GetType().GetProperty(propName)) ?? throw new KeyNotFoundException($"Property '{propName}' not found.");
                         current = prop.GetValue(current);
                     }
                 }
@@ -84,126 +83,111 @@ namespace EchoPhase.Scripting.Parsers
                     {
                         var lexerForExpr = scope.ServiceProvider.GetRequiredService<ILexer<Token>>();
                         var parserForExpr = scope.ServiceProvider.GetRequiredService<IParser<Token>>();
-
                         var evalResult = Eval.Execute<int>(lexerForExpr, parserForExpr, innerExprText, _variables);
                         if (!evalResult.TryGetValue(out idx))
                             throw new InvalidOperationException($"Index expression '{innerExprText}' did not evaluate to int.");
                     }
 
-                    if (current is JArray jArr)
-                    {
-                        if (idx < 0 || idx >= jArr.Count)
-                            throw new IndexOutOfRangeException($"Index {idx} out of range for JArray (length={jArr.Count}).");
-                        current = jArr[idx];
-                    }
-                    else if (current is IList list)
+                    if (current is IList<object?> list)
                     {
                         if (idx < 0 || idx >= list.Count)
-                            throw new IndexOutOfRangeException($"Index {idx} out of range for IList (count={list.Count}).");
+                            throw new InvalidOperationException($"Index {idx} out of range (length={list.Count}).");
                         current = list[idx];
                     }
-                    else
+                    else if (current is IList legacyList)
                     {
-                        throw new InvalidOperationException("Value is not indexable");
+                        if (idx < 0 || idx >= legacyList.Count)
+                            throw new InvalidOperationException($"Index {idx} out of range (count={legacyList.Count}).");
+                        current = legacyList[idx];
                     }
+                    else
+                        throw new InvalidOperationException("Value is not indexable");
                 }
                 else
                 {
                     throw new InvalidOperationException($"Unexpected token: {token.Type}");
                 }
             }
-
-            if (current is JValue jVal && jVal.Type == JTokenType.Null)
-                return null;
 
             return current;
         }
 
         public IDictionary<string, object> Set(object? value)
         {
-            int _pos = 0;
-            object? current;
+            int pos = 0;
 
-            if (_tokens[_pos].Type != PathTokenType.Identifier)
+            if (_tokens[pos].Type != PathTokenType.Identifier)
                 throw new InvalidOperationException("Path must start with variable name.");
 
-            string varName = _tokens[_pos++].Value;
-            if (!_variables.TryGetValue(varName, out current) || current == null)
+            string varName = _tokens[pos++].Value;
+            if (!_variables.TryGetValue(varName, out var current) || current == null)
             {
-                current = _tokens.Any(t => t.Type == PathTokenType.LBracket) ? new JArray() : new JObject();
+                current = _tokens.Any(t => t.Type == PathTokenType.LBracket)
+                    ? new List<object?>()
+                    : new Dictionary<string, object?>();
                 _variables[varName] = current;
             }
 
             object? parent = null;
-            PathToken? lastToken = null;
+            string? lastKey = null;
             int? lastIndex = null;
 
-            while (_pos < _tokens.Count)
+            while (pos < _tokens.Count)
             {
-                var token = _tokens[_pos++];
+                var token = _tokens[pos++];
 
                 if (token.Type == PathTokenType.Dot)
                 {
-                    var next = _tokens[_pos++];
+                    var next = _tokens[pos++];
                     if (next.Type != PathTokenType.Identifier)
                         throw new InvalidOperationException("Expected identifier after '.'");
 
                     string propName = next.Value;
                     parent = current;
-                    lastToken = next;
+                    lastKey = propName;
+                    lastIndex = null;
 
-                    if (current is JObject jObj)
-                    {
-                        if (!jObj.ContainsKey(propName))
-                            jObj[propName] = new JObject();
-                        current = jObj[propName];
-                    }
-                    else if (current is IDictionary<string, object> dict)
+                    if (current is IDictionary<string, object?> dict)
                     {
                         if (!dict.ContainsKey(propName))
-                            dict[propName] = new Dictionary<string, object>();
+                            dict[propName] = new Dictionary<string, object?>();
                         current = dict[propName];
                     }
                     else
                     {
-                        var prop = current?.GetType().GetProperty(propName);
-                        if (prop == null)
-                            throw new KeyNotFoundException($"Property '{propName}' not found.");
+                        var prop = (current?.GetType().GetProperty(propName)) ?? throw new KeyNotFoundException($"Property '{propName}' not found.");
                         current = prop.GetValue(current);
                     }
                 }
                 else if (token.Type == PathTokenType.LBracket)
                 {
-                    if (_pos >= _tokens.Count || _tokens[_pos].Type != PathTokenType.Expression)
+                    if (_pos >= _tokens.Count || _tokens[pos].Type != PathTokenType.Expression)
                         throw new InvalidOperationException("Expected expression inside brackets.");
 
-                    string innerExprText = _tokens[_pos++].Value;
+                    string innerExprText = _tokens[pos++].Value;
 
-                    if (_pos >= _tokens.Count || _tokens[_pos].Type != PathTokenType.RBracket)
+                    if (pos >= _tokens.Count || _tokens[pos].Type != PathTokenType.RBracket)
                         throw new InvalidOperationException("Missing closing ']' in path.");
-                    _pos++;
+                    pos++;
 
                     int idx;
                     using (var scope = _serviceProvider.CreateScope())
                     {
                         var lexerForExpr = scope.ServiceProvider.GetRequiredService<ILexer<Token>>();
                         var parserForExpr = scope.ServiceProvider.GetRequiredService<IParser<Token>>();
-
                         var evalResult = Eval.Execute<int>(lexerForExpr, parserForExpr, innerExprText, _variables);
                         if (!evalResult.TryGetValue(out idx))
                             throw new InvalidOperationException($"Index expression '{innerExprText}' did not evaluate to int.");
                     }
 
-                    if (current is JArray jArr)
-                    {
-                        while (jArr.Count <= idx)
-                            jArr.Add(JValue.CreateNull());
-                        current = jArr[idx];
-                    }
-                    else if (current is IList list)
+                    parent = current;
+                    lastIndex = idx;
+                    lastKey = null;
+
+                    if (current is IList<object?> list)
                     {
                         while (list.Count <= idx)
-                            list.Add(null!);
+                            list.Add(null);
                         current = list[idx];
                     }
                     else
@@ -215,35 +199,29 @@ namespace EchoPhase.Scripting.Parsers
                 }
             }
 
-            if (parent != null && lastToken != null)
+            if (parent != null)
             {
-                if (lastToken.Type == PathTokenType.Identifier)
-                {
-                    if (parent is JObject jObj)
-                        jObj[lastToken.Value] = value == null ? JValue.CreateNull() : JToken.FromObject(value);
-                    else if (parent is IDictionary<string, object> dict)
-                        dict[lastToken.Value] = value ?? JValue.CreateNull();
-                }
-                else if (lastToken.Type == PathTokenType.LBracket && lastIndex.HasValue)
-                {
-                    if (parent is JArray jArr)
-                    {
-                        Console.WriteLine($"[DEBUG] JArray assignment at index {lastIndex.Value}: Current Value={jArr[lastIndex.Value]}, New Value={value}");
-                        jArr[lastIndex.Value] = value == null ? JValue.CreateNull() : JToken.FromObject(value);
-                    }
-                    else if (parent is IList list)
-                    {
-                        Console.WriteLine($"[DEBUG] IList assignment at index {lastIndex.Value}: Current Value={list[lastIndex.Value]}, New Value={value}, Current Type={list[lastIndex.Value]?.GetType().Name ?? "null"}, Value Type={value?.GetType().Name ?? "null"}");
-                        list[lastIndex.Value] = value;
-                    }
-                }
+                if (lastKey != null && parent is IDictionary<string, object?> dict)
+                    dict[lastKey] = value;
+                else if (lastIndex.HasValue && parent is IList<object?> list)
+                    list[lastIndex.Value] = value;
             }
             else
             {
-                _variables[varName] = value == null ? JValue.CreateNull() : value;
+                _variables[varName] = value!;
             }
 
             return _variables;
         }
+
+        private static object? GetJsonSimpleValue(JsonElement elem) => elem.ValueKind switch
+        {
+            JsonValueKind.String => elem.GetString(),
+            JsonValueKind.Number => elem.TryGetInt64(out long l) ? l : elem.GetDouble(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            _ => elem.GetRawText()
+        };
     }
 }

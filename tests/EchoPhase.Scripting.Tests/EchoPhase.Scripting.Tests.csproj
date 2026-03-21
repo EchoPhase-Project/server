@@ -10,10 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-	<PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\src\EchoPhase.Scripting\EchoPhase.Scripting.csproj" />
     <ProjectReference Include="..\..\src\EchoPhase.Types\EchoPhase.Types.csproj" />
     <ProjectReference Include="..\..\src\EchoPhase.Profilers\EchoPhase.Profilers.csproj" />

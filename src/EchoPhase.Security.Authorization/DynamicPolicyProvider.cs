@@ -1,10 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Options;
-using System.Reflection;
-using EchoPhase.Security.Authorization.Builders;
-using EchoPhase.Security.Authorization.Attributes;
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Collections.Concurrent;
+using System.Reflection;
+using EchoPhase.Security.Authorization.Attributes;
+using EchoPhase.Security.Authorization.Builders;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace EchoPhase.Security.Authorization
 {

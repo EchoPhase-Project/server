@@ -1,20 +1,21 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
-using EchoPhase.DAL.Postgres.Repositories.Options;
 using EchoPhase.DAL.Redis.Interfaces;
 using EchoPhase.DAL.Redis.Models;
-using EchoPhase.Types.Repository;
 using EchoPhase.Types.Service;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
-using UserOptions = EchoPhase.DAL.Postgres.Repositories.Options.UserOptions;
 
 namespace EchoPhase.Identity
 {
-    public class UserService : DataServiceBase<User, UserRepository, UserOptions>, IUserService
+    public class UserService : DataServiceBase<User, UserRepository>, IUserService
     {
         private readonly PostgresContext _context;
         private readonly UserManager<User> _userManager;
@@ -57,9 +58,14 @@ namespace EchoPhase.Identity
         public Task<IdentityResult> DeleteUserAsync(User user)
             => _userManager.DeleteAsync(user);
 
-        public async Task<User> GetAsync(ClaimsPrincipal userPrincipal) =>
-            await _userManager.GetUserAsync(userPrincipal) ??
-                throw new InvalidOperationException("User not found.");
+        public async Task<User?> GetAsync(ClaimsPrincipal principal)
+        {
+            var sub = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (sub is null || !Guid.TryParse(sub, out var userId))
+                return null;
+
+            return await _userManager.FindByIdAsync(userId.ToString());
+        }
 
         public async Task<string> GetOrSetCodeAsync(User user)
         {

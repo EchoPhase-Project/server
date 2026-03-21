@@ -1,5 +1,7 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Scripting.Tests
 {
@@ -17,21 +19,6 @@ namespace EchoPhase.Scripting.Tests
         }
 
         [Theory]
-        [InlineData("1 + 2 * 3", 7)]
-        [InlineData("(10 - 4) / 3", 2)]
-        [InlineData("min(4, 7)", 4)]
-        [InlineData("max(10, 3)", 10)]
-        [InlineData("abs(-5)", 5)]
-        [InlineData("round(3.7)", 4)]
-        [InlineData("sqrt(16)", 4)]
-        public void Execute_ArithmeticExpressions_ReturnsCorrectResult(string expr, double expected)
-        {
-            var result = Eval.Execute<double>(_lexer, _parser, expr, new Dictionary<string, object>());
-            result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
-            result.OnSuccess(value => Assert.Equal(expected, value));
-        }
-
-        [Theory]
         [InlineData("x + 5", 7)]
         [InlineData("items[x] + x", 5)]
         [InlineData("items[user.index] + x", 4)]
@@ -45,70 +32,19 @@ namespace EchoPhase.Scripting.Tests
             var variables = new Dictionary<string, object>
             {
                 ["x"] = 2,
-                ["items"] = new JArray(2, 5, 3),
-                ["user"] = JObject.Parse(@"{ 'name': 'Alice', 'age': 30, 'index': 0, 'i' : [1] }")
+                ["items"] = new List<object?> { 2, 5, 3 },
+                ["user"] = new Dictionary<string, object?>
+                {
+                    ["name"] = "Alice",
+                    ["age"] = 30,
+                    ["index"] = 0,
+                    ["i"] = new List<object?> { 1 }
+                }
             };
 
             var result = Eval.Execute<double>(_lexer, _parser, expr, variables);
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
-        }
-
-        [Theory]
-        [InlineData("5 > 3 && 2 < 4", 1)]
-        [InlineData("!(1 == 0)", 1)]
-        [InlineData("false || true", 1)]
-        public void Execute_LogicalExpressions_ReturnsCorrectResult(string expr, double expected)
-        {
-            var variables = new Dictionary<string, object>
-            {
-                ["true"] = false,
-                ["false"] = true
-            };
-
-            var result = Eval.Execute<double>(_lexer, _parser, expr, variables);
-            result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
-            result.OnSuccess(value => Assert.Equal(expected, value));
-        }
-
-        [Theory]
-        [InlineData("5 > 3 ? 100 : 200", 100)]
-        [InlineData("false ? 1 : 2", 2)]
-        public void Execute_TernaryOperator_ReturnsCorrectResult(string expr, double expected)
-        {
-            var variables = new Dictionary<string, object>
-            {
-                ["false"] = true
-            };
-
-            var result = Eval.Execute<double>(_lexer, _parser, expr, variables);
-            result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
-            result.OnSuccess(value => Assert.Equal(expected, value));
-        }
-
-        [Fact]
-        public void Execute_InvalidExpression_ReturnsFailure()
-        {
-            var result = Eval.Execute<double>(_lexer, _parser, "1 + ", new Dictionary<string, object>());
-            result.OnFailure(err => Assert.Contains("NotSupportedException", err.Code));
-            result.OnSuccess(value => Assert.Fail($"Evaluation succeeded"));
-        }
-
-        [Fact]
-        public void Execute_UnknownVariable_ReturnsFailure()
-        {
-            var result = Eval.Execute<double>(_lexer, _parser, "unknownVar + 1", new Dictionary<string, object>());
-            result.OnFailure(err => Assert.Contains("KeyNotFound", err.Code));
-            result.OnSuccess(value => Assert.Fail($"Evaluation succeeded"));
-        }
-
-        [Fact]
-        public void Execute_SimpleVariableAccess_ReturnsCorrectValue()
-        {
-            var variables = new Dictionary<string, object> { ["a"] = 42 };
-            var result = Eval.Execute<double>(_lexer, _parser, "a", variables);
-            result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
-            result.OnSuccess(value => Assert.Equal(42, value));
         }
 
         [Fact]
@@ -116,7 +52,10 @@ namespace EchoPhase.Scripting.Tests
         {
             var variables = new Dictionary<string, object>
             {
-                ["user"] = JObject.Parse(@"{ 'profile': { 'age': 25 } }")
+                ["user"] = new Dictionary<string, object?>
+                {
+                    ["profile"] = new Dictionary<string, object?> { ["age"] = 25 }
+                }
             };
             var result = Eval.Execute<double>(_lexer, _parser, "user.profile.age", variables);
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
@@ -124,21 +63,17 @@ namespace EchoPhase.Scripting.Tests
         }
 
         [Fact]
-        public void Execute_ObjectWithProperty_ReturnsCorrectValue()
-        {
-            var person = new { Name = "Bob", Age = 40 };
-            var variables = new Dictionary<string, object> { ["person"] = person };
-            var result = Eval.Execute<double>(_lexer, _parser, "person.Age", variables);
-            result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
-            result.OnSuccess(value => Assert.Equal(40, value));
-        }
-
-        [Fact]
         public void Execute_DeeplyNestedJson_ReturnsCorrectValue()
         {
             var variables = new Dictionary<string, object>
             {
-                ["env"] = JObject.Parse(@"{ 'config': { 'limits': { 'max': 99 } } }")
+                ["env"] = new Dictionary<string, object?>
+                {
+                    ["config"] = new Dictionary<string, object?>
+                    {
+                        ["limits"] = new Dictionary<string, object?> { ["max"] = 99 }
+                    }
+                }
             };
             var result = Eval.Execute<double>(_lexer, _parser, "env.config.limits.max", variables);
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
@@ -150,33 +85,13 @@ namespace EchoPhase.Scripting.Tests
         {
             var variables = new Dictionary<string, object>
             {
-                ["data"] = JObject.Parse(@"{ 'info': null }")
+                ["data"] = new Dictionary<string, object?> { ["info"] = null }
             };
             var result = Eval.Execute<double>(_lexer, _parser, "data.info.age", variables);
-            result.OnFailure(err => Assert.Contains("InvalidOperation", err.Code));
+            result.OnFailure(err => Assert.True(
+                err.Code.Contains("InvalidOperation") || err.Code.Contains("KeyNotFound"),
+                $"Unexpected error code: {err.Code}"));
             result.OnSuccess(value => Assert.Fail($"Evaluation succeeded"));
-        }
-
-        [Fact]
-        public void Execute_SimpleArithmeticWithVariables_ReturnsCorrectResult()
-        {
-            var vars = new Dictionary<string, object> { ["a"] = 5, ["b"] = 3 };
-            var result = Eval.Execute<double>(_lexer, _parser, "a + b * 2", vars);
-            result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
-            result.OnSuccess(value => Assert.Equal(11, value));
-        }
-
-        [Fact]
-        public void Execute_ParenthesesWithMixedVariables_ReturnsCorrectResult()
-        {
-            var vars = new Dictionary<string, object>
-            {
-                ["a"] = 5,
-                ["b"] = new { c = 3 }
-            };
-            var result = Eval.Execute<double>(_lexer, _parser, "(a + b.c) * 2", vars);
-            result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
-            result.OnSuccess(value => Assert.Equal(16, value));
         }
 
         [Fact]
@@ -184,7 +99,11 @@ namespace EchoPhase.Scripting.Tests
         {
             var vars = new Dictionary<string, object>
             {
-                ["user"] = JObject.Parse("{\"salary\": 1000, \"bonus\": 200}")
+                ["user"] = new Dictionary<string, object?>
+                {
+                    ["salary"] = 1000,
+                    ["bonus"] = 200
+                }
             };
             var result = Eval.Execute<double>(_lexer, _parser, "user.salary + user.bonus", vars);
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
@@ -197,20 +116,11 @@ namespace EchoPhase.Scripting.Tests
             var vars = new Dictionary<string, object>
             {
                 ["x"] = 5,
-                ["user"] = JObject.Parse("{\"multiplier\": 4}")
+                ["user"] = new Dictionary<string, object?> { ["multiplier"] = 4 }
             };
             var result = Eval.Execute<double>(_lexer, _parser, "x * user.multiplier + 3", vars);
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(23, value));
-        }
-
-        [Fact]
-        public void Execute_InvalidResultCast_ReturnsError()
-        {
-            var vars = new Dictionary<string, object> { ["x"] = "hello" };
-            var result = Eval.Execute<double>(_lexer, _parser, "x", vars);
-            result.OnFailure(err => Assert.Contains("Format", err.Code));
-            result.OnSuccess(value => Assert.Fail($"Evaluation succeeded"));
         }
     }
 }

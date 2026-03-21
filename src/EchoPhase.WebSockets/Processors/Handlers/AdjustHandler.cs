@@ -1,10 +1,13 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Net.WebSockets;
+using EchoPhase.Security.BitMasks;
 using EchoPhase.Types.Result.Extensions;
 using EchoPhase.WebSockets.Attributes;
 using EchoPhase.WebSockets.Constants;
 using EchoPhase.WebSockets.Exceptions;
 using EchoPhase.WebSockets.Processors.Payloads;
-using EchoPhase.Security.BitMasks;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {

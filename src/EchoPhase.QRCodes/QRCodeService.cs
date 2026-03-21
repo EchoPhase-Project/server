@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Reflection;
 using EchoPhase.QRCodes.Generators;
 
@@ -17,25 +20,15 @@ namespace EchoPhase.QRCodes
 
             foreach (var type in generatorTypes)
             {
-                var attribute = type.GetCustomAttribute<QRFormatAttribute>();
-                if (attribute == null)
-                    throw new InvalidOperationException($"Generator type '{type.FullName}' is missing required QrFormatAttribute.");
-
+                var attribute = type.GetCustomAttribute<QRFormatAttribute>() ?? throw new InvalidOperationException($"Generator type '{type.FullName}' is missing required QrFormatAttribute.");
                 if (_generators.ContainsKey(attribute.Format))
                     throw new InvalidOperationException($"Duplicate generator registration for format {attribute.Format}.");
 
-                var ctor = type.GetConstructor(Type.EmptyTypes);
-                if (ctor == null)
-                    throw new InvalidOperationException($"Generator '{type.FullName}' missing default constructor.");
-
+                var ctor = type.GetConstructor(Type.EmptyTypes) ?? throw new InvalidOperationException($"Generator '{type.FullName}' missing default constructor.");
                 var factory = () =>
                 {
-                    var instance = Activator.CreateInstance(type) as IQRCodeGenerator;
-                    if (instance == null)
-                    {
-                        throw new InvalidOperationException(
+                    var instance = Activator.CreateInstance(type) as IQRCodeGenerator ?? throw new InvalidOperationException(
                             $"Type {type.Name} does not implement IQRCodeGenerator or failed to instantiate");
-                    }
                     return instance;
                 };
 

@@ -1,3 +1,7 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using EchoPhase.Configuration.Database;
 using EchoPhase.Configuration.Database.Redis;
@@ -5,7 +9,6 @@ using EchoPhase.Types.Result;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using UUIDNext;
-using System.Collections.Concurrent;
 
 
 namespace EchoPhase.Security.Cryptography.Vaults

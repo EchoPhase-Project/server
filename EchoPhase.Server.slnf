@@ -1,0 +1,31 @@
+{
+  "solution": {
+    "path": "EchoPhase.slnx",
+    "projects": [
+      "src/EchoPhase.Cli/EchoPhase.Cli.csproj",
+      "src/EchoPhase.Clients/EchoPhase.Clients.csproj",
+      "src/EchoPhase.Configuration/EchoPhase.Configuration.csproj",
+      "src/EchoPhase.DAL.Abstractions/EchoPhase.DAL.Abstractions.csproj",
+      "src/EchoPhase.DAL.Postgres/EchoPhase.DAL.Postgres.csproj",
+      "src/EchoPhase.DAL.Redis/EchoPhase.DAL.Redis.csproj",
+      "src/EchoPhase.DAL.Scylla/EchoPhase.DAL.Scylla.csproj",
+      "src/EchoPhase.Identity/EchoPhase.Identity.csproj",
+      "src/EchoPhase.Profilers/EchoPhase.Profilers.csproj",
+      "src/EchoPhase.Projection/EchoPhase.Projection.csproj",
+      "src/EchoPhase.QRCodes/EchoPhase.QRCodes.csproj",
+      "src/EchoPhase.Runners/EchoPhase.Runners.csproj",
+      "src/EchoPhase.Scheduling/EchoPhase.Scheduling.csproj",
+      "src/EchoPhase.Scripting/EchoPhase.Scripting.csproj",
+      "src/EchoPhase.Security.Antiforgery/EchoPhase.Security.Antiforgery.csproj",
+      "src/EchoPhase.Security.Authentication/EchoPhase.Security.Authentication.csproj",
+      "src/EchoPhase.Security.Authorization/EchoPhase.Security.Authorization.csproj",
+      "src/EchoPhase.Security.BitMasks/EchoPhase.Security.BitMasks.csproj",
+      "src/EchoPhase.Security.Cryptography/EchoPhase.Security.Cryptography.csproj",
+      "src/EchoPhase.Security.Hashers/EchoPhase.Security.Hashers.csproj",
+      "src/EchoPhase.Types/EchoPhase.Types.csproj",
+      "src/EchoPhase.WebHooks/EchoPhase.WebHooks.csproj",
+      "src/EchoPhase.WebSockets/EchoPhase.WebSockets.csproj",
+      "src/EchoPhase/EchoPhase.csproj"
+    ]
+  }
+}

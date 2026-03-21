@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using EchoPhase.Types.Result;
 using StackExchange.Redis;
 
@@ -43,9 +46,24 @@ namespace EchoPhase.Security.Cryptography.Vaults
         // GetOrSet
         // --------------------------
 
-        Task<IServiceResult<T>> GetOrSetAsync<T>(string key, Func<Task<T>>? generator = null);
-        Task<IServiceResult<T>> GetOrSetAsync<T>(string key, Func<T> generator);
-        IServiceResult<T> GetOrSet<T>(string key, Func<T>? generator = null);
+        Task<IServiceResult<T>> GetOrSetAsync<T>(
+            string key,
+            Func<Task<T>>? generator = null,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None);
+        Task<IServiceResult<T>> GetOrSetAsync<T>(
+            string key,
+            Func<T> generator,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None);
+        IServiceResult<T> GetOrSet<T>(
+            string key,
+            Func<T>? generator = null,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None);
 
         // --------------------------
         // Delete

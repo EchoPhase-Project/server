@@ -1,15 +1,18 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Collections;
 using System.Linq.Expressions;
 using System.Reflection;
 using Cassandra;
 using EchoPhase.DAL.Scylla.Interfaces;
+using EchoPhase.DAL.Scylla.Linq;
 
-namespace EchoPhase.DAL.Scylla
+namespace EchoPhase.DAL.Scylla.Database
 {
     public class DbSet<TEntity> : IQueryable<TEntity> where TEntity : class, new()
     {
         private readonly Database _database;
-        private readonly Expression _expression;
         private readonly QueryProvider _provider;
 
         public DbSet(IQueryProviderFactory factory)
@@ -19,26 +22,26 @@ namespace EchoPhase.DAL.Scylla
 
             _provider = factory.Create();
             _database = _provider.Database;
-            _expression = Expression.Constant(this);
+            Expression = Expression.Constant(this);
         }
 
         internal DbSet(QueryProvider provider, Expression expression)
         {
             _provider = provider ?? throw new ArgumentNullException(nameof(provider));
             _database = provider.Database;
-            _expression = expression ?? throw new ArgumentNullException(nameof(expression));
+            Expression = expression ?? throw new ArgumentNullException(nameof(expression));
         }
 
         #region IQueryable Implementation
 
         public IEnumerator<TEntity> GetEnumerator() =>
-            _provider.Execute<IEnumerable<TEntity>>(_expression).GetEnumerator();
+            _provider.Execute<IEnumerable<TEntity>>(Expression).GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         public Type ElementType => typeof(TEntity);
 
-        public Expression Expression => _expression;
+        public Expression Expression { get; }
 
         public IQueryProvider Provider => _provider;
 
@@ -127,10 +130,7 @@ namespace EchoPhase.DAL.Scylla
             if (keyValues == null || keyValues.Length == 0)
                 throw new ArgumentException("Key values must be provided", nameof(keyValues));
 
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-
+            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
             var pkNames = builder.GetPrimaryKey();
             if (pkNames == null || pkNames.Count == 0)
                 throw new InvalidOperationException($"No primary key defined for type {typeof(TEntity).Name}");
@@ -156,10 +156,7 @@ namespace EchoPhase.DAL.Scylla
             if (keyValues == null || keyValues.Length == 0)
                 throw new ArgumentException("Key values must be provided", nameof(keyValues));
 
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-
+            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
             var pkNames = builder.GetPrimaryKey();
             if (pkNames == null || pkNames.Count == 0)
                 throw new InvalidOperationException($"No primary key defined for type {typeof(TEntity).Name}");
@@ -182,20 +179,14 @@ namespace EchoPhase.DAL.Scylla
 
         public List<TEntity> ToList()
         {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-
+            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
             var cql = $"SELECT * FROM {builder.GetTableName()}";
             return _database.ExecuteQuery<TEntity>(cql, row => MapRowToEntity(row)).ToList();
         }
 
         public async Task<List<TEntity>> ToListAsync()
         {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-
+            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
             var cql = $"SELECT * FROM {builder.GetTableName()}";
             var results = await _database.ExecuteQueryAsync<TEntity>(cql, row => MapRowToEntity(row));
             return results.ToList();
@@ -203,20 +194,14 @@ namespace EchoPhase.DAL.Scylla
 
         public TEntity? FirstOrDefault()
         {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-
+            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
             var cql = $"SELECT * FROM {builder.GetTableName()} LIMIT 1";
             return _database.ExecuteQuery<TEntity>(cql, row => MapRowToEntity(row)).FirstOrDefault();
         }
 
         public async Task<TEntity?> FirstOrDefaultAsync()
         {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-
+            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
             var cql = $"SELECT * FROM {builder.GetTableName()} LIMIT 1";
             var results = await _database.ExecuteQueryAsync<TEntity>(cql, row => MapRowToEntity(row));
             return results.FirstOrDefault();
@@ -224,40 +209,28 @@ namespace EchoPhase.DAL.Scylla
 
         public long Count()
         {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-
+            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
             var cql = $"SELECT COUNT(*) FROM {builder.GetTableName()}";
             return _database.ExecuteScalar<long>(cql);
         }
 
         public async Task<long> CountAsync()
         {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-
+            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
             var cql = $"SELECT COUNT(*) FROM {builder.GetTableName()}";
             return await _database.ExecuteScalarAsync<long>(cql);
         }
 
         public bool Any()
         {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-
+            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
             var cql = $"SELECT * FROM {builder.GetTableName()} LIMIT 1";
             return _database.ExecuteQuery(cql).Any();
         }
 
         public async Task<bool> AnyAsync()
         {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-
+            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
             var cql = $"SELECT * FROM {builder.GetTableName()} LIMIT 1";
             var results = await _database.ExecuteQueryAsync(cql);
             return results.Any();

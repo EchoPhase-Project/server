@@ -1,9 +1,12 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
 using EchoPhase.Clients.Helpers;
-using System.Net;
 
 namespace EchoPhase.Clients.Abstractions
 {
@@ -36,7 +39,7 @@ namespace EchoPhase.Clients.Abstractions
 
             var url = query != null
                 ? new UriBuilder(new Uri(baseUri, uri))
-                    { Query = _queryStringBuilder.Build(query) }.ToString()
+                { Query = _queryStringBuilder.Build(query) }.ToString()
                 : new Uri(baseUri, uri).ToString();
 
             using var request = new HttpRequestMessage(method, url);

@@ -1,3 +1,8 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+using ScyllaDatabase = EchoPhase.DAL.Scylla.Database.Database;
+
 namespace EchoPhase.DAL.Scylla.Interfaces
 {
     public interface IMigration
@@ -6,8 +11,8 @@ namespace EchoPhase.DAL.Scylla.Interfaces
         {
             get;
         }
-        Task Up(Database db);
-        Task Down(Database db);
-        Task<bool> Validate(Database db);
+        Task Up(ScyllaDatabase db);
+        Task Down(ScyllaDatabase db);
+        Task<bool> Validate(ScyllaDatabase db);
     }
 }

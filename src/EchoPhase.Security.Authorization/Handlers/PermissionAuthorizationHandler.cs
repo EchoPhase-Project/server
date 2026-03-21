@@ -1,9 +1,12 @@
-using EchoPhase.Security.Authorization.Requirements;
-using Microsoft.AspNetCore.Authorization;
-using EchoPhase.Security.BitMasks;
-using EchoPhase.Types.Result.Extensions;
-using EchoPhase.Types.BitMask;
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Security.Claims;
+using EchoPhase.Security.Authorization.Requirements;
+using EchoPhase.Security.BitMasks;
+using EchoPhase.Types.BitMask;
+using EchoPhase.Types.Result.Extensions;
+using Microsoft.AspNetCore.Authorization;
 
 namespace EchoPhase.Security.Authorization.Handlers
 {
@@ -37,10 +40,9 @@ namespace EchoPhase.Security.Authorization.Handlers
                 return Task.CompletedTask;
             }
 
-            var requiredKeyBits = ResourcePermissionsBitMask.KeyMask
+            _ = ResourcePermissionsBitMask.KeyMask
                 .Add(BitMaskBase.Empty, requirement.Resources);
-
-            var requiredValBits = _mask
+            _ = _mask
                 .Add(BitMaskBase.Empty, requirement.Permissions);
 
             foreach (var (keyBits, valBits) in bitmasks)

@@ -1,15 +1,15 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Security.Claims;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
-using EchoPhase.DAL.Postgres.Repositories.Options;
-using EchoPhase.Types.Repository;
 using EchoPhase.Types.Service;
 using Microsoft.AspNetCore.Identity;
-using RepositoryUserOptions = EchoPhase.DAL.Postgres.Repositories.Options.UserOptions;
 
 namespace EchoPhase.Identity
 {
-    public interface IUserService : IDataServiceBase<User, UserRepository, RepositoryUserOptions>
+    public interface IUserService : IDataServiceBase<User, UserRepository>
     {
         Task<IdentityResult> CreateUserAsync(
             string name,
@@ -17,7 +17,7 @@ namespace EchoPhase.Identity
             string password,
             params string[] roles);
         Task<IdentityResult> DeleteUserAsync(User user);
-        Task<User> GetAsync(ClaimsPrincipal userPrincipal);
+        Task<User?> GetAsync(ClaimsPrincipal userPrincipal);
         Task<string> GetOrSetCodeAsync(User user);
         Task<IDictionary<Guid, string>> GetOrSetCodesAsync(params IEnumerable<User> users);
         Task<Guid> GetIdFromCode(string code);

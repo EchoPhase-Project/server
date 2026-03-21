@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Dynamic;
@@ -7,7 +10,6 @@ using System.Text;
 using System.Text.Json;
 using EchoPhase.Projection.Attributes;
 using EchoPhase.Projection.Options;
-using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Projection
 {
@@ -64,7 +66,7 @@ namespace EchoPhase.Projection
             collectionConfigs ??= new Dictionary<string, CollectionConfig>();
 
             return options.UseExpando
-                ? (object)ProjectToExpando(source!, fields, visited, options, collectionConfigs)
+                ? ProjectToExpando(source!, fields, visited, options, collectionConfigs)
                 : ProjectToDictionary(source!, fields, visited, options, collectionConfigs);
         }
 
@@ -85,7 +87,7 @@ namespace EchoPhase.Projection
             IReadOnlyDictionary<string, CollectionConfig> collectionConfigs)
         {
             var expando = new ExpandoObject();
-            FillDict((IDictionary<string, object?>)expando, source, includePaths, visited, options, collectionConfigs,
+            FillDict(expando, source, includePaths, visited, options, collectionConfigs,
                 (s, p, v) => ProjectToExpando(s, p, v, options, collectionConfigs));
             return expando;
         }
@@ -114,26 +116,6 @@ namespace EchoPhase.Projection
                         return jlist;
                     default:
                         return GetJsonSimpleValue(jsonElem);
-                }
-            }
-
-            if (source is JToken jtoken)
-            {
-                switch (jtoken.Type)
-                {
-                    case JTokenType.Object:
-                        var jtdict = new Dictionary<string, object?>();
-                        FillDict(jtdict, jtoken, includePaths, visited, options, collectionConfigs, recursion);
-                        return jtdict;
-                    case JTokenType.Array:
-                        var jtlist = new List<object?>();
-                        foreach (var item in (JArray)jtoken)
-                            jtlist.Add(ConvertToObject(item, includePaths, visited, options, collectionConfigs, recursion));
-                        return jtlist;
-                    case JTokenType.Null:
-                        return null;
-                    default:
-                        return jtoken is JValue jval ? jval.Value : jtoken.ToString();
                 }
             }
 
@@ -199,17 +181,6 @@ namespace EchoPhase.Projection
             if (source is JsonElement jsonElem)
             {
                 foreach (var prop in jsonElem.EnumerateObject())
-                {
-                    if (!ShouldInclude(prop.Name)) continue;
-                    dict[prop.Name] = ConvertToObject(prop.Value, SubPaths(includePaths, prop.Name),
-                        visited, options, collectionConfigs, recursion);
-                }
-                return;
-            }
-
-            if (source is JObject jobject)
-            {
-                foreach (var prop in jobject.Properties())
                 {
                     if (!ShouldInclude(prop.Name)) continue;
                     dict[prop.Name] = ConvertToObject(prop.Value, SubPaths(includePaths, prop.Name),

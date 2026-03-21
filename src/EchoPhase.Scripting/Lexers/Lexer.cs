@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using EchoPhase.Profilers;
 using EchoPhase.Scripting.Tokens;
 
@@ -130,7 +133,7 @@ namespace EchoPhase.Scripting.Lexers
             }
 
             if (depth != 0)
-                throw new Exception("Unterminated brackets in identifier");
+                throw new InvalidOperationException("Unterminated brackets in identifier");
         }
 
         private Token ReadString()
@@ -144,7 +147,7 @@ namespace EchoPhase.Scripting.Lexers
                     Advance();
 
                 if (IsAtEnd())
-                    throw new Exception("Unterminated string literal");
+                    throw new InvalidOperationException("Unterminated string literal");
 
                 int end = _pos;
                 Advance();
@@ -172,7 +175,7 @@ namespace EchoPhase.Scripting.Lexers
                         ">=" => TokenType.GreaterEq,
                         "&&" => TokenType.And,
                         "||" => TokenType.Or,
-                        _ => throw new Exception()
+                        _ => throw new NotSupportedException($"Unknown comparer: '{current}'")
                     }, two, 0, two.Length);
                 }
 
@@ -192,7 +195,7 @@ namespace EchoPhase.Scripting.Lexers
                     '>' => TokenType.Greater,
                     '!' => TokenType.Not,
                     '%' => TokenType.Mod,
-                    '=' => throw new Exception("Unexpected single '='; did you mean '=='?"),
+                    '=' => throw new InvalidOperationException("Unexpected single '='; did you mean '=='?"),
                     _ => throw new NotSupportedException($"Unknown character: '{current}'")
                 }, current.ToString(), 0, 1);
             }

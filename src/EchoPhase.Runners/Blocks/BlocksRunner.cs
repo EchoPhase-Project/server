@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using EchoPhase.Runners.Blocks.Contexts;
 using EchoPhase.Runners.Blocks.Handlers;
 using EchoPhase.Runners.Blocks.Models;
@@ -26,8 +29,7 @@ namespace EchoPhase.Runners.Blocks
 
         public async Task<IBlockExecutionContext> ExecuteAsync(IBlockExecutionContext context)
         {
-            if (context is null)
-                context = new BlockExecutionContext();
+            context ??= new BlockExecutionContext();
 
             var dict = context.Blocks.ToDictionary(b => b.Id);
             var queue = new Queue<int>();

@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,17 +25,11 @@ namespace EchoPhase.Runners.Blocks.Handlers
 
             foreach (var type in handlerTypes)
             {
-                var attribute = type.GetCustomAttribute<BlockTypeHandlerAttribute>();
-                if (attribute == null)
-                    throw new InvalidOperationException($"Handler type '{type.FullName}' is missing required BlockTypeHandlerAttribute.");
-
+                var attribute = type.GetCustomAttribute<BlockTypeHandlerAttribute>() ?? throw new InvalidOperationException($"Handler type '{type.FullName}' is missing required BlockTypeHandlerAttribute.");
                 if (_handlers.ContainsKey(attribute.Type))
                     throw new InvalidOperationException($"Duplicate handler registration for type {attribute.Type}.");
 
-                var ctor = type.GetConstructor(new Type[] { typeof(IServiceProvider) });
-                if (ctor == null)
-                    throw new InvalidOperationException($"Handler '{type.FullName}' missing default constructor.");
-
+                var ctor = type.GetConstructor(new Type[] { typeof(IServiceProvider) }) ?? throw new InvalidOperationException($"Handler '{type.FullName}' missing default constructor.");
                 var factory = () =>
                     (IBlockHandler)ActivatorUtilities.CreateInstance(_scope.ServiceProvider, type);
 

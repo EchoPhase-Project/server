@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using Microsoft.Extensions.Localization;
 
 namespace EchoPhase.Helpers
@@ -7,8 +10,7 @@ namespace EchoPhase.Helpers
         public static string GetTimeSince(DateTime date, IStringLocalizer localizer)
         {
             var timeSpan = DateTime.UtcNow - date;
-            string result = "";
-
+            string result;
             if (timeSpan.TotalMinutes < 1)
             {
                 int seconds = (int)timeSpan.TotalSeconds;

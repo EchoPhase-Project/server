@@ -1,8 +1,11 @@
-using EchoPhase.Clients.Discord.Models;
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using EchoPhase.Clients.Abstractions;
+using EchoPhase.Clients.Discord.Models;
 
 namespace EchoPhase.Clients.Discord
 {

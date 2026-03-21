@@ -1,8 +1,11 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Linq.Expressions;
 using System.Reflection;
 using EchoPhase.DAL.Scylla.Interfaces;
 
-namespace EchoPhase.DAL.Scylla
+namespace EchoPhase.DAL.Scylla.Builders
 {
     public class EntityBuilder<TEntity> : IEntityBuilder<TEntity> where TEntity : class
     {
@@ -12,30 +15,27 @@ namespace EchoPhase.DAL.Scylla
         private readonly List<string> _clusteringKeys = new();
         private readonly HashSet<string> _ignoredProperties = new();
 
-        private string? _tableName;
-        private string? _keyspace;
-
         #region Table Configuration
 
-        public string? TableName => _tableName;
-        public string? Keyspace => _keyspace;
+        public string? TableName { get; private set; }
+        public string? Keyspace { get; private set; }
 
         public IEntityBuilder<TEntity> ToTable(string name, string? keyspace = null)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Table name cannot be null or empty", nameof(name));
 
-            _tableName = name;
-            _keyspace = keyspace;
+            TableName = name;
+            Keyspace = keyspace;
             return this;
         }
 
-        public string GetTableName() => _tableName ?? typeof(TEntity).Name.ToLowerInvariant();
+        public string GetTableName() => TableName ?? typeof(TEntity).Name.ToLowerInvariant();
 
         public string GetFullTableName() =>
-            string.IsNullOrEmpty(_keyspace)
+            string.IsNullOrEmpty(Keyspace)
                 ? GetTableName()
-                : $"{_keyspace}.{GetTableName()}";
+                : $"{Keyspace}.{GetTableName()}";
 
         #endregion
 
@@ -149,8 +149,8 @@ namespace EchoPhase.DAL.Scylla
 
         public void Validate()
         {
-            if (string.IsNullOrWhiteSpace(_tableName))
-                _tableName = typeof(TEntity).Name.ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(TableName))
+                TableName = typeof(TEntity).Name.ToLowerInvariant();
 
             if (!_partitionKeys.Any())
                 throw new InvalidOperationException(

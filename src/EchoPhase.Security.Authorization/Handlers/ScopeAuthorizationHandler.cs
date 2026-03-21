@@ -1,8 +1,11 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Security.Claims;
 using EchoPhase.Security.Authorization.Requirements;
-using Microsoft.AspNetCore.Authorization;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Types.Result.Extensions;
-using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace EchoPhase.Security.Authorization.Handlers
 {
@@ -30,7 +33,7 @@ namespace EchoPhase.Security.Authorization.Handlers
             if (!deserialized.Successful || !deserialized.TryGetValue(out var bitmask))
             {
                 if (deserialized.TryGetError(out var err))
-                context.Fail();
+                    context.Fail();
                 return Task.CompletedTask;
             }
 

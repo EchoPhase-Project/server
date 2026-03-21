@@ -1,13 +1,18 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Linq.Expressions;
 using Cassandra;
 using EchoPhase.DAL.Scylla.Cql;
+using EchoPhase.DAL.Scylla.Database;
+using ScyllaDatabase = EchoPhase.DAL.Scylla.Database.Database;
 
-namespace EchoPhase.DAL.Scylla
+namespace EchoPhase.DAL.Scylla.Linq
 {
     public class QueryProvider : IQueryProvider
     {
         public readonly DbContext _context;
-        public Database Database => _context.Database;
+        public ScyllaDatabase Database => _context.Database;
 
         public QueryProvider(DbContext dbContext)
         {

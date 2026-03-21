@@ -1,8 +1,11 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Distributed;
 using UUIDNext;
-using System.Collections.Concurrent;
 
-namespace EchoPhase.DAL.Redis
+namespace EchoPhase.DAL.Redis.Database
 {
     public class CacheSet<T>
     {

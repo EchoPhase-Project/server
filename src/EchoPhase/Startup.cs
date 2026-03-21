@@ -1,4 +1,8 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Reflection;
+using EchoPhase.Clients.Extensions;
 using EchoPhase.Configuration.Extensions;
 using EchoPhase.DAL.Postgres.Extensions;
 using EchoPhase.DAL.Postgres.Models;
@@ -9,7 +13,7 @@ using EchoPhase.Helpers;
 using EchoPhase.Hubs;
 using EchoPhase.Hubs.Managers;
 using EchoPhase.Identity;
-using EchoPhase.Interfaces;
+using EchoPhase.Interfaces.Services;
 using EchoPhase.Middlewares;
 using EchoPhase.Profilers.Extensions;
 using EchoPhase.Projection.Extensions;
@@ -161,6 +165,7 @@ namespace EchoPhase
 
             //services.AddTwitchClient(Configuration.GetSection("Twitch"));
             services.AddDiscordClient();
+            services.AddClientTokenProviders();
 
             services.AddHealthChecks()
                 .AddCheck("self", () => HealthCheckResult.Healthy());

@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Net.WebSockets;
 using System.Text.Json;
 using EchoPhase.WebSockets.Constants;
@@ -25,11 +28,7 @@ namespace EchoPhase.WebSockets.Processors.Handlers
 
         public async Task HandleAsync(WebSocket webSocket, string payloadJson)
         {
-            var payload = JsonSerializer.Deserialize<TPayload>(payloadJson, _serializerOptions);
-
-            if (payload is null)
-                throw new JsonException($"Failed to deserialize payload for type {typeof(TPayload).Name}.");
-
+            var payload = JsonSerializer.Deserialize<TPayload>(payloadJson, _serializerOptions) ?? throw new JsonException($"Failed to deserialize payload for type {typeof(TPayload).Name}.");
             await BeforeHandleAsync(webSocket, payload);
         }
 

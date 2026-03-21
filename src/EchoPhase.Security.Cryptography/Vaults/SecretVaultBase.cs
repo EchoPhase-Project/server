@@ -1,3 +1,7 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using EchoPhase.Configuration.Database;
@@ -5,7 +9,6 @@ using EchoPhase.Configuration.Database.Redis;
 using EchoPhase.Types.Result;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
-using System.Collections.Concurrent;
 using UUIDNext;
 
 // --------------------------
@@ -113,35 +116,42 @@ namespace EchoPhase.Security.Cryptography.Vaults
 
         public async Task<IServiceResult<T>> GetOrSetAsync<T>(
             string key,
-            Func<Task<T>>? generator = null)
+            Func<Task<T>>? generator = null,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None)
         {
             if (await ExistsAsync(key))
                 return await GetAsync<T>(key);
-
             generator ??= () => Task.FromResult(default(T)!);
             var value = await generator();
-
-            if (await SetAsync(key, value, when: When.NotExists))
+            if (await SetAsync(key, value, expiry, keepTtl, When.NotExists, flags))
                 return ServiceResult<T>.Success(value);
-
             return ServiceResult<T>.Failure(err =>
                 err.Set("InvalidOperation", $"Failed to save '{key}' to storage."));
         }
 
-        public Task<IServiceResult<T>> GetOrSetAsync<T>(string key, Func<T> generator) =>
-            GetOrSetAsync<T>(key, () => Task.FromResult(generator()));
+        public Task<IServiceResult<T>> GetOrSetAsync<T>(
+            string key,
+            Func<T> generator,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None) =>
+            GetOrSetAsync<T>(key, () => Task.FromResult(generator()), expiry, keepTtl, flags);
 
-        public IServiceResult<T> GetOrSet<T>(string key, Func<T>? generator = null)
+        public IServiceResult<T> GetOrSet<T>(
+            string key,
+            Func<T>? generator = null,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None)
         {
             if (Exists(key))
                 return Get<T>(key);
-
             generator ??= () => default!;
             var value = generator();
-
-            if (Set(key, value, when: When.NotExists))
+            if (Set(key, value, expiry, keepTtl, When.NotExists, flags))
                 return ServiceResult<T>.Success(value);
-
             return ServiceResult<T>.Failure(err =>
                 err.Set("InvalidOperation", $"Failed to save '{key}' to storage."));
         }
@@ -163,8 +173,8 @@ namespace EchoPhase.Security.Cryptography.Vaults
         protected byte[] Serialize<T>(T value) => value switch
         {
             byte[] bytes => bytes,
-            string str   => Encoding.UTF8.GetBytes(str),
-            _            => Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, JsonOptions))
+            string str => Encoding.UTF8.GetBytes(str),
+            _ => Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, JsonOptions))
         };
 
         protected IServiceResult<T> Deserialize<T>(string key, byte[] raw)

@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Text;
 using EchoPhase.Profilers;
 using EchoPhase.Scripting.Tokens;
@@ -96,7 +99,7 @@ namespace EchoPhase.Scripting.Lexers
                     _pos++;
                 }
 
-                if (depth != 0) throw new Exception("Unmatched ( in expression");
+                if (depth != 0) throw new InvalidOperationException("Unmatched ( in expression");
 
                 var content = _input.Substring(start, _pos - start);
                 _pos++;

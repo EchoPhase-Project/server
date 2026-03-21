@@ -1,15 +1,15 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Text.Json;
 using EchoPhase.DAL.Redis.Interfaces;
 using EchoPhase.Types.Extensions;
 using Microsoft.Extensions.Caching.Distributed;
 
-namespace EchoPhase.DAL.Redis
+namespace EchoPhase.DAL.Redis.Database
 {
     public class CacheEntry<T> : ICacheEntry<T>
     {
-        private readonly string _cacheKey;
-        private readonly Guid _tenantId;
-        private readonly string _key;
         private readonly IDistributedCache _cache;
 
         public CacheEntry(
@@ -19,54 +19,44 @@ namespace EchoPhase.DAL.Redis
             string key)
         {
             _cache = cache;
-            _cacheKey = cacheKey;
-            _tenantId = tenantId;
-            _key = key;
+            CacheKey = cacheKey;
+            TenantId = tenantId;
+            Key = key;
         }
 
-        public Guid TenantId => _tenantId;
-        public string Key => _key;
-        public string CacheKey => _cacheKey;
+        public Guid TenantId { get; }
+        public string Key { get; }
+        public string CacheKey { get; }
 
         public virtual async Task<T> GetOrSetAsync(Func<Task<T>> getData, TimeSpan cacheDuration)
         {
             try
             {
-                T result = await GetAsync();
-                return result;
-            }
-            catch (NullReferenceException)
-            {
-                return await SetAsync(getData, cacheDuration);
+                return await GetAsync();
             }
             catch (InvalidOperationException)
             {
-                await RemoveAsync();
                 return await SetAsync(getData, cacheDuration);
-            }
-            catch (Exception)
-            {
-                throw;
             }
         }
 
         public virtual async Task<T> GetAsync()
         {
-            string? cachedData = await _cache.GetStringAsync(_cacheKey);
-            if (cachedData is null)
-                throw new NullReferenceException($"Data not found in cache for tenant {_tenantId}, key {_key} (cache key: {_cacheKey}).");
+            string? cachedData = await _cache.GetStringAsync(CacheKey) ??
+                throw new InvalidOperationException($"Data not found in cache for tenant {TenantId}, key {Key} (cache key: {CacheKey}).");
+
             try
             {
                 T? result = JsonSerializer.Deserialize<T>(cachedData);
                 if (EqualityComparer<T>.Default.Equals(result, default(T)))
-                    throw new InvalidOperationException($"Unable to deserialize result for tenant {_tenantId}, key {_key}.");
+                    throw new InvalidOperationException($"Unable to deserialize result for tenant {TenantId}, key {Key}.");
                 if (result is null)
-                    throw new NullReferenceException($"Data is null for tenant {_tenantId}, key {_key}.");
+                    throw new InvalidOperationException($"Data is null for tenant {TenantId}, key {Key}.");
                 return result;
             }
             catch (JsonException ex)
             {
-                throw new InvalidOperationException($"Error deserializing data for tenant {_tenantId}, key {_key}: {ex.Message}.", ex);
+                throw new InvalidOperationException($"Error deserializing data for tenant {TenantId}, key {Key}: {ex.Message}.", ex);
             }
         }
 
@@ -80,7 +70,7 @@ namespace EchoPhase.DAL.Redis
         public virtual async Task SetAsync(T data, TimeSpan cacheDuration)
         {
             string serializedData = JsonSerializer.Serialize(data);
-            await _cache.SetStringAsync(_cacheKey, serializedData, new DistributedCacheEntryOptions
+            await _cache.SetStringAsync(CacheKey, serializedData, new DistributedCacheEntryOptions
             {
                 AbsoluteExpirationRelativeToNow = cacheDuration
             });
@@ -93,6 +83,6 @@ namespace EchoPhase.DAL.Redis
             await GetOrSetAsync(getData.ToAsync(), cacheDuration);
 
         public virtual async Task RemoveAsync() =>
-            await _cache.RemoveAsync(_cacheKey);
+            await _cache.RemoveAsync(CacheKey);
     }
 }

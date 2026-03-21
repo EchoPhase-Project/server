@@ -1,0 +1,11 @@
+{
+  "solution": {
+    "path": "../EchoPhase.slnx",
+    "projects": [
+      "tests/EchoPhase.Security.Cryptography.Tests/EchoPhase.Security.Cryptography.Tests.csproj",
+      "tests/EchoPhase.Scripting.Tests/EchoPhase.Scripting.Tests.csproj",
+      "tests/EchoPhase.Projection.Tests/EchoPhase.Projection.Tests.csproj",
+      "tests/EchoPhase.Scheduling.Tests/EchoPhase.Scheduling.Tests.csproj"
+    ]
+  }
+}

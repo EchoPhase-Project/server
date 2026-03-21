@@ -16,4 +16,8 @@
     <ProjectReference Include="..\EchoPhase.Types\EchoPhase.Types.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="UUIDNext" />
+  </ItemGroup>
+
 </Project>

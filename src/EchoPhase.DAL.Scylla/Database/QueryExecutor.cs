@@ -1,10 +1,13 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Cassandra;
 using EchoPhase.DAL.Scylla.Interfaces;
 using ISession = Cassandra.ISession;
 
-namespace EchoPhase.DAL.Scylla
+namespace EchoPhase.DAL.Scylla.Database
 {
     public class QueryExecutor
     {

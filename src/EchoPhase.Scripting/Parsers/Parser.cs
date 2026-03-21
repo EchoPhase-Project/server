@@ -1,9 +1,12 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Globalization;
+using System.Text.Json;
 using EchoPhase.Profilers;
 using EchoPhase.Scripting.Extensions;
 using EchoPhase.Scripting.Lexers;
 using EchoPhase.Scripting.Tokens;
-using Newtonsoft.Json.Linq;
 
 namespace EchoPhase.Scripting.Parsers
 {
@@ -34,15 +37,15 @@ namespace EchoPhase.Scripting.Parsers
             _variables = variables;
         }
 
-        private Token Current =>
+        private Token current =>
             _pos < _tokens.Count
                 ? _tokens[_pos]
-                : throw new IndexOutOfRangeException($"Unexpected end of input: {_tokens[^1]} {_pos}");
+                : throw new InvalidOperationException($"Unexpected end of input: {_tokens[^1]} {_pos}");
 
         private Token Advance()
         {
             if (_pos >= _tokens.Count)
-                throw new IndexOutOfRangeException($"Unexpected end of input: {_tokens[^1]} {_pos}");
+                throw new InvalidOperationException($"Unexpected end of input: {_tokens[^1]} {_pos}");
             return _tokens[_pos++];
         }
 
@@ -58,7 +61,7 @@ namespace EchoPhase.Scripting.Parsers
 
                 while (true)
                 {
-                    var next = Current;
+                    var next = current;
                     if (!BindingPower(next.Type, out var lbp, out var rbp) || lbp < minBindingPower)
                         break;
 
@@ -67,8 +70,8 @@ namespace EchoPhase.Scripting.Parsers
                     if (next.Type == TokenType.Question)
                     {
                         var trueExpr = ParseExpression();
-                        if (Current.Type != TokenType.Colon)
-                            throw new Exception("Expected ':' in ternary expression");
+                        if (current.Type != TokenType.Colon)
+                            throw new InvalidOperationException("Expected ':' in ternary expression");
                         Advance();
                         var falseExpr = ParseExpression(rbp);
                         left = ToBool(left) ? trueExpr : falseExpr;
@@ -98,8 +101,8 @@ namespace EchoPhase.Scripting.Parsers
                     TokenType.LParen =>
                         ParseExpression().Also(_ =>
                         {
-                            if (Current.Type != TokenType.RParen)
-                                throw new Exception("Expected closing parenthesis");
+                            if (current.Type != TokenType.RParen)
+                                throw new InvalidOperationException("Expected closing parenthesis");
                             Advance();
                         }),
                     _ => throw new NotSupportedException($"Unexpected token: {token.Type}")
@@ -150,15 +153,15 @@ namespace EchoPhase.Scripting.Parsers
             {
                 Advance();
                 var args = new List<object>();
-                if (Current.Type != TokenType.RParen)
+                if (current.Type != TokenType.RParen)
                 {
                     do
                     {
                         args.Add(ParseExpression());
-                    } while (Current.Type == TokenType.Comma && Advance() != null);
+                    } while (current.Type == TokenType.Comma && Advance() != null);
                 }
-                if (Current.Type != TokenType.RParen)
-                    throw new Exception("Expected ')' after function arguments");
+                if (current.Type != TokenType.RParen)
+                    throw new InvalidOperationException("Expected ')' after function arguments");
                 Advance();
 
                 return name switch
@@ -179,7 +182,7 @@ namespace EchoPhase.Scripting.Parsers
             {
                 var name = token.Text.ToString().ToLowerInvariant();
 
-                if (Current.Type == TokenType.LParen)
+                if (current.Type == TokenType.LParen)
                     return ParseFunctionCall(name);
 
                 return name switch
@@ -203,10 +206,11 @@ namespace EchoPhase.Scripting.Parsers
 
             if (value is bool b) return b ? 1 : 0;
 
-            if (value is JValue jv)
+            if (value is JsonElement je)
             {
-                if (jv.Type == JTokenType.Boolean) return jv.Value<bool>() ? 1 : 0;
-                return Convert.ToDouble(jv.Value, CultureInfo.InvariantCulture);
+                if (je.ValueKind == JsonValueKind.True) return 1;
+                if (je.ValueKind == JsonValueKind.False) return 0;
+                return je.TryGetDouble(out var d) ? d : 0;
             }
 
             return Convert.ToDouble(value, CultureInfo.InvariantCulture);
@@ -214,33 +218,39 @@ namespace EchoPhase.Scripting.Parsers
 
         private bool ToBool(object? value)
         {
-            if (value == null)
-                return false;
-
+            if (value == null) return false;
             if (value is string s) return !string.IsNullOrEmpty(s);
-
             if (value is bool b) return b;
-
             if (value is double d) return Math.Abs(d) > double.Epsilon;
 
-            if (value is JValue jv)
+            if (value is JsonElement je)
             {
-                if (jv.Type == JTokenType.Boolean) return jv.Value<bool>();
-                return Convert.ToDouble(jv.Value, CultureInfo.InvariantCulture) != 0;
+                if (je.ValueKind == JsonValueKind.True) return true;
+                if (je.ValueKind == JsonValueKind.False) return false;
+                return je.TryGetDouble(out var jd) && Math.Abs(jd) > double.Epsilon;
             }
 
-            try
-            {
-                double num = Convert.ToDouble(value, CultureInfo.InvariantCulture);
-                return Math.Abs(num) > double.Epsilon;
-            }
-            catch
-            {
-                return false;
-            }
+            try { return Math.Abs(Convert.ToDouble(value, CultureInfo.InvariantCulture)) > double.Epsilon; }
+            catch { return false; }
         }
 
-        private static readonly Dictionary<Type, int> TypePriority = new()
+        private object UnwrapValue(object obj)
+        {
+            if (obj is JsonElement je)
+            {
+                return je.ValueKind switch
+                {
+                    JsonValueKind.String => je.GetString()!,
+                    JsonValueKind.Number => je.TryGetInt64(out long l) ? (object)l : je.GetDouble(),
+                    JsonValueKind.True => true,
+                    JsonValueKind.False => false,
+                    _ => je.GetRawText()
+                };
+            }
+            return obj;
+        }
+
+        private static readonly Dictionary<Type, int> typePriority = new()
         {
             { typeof(byte), 1 },
             { typeof(sbyte), 1 },
@@ -255,13 +265,6 @@ namespace EchoPhase.Scripting.Parsers
             { typeof(decimal), 7 },
             { typeof(string), 8 },
         };
-
-        private object UnwrapValue(object obj)
-        {
-            if (obj is JValue jval)
-                return jval.Value!;
-            return obj;
-        }
 
         private bool CompareOperands(object left, object right, string op)
         {
@@ -279,22 +282,19 @@ namespace EchoPhase.Scripting.Parsers
                 return CompareDirect(left, right, op);
             }
 
-            if (!TypePriority.TryGetValue(leftType, out int leftPriority) ||
-                !TypePriority.TryGetValue(rightType, out int rightPriority))
+            if (!typePriority.TryGetValue(leftType, out int leftPriority) ||
+                !typePriority.TryGetValue(rightType, out int rightPriority))
             {
                 throw new InvalidOperationException($"Operands have incompatible or unsupported types: {leftType} and {rightType}.");
             }
 
-            Type targetType;
             if (leftPriority < rightPriority)
             {
                 left = Convert.ChangeType(left, rightType);
-                targetType = rightType;
             }
             else
             {
                 right = Convert.ChangeType(right, leftType);
-                targetType = leftType;
             }
 
             return CompareDirect(left, right, op);

@@ -1,16 +1,19 @@
-using Microsoft.AspNetCore.Http;
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using AesGcm = EchoPhase.Security.Cryptography.AesGcm;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Security.Cryptography;
-using System.IdentityModel.Tokens.Jwt;
+using Microsoft.AspNetCore.Http;
+using AesGcm = EchoPhase.Security.Cryptography.AesGcm;
 
 namespace EchoPhase.Security.Antiforgery
 {
     public class AntiforgeryService : IAntiforgeryService
     {
-        private readonly AesGcm               _aes;
+        private readonly AesGcm _aes;
         private readonly IHttpContextAccessor _httpContext;
 
         public const string CookieName = "XSRF-TOKEN";
@@ -18,7 +21,7 @@ namespace EchoPhase.Security.Antiforgery
 
         public AntiforgeryService(AesGcm aes, IHttpContextAccessor httpContext)
         {
-            _aes         = aes;
+            _aes = aes;
             _httpContext = httpContext;
         }
 
@@ -103,9 +106,9 @@ namespace EchoPhase.Security.Antiforgery
         private static CookieOptions BuildCookieOptions(HttpContext context) => new()
         {
             HttpOnly = true,
-            Secure   = context.Request.IsHttps,
+            Secure = context.Request.IsHttps,
             SameSite = SameSiteMode.Strict,
-            Path     = "/",
+            Path = "/",
             IsEssential = true
         };
 

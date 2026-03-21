@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -230,10 +233,7 @@ namespace EchoPhase.Security.Cryptography
             if (recipientX25519SecretKey == null)
                 throw new ArgumentNullException(nameof(recipientX25519SecretKey));
 
-            var box = JsonSerializer.Deserialize<EncryptedMessage>(json);
-            if (box == null)
-                throw new ArgumentException("Invalid or empty encrypted message JSON", nameof(json));
-
+            var box = JsonSerializer.Deserialize<EncryptedMessage>(json) ?? throw new ArgumentException("Invalid or empty encrypted message JSON", nameof(json));
             return DecryptFromSenderStructured(box, recipientX25519SecretKey);
         }
 
@@ -317,7 +317,7 @@ namespace EchoPhase.Security.Cryptography
                 state[12 + i] = BinaryPrimitives.ReadUInt32LittleEndian(nonce16.Slice(i * 4, 4));
             }
 
-            void QuarterRound(uint[] x, int a, int b, int c, int d)
+            static void QuarterRound(uint[] x, int a, int b, int c, int d)
             {
                 x[a] += x[b]; x[d] ^= x[a]; x[d] = (x[d] << 16) | (x[d] >> 16);
                 x[c] += x[d]; x[b] ^= x[c]; x[b] = (x[b] << 12) | (x[b] >> 20);

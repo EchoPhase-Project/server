@@ -1,6 +1,10 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Reflection;
 using Cassandra;
 using EchoPhase.Configuration.Database.Scylla;
+using EchoPhase.DAL.Scylla.Builders;
 using EchoPhase.DAL.Scylla.Cql;
 using EchoPhase.DAL.Scylla.Enums;
 using EchoPhase.DAL.Scylla.Interfaces;
@@ -8,7 +12,7 @@ using EchoPhase.DAL.Scylla.Loggers;
 using EchoPhase.DAL.Scylla.Models;
 using ISession = Cassandra.ISession;
 
-namespace EchoPhase.DAL.Scylla
+namespace EchoPhase.DAL.Scylla.Database
 {
     public class Database : IDisposable
     {
@@ -110,11 +114,7 @@ namespace EchoPhase.DAL.Scylla
             if (!_builderCache.TryGetValue(entityType, out var builder))
             {
                 var method = typeof(ModelBuilder)
-                    .GetMethod(nameof(ModelBuilder.GetBuilder));
-
-                if (method is null)
-                    throw new InvalidOperationException($"Method {nameof(ModelBuilder.GetBuilder)} not found.");
-
+                    .GetMethod(nameof(ModelBuilder.GetBuilder)) ?? throw new InvalidOperationException($"Method {nameof(ModelBuilder.GetBuilder)} not found.");
                 var generic = method.MakeGenericMethod(entityType);
                 var obj = generic?.Invoke(ModelBuilder, null);
                 if (obj is not IEntityBuilder entityBuilder)

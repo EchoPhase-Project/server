@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Linq.Expressions;
 using System.Net.Mime;
 using System.Text;
@@ -5,14 +8,13 @@ using System.Text.Json;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
-using EchoPhase.DAL.Postgres.Repositories.Options;
 using EchoPhase.Identity;
 using EchoPhase.Types.Extensions;
 using EchoPhase.Types.Service;
 
 namespace EchoPhase.WebHooks
 {
-    public class WebHookService : DataServiceBase<WebHook, WebHookRepository, WebHookOptions>
+    public class WebHookService : DataServiceBase<WebHook, WebHookRepository>
     {
         private readonly PostgresContext _context;
         private readonly HttpClient _httpClient;
@@ -83,40 +85,52 @@ namespace EchoPhase.WebHooks
             return webhooks;
         }
 
-        public async Task SendMessageToAllAsync<T>(T message, HashSet<string> intents, string ContentType = MediaTypeNames.Application.Json)
+        public async Task SendMessageToAllAsync<T>(
+            T message,
+            HashSet<string> intents,
+            string contentType = MediaTypeNames.Application.Json)
         {
-            var webhooks = _repository.Get(opts =>
-            {
-                opts.Intents = intents;
-                opts.Status = WebHookStatus.Enabled;
-            });
-            var content = WrapMessage(message, Encoding.UTF8, ContentType);
-            await PostMessageToWebHooksAsync(content, webhooks.Data);
+            var webhooks = _repository.Query()
+                .WithStatus(WebHookStatus.Enabled)
+                .WithIntents(intents.ToArray())
+                .ToList();
+
+            var content = WrapMessage(message, Encoding.UTF8, contentType);
+            await PostMessageToWebHooksAsync(content, webhooks);
         }
 
-        public async Task SendMessageToUsersAsync<T>(HashSet<Guid> userIds, T message, HashSet<string> intents, string ContentType = MediaTypeNames.Application.Json)
+        public async Task SendMessageToUsersAsync<T>(
+            HashSet<Guid> userIds,
+            T message,
+            HashSet<string> intents,
+            string contentType = MediaTypeNames.Application.Json)
         {
-            var webhooks = _repository.Get(opts =>
-            {
-                opts.UserIds = userIds;
-                opts.Intents = intents;
-                opts.Status = WebHookStatus.Enabled;
-            });
-            var content = WrapMessage(message, Encoding.UTF8, ContentType);
-            await PostMessageToWebHooksAsync(content, webhooks.Data);
+            var webhooks = _repository.Query()
+                .WithUserIds(userIds.ToArray())
+                .WithStatus(WebHookStatus.Enabled)
+                .WithIntents(intents.ToArray())
+                .ToList();
+
+            var content = WrapMessage(message, Encoding.UTF8, contentType);
+            await PostMessageToWebHooksAsync(content, webhooks);
         }
 
-        public async Task SendMessageToRolesAsync<T>(IEnumerable<string> roles, T message, HashSet<string> intents, string ContentType = MediaTypeNames.Application.Json)
+        public async Task SendMessageToRolesAsync<T>(
+            IEnumerable<string> roles,
+            T message,
+            HashSet<string> intents,
+            string contentType = MediaTypeNames.Application.Json)
         {
             var usersWithRole = await _roleService.GetUsersInRolesAsync(roles);
-            var webhooks = _repository.Get(opts =>
-            {
-                opts.UserIds = usersWithRole.Select(u => u.Id).ToHashSet();
-                opts.Intents = intents;
-                opts.Status = WebHookStatus.Enabled;
-            });
-            var content = WrapMessage(message, Encoding.UTF8, ContentType);
-            await PostMessageToWebHooksAsync(content, webhooks.Data);
+
+            var webhooks = _repository.Query()
+                .WithUserIds(usersWithRole.Select(u => u.Id).ToArray())
+                .WithStatus(WebHookStatus.Enabled)
+                .WithIntents(intents.ToArray())
+                .ToList();
+
+            var content = WrapMessage(message, Encoding.UTF8, contentType);
+            await PostMessageToWebHooksAsync(content, webhooks);
         }
 
         private async Task PostMessageToWebHooksAsync(StringContent content, IEnumerable<WebHook> webhooks)
@@ -126,7 +140,7 @@ namespace EchoPhase.WebHooks
         }
 
         private StringContent WrapMessage<T>(T message, Encoding encoding, string contentType) =>
-            new StringContent(SerializeMessage(message), encoding, contentType);
+            new(SerializeMessage(message), encoding, contentType);
 
         private string SerializeMessage<T>(T message) =>
             message is string str ? str : JsonSerializer.Serialize(message);

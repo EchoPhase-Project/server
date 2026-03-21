@@ -1,14 +1,18 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Collections;
 using System.Net.WebSockets;
 using EchoPhase.Types.Attributes;
 using EchoPhase.Types.BitMask;
 using Microsoft.AspNetCore.Http;
+using UUIDNext;
 
 namespace EchoPhase.WebSockets
 {
     public class WebSocketConnection : IDisposable
     {
-        public Guid Id { get; } = Guid.NewGuid();
+        public Guid Id { get; } = Uuid.NewSequential();
 
         public WebSocket WebSocket { get; set; } = default!;
         public HttpContext HttpContext { get; set; } = default!;

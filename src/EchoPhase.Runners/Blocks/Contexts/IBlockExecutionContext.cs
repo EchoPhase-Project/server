@@ -1,30 +1,33 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using EchoPhase.Runners.Blocks.Models;
 
 namespace EchoPhase.Runners.Blocks.Contexts
 {
     public interface IBlockExecutionContext
     {
-        public IEnumerable<int> StartIds
+        IEnumerable<int> StartIds
         {
             get; set;
         }
-        public IEnumerable<IBlock> Blocks
+        IEnumerable<IBlock> Blocks
         {
             get; set;
         }
-        public IDictionary<string, object> Variables
+        IDictionary<string, object> Variables
         {
             get; set;
         }
-        public IDictionary<string, int> LoopStates
+        IDictionary<string, int> LoopStates
         {
             get; set;
         }
-        public IList<string> Output
+        IList<string> Output
         {
             get; set;
         }
-        public IList<BlockError> Errors
+        IList<BlockError> Errors
         {
             get; set;
         }

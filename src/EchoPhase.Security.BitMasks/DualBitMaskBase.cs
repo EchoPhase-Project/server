@@ -1,15 +1,18 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Collections;
+using EchoPhase.Security.BitMasks.Comparers;
 using EchoPhase.Security.BitMasks.Constants;
 using EchoPhase.Security.BitMasks.Extensions;
 using EchoPhase.Types.BitMask;
 using EchoPhase.Types.Extensions;
 using EchoPhase.Types.Result;
-using EchoPhase.Security.BitMasks.Comparers;
 
 namespace EchoPhase.Security.BitMasks
 {
     public abstract class DualBitMaskBase<TKey, TValue> : BitMaskBase
-        where TKey   : ConstantsBase<TKey>
+        where TKey : ConstantsBase<TKey>
         where TValue : ConstantsBase<TValue>
     {
         public abstract string ClaimName { get; }

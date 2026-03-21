@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Security.Cryptography;
 using System.Text;
 using EchoPhase.Configuration.Cryptography;
@@ -64,10 +67,10 @@ namespace EchoPhase.Security.Cryptography
             return result;
         }
 
-        public string DecryptToBase64(string encrypted) =>
-            DecryptToBase64(Encoding.UTF8.GetBytes(encrypted));
+        public string DecryptToString(string encrypted) =>
+            DecryptToString(Encoding.UTF8.GetBytes(encrypted));
 
-        public string DecryptToBase64(byte[] bytes) =>
+        public string DecryptToString(byte[] bytes) =>
             Encoding.UTF8.GetString(Decrypt(bytes));
 
         public byte[] Decrypt(string encrypted) =>

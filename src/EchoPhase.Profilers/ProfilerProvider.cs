@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
 namespace EchoPhase.Profilers
 {
     public class ProfilerProvider : IProfilerProvider
@@ -7,11 +10,9 @@ namespace EchoPhase.Profilers
         private readonly FlatProfiler _flatProfiler = new();
         private readonly StackProfiler _stackProfiler = new();
 
-        private IProfiler _current;
-
         public ProfilerProvider()
         {
-            _current = _flatProfiler;
+            Current = _flatProfiler;
         }
 
         public IProfiler Current
@@ -19,15 +20,17 @@ namespace EchoPhase.Profilers
             get
             {
                 lock (_lock)
-                    return _current;
+                    return field;
             }
+
+            private set;
         }
 
         public void Use(ProfilerTypes type)
         {
             lock (_lock)
             {
-                _current = type switch
+                Current = type switch
                 {
                     ProfilerTypes.Flat => _flatProfiler,
                     ProfilerTypes.Stack => _stackProfiler,

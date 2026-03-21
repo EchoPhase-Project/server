@@ -1,4 +1,7 @@
-namespace EchoPhase.DAL.Scylla
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+namespace EchoPhase.DAL.Scylla.Builders
 {
     public class PropertyBuilder<TEntity, TProp> where TEntity : class
     {
@@ -32,6 +35,6 @@ namespace EchoPhase.DAL.Scylla
             return this;
         }
 
-        public EntityBuilder<TEntity> And() => (EntityBuilder<TEntity>)_entityBuilder;
+        public EntityBuilder<TEntity> And() => _entityBuilder;
     }
 }
