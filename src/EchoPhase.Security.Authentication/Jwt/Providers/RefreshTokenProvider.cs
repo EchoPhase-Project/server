@@ -12,6 +12,7 @@ using EchoPhase.Security.Authentication.Jwt.Claims;
 using EchoPhase.Types.Repository;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
+using EchoPhase.Security.Authentication.Jwt.Exceptions;
 
 namespace EchoPhase.Security.Authentication.Jwt.Providers
 {
@@ -116,9 +117,10 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             var isReused = existing.Audits.Any(a => a.Token == refreshToken);
             if (isReused)
             {
+                var userId = existing.UserId;
                 _db.RefreshTokens.Remove(existing);
                 await _db.SaveChangesAsync();
-                throw new UnauthorizedAccessException("Refresh token reuse detected.");
+                throw new RefreshTokenReusedException(userId);
             }
 
             if (existing.RefreshValue != refreshToken)

@@ -4,6 +4,7 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using EchoPhase.Security.Authentication.Jwt;
+using EchoPhase.Security.Authentication.Jwt.Exceptions;
 using EchoPhase.Security.Authentication.Jwt.Helpers;
 using EchoPhase.Security.Authentication.Jwt.Providers;
 using EchoPhase.Security.Authentication.Options;
@@ -19,18 +20,18 @@ namespace EchoPhase.Security.Authentication.Handlers
     public class RefreshHandler : AuthenticationHandler<RefreshOptions>
     {
         private readonly IJwtTokenProvider _jwt;
-        private readonly IRefreshTokenProvider _refresh;
+        private readonly RefreshSignInManager _signInManager;
 
         public RefreshHandler(
             IJwtTokenProvider jwt,
-            IRefreshTokenProvider refresh,
+            RefreshSignInManager signInManager,
             IOptionsMonitor<RefreshOptions> options,
             ILoggerFactory logger,
             UrlEncoder encoder)
             : base(options, logger, encoder)
         {
             _jwt = jwt;
-            _refresh = refresh;
+            _signInManager = signInManager;
         }
 
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -110,11 +111,16 @@ namespace EchoPhase.Security.Authentication.Handlers
 
             try
             {
-                var pair = await _refresh.RefreshAsync(refreshId, refreshToken);
+                var pair = await _signInManager.RefreshAsync(refreshId, refreshToken);
 
                 TokenCookieHelper.WriteRefreshed(Response, Request, pair);
 
                 return await _jwt.ValidateTokenAsync(pair.AccessToken);
+            }
+            catch (RefreshTokenReusedException)
+            {
+                TokenCookieHelper.Clear(Response);
+                return null;
             }
             catch
             {

@@ -9,6 +9,7 @@ using EchoPhase.Security.Authentication.Jwt.Providers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
+using EchoPhase.Security.Authentication.Jwt.Exceptions;
 
 namespace EchoPhase.Security.Authentication.Jwt
 {
@@ -75,6 +76,19 @@ namespace EchoPhase.Security.Authentication.Jwt
             await _refresh.RevokeAllAsync(userId);
             await InvalidateUserAsync(userId);
             TokenCookieHelper.Clear(_httpContext.HttpContext!.Response);
+        }
+
+        public async Task<TokenPair> RefreshAsync(Guid refreshId, string refreshToken)
+        {
+            try
+            {
+                return await _refresh.RefreshAsync(refreshId, refreshToken);
+            }
+            catch (RefreshTokenReusedException ex)
+            {
+                await InvalidateUserAsync(ex.UserId);
+                throw;
+            }
         }
 
         public async Task RevokeSessionAsync(Guid userId, Guid tokenId)
