@@ -40,17 +40,17 @@ namespace EchoPhase.Clients
         private async Task<HashSet<string>> IndexGetAsync(string userId)
         {
             var raw = await Db.StringGetAsync(IndexKey(userId));
-            if (!raw.HasValue) return new HashSet<string>();
+            if (!raw.HasValue) return [];
 
             try
             {
                 var decrypted = AesGcm.Decrypt((byte[])raw!);
                 return JsonSerializer.Deserialize<HashSet<string>>(decrypted)
-                    ?? new HashSet<string>();
+                    ?? [];
             }
             catch
             {
-                return new HashSet<string>();
+                return [];
             }
         }
 
@@ -73,6 +73,38 @@ namespace EchoPhase.Clients
             var index = await IndexGetAsync(userId);
             if (index.Remove(keyName))
                 await IndexSaveAsync(userId, index);
+        }
+
+        private HashSet<string> IndexGet(string userId)
+        {
+            var raw = Db.StringGet(IndexKey(userId));
+            if (!raw.HasValue) return [];
+            try
+            {
+                var decrypted = AesGcm.Decrypt((byte[])raw!);
+                return JsonSerializer.Deserialize<HashSet<string>>(decrypted) ?? [];
+            }
+            catch { return []; }
+        }
+
+        private void IndexSave(string userId, HashSet<string> index)
+        {
+            var encrypted = AesGcm.Encrypt(JsonSerializer.SerializeToUtf8Bytes(index));
+            Db.StringSet(IndexKey(userId), encrypted);
+        }
+
+        private void IndexAdd(string userId, string keyName)
+        {
+            var index = IndexGet(userId);
+            if (index.Add(keyName))
+                IndexSave(userId, index);
+        }
+
+        private void IndexRemove(string userId, string keyName)
+        {
+            var index = IndexGet(userId);
+            if (index.Remove(keyName))
+                IndexSave(userId, index);
         }
 
         // --------------------------
@@ -126,10 +158,8 @@ namespace EchoPhase.Clients
             CommandFlags flags = CommandFlags.None)
         {
             var result = Set(UserKey(userId, keyName), value, expiry, keepTtl, when, flags);
-
             if (result)
-                IndexAddAsync(userId, keyName).GetAwaiter().GetResult();
-
+                IndexAdd(userId, keyName);
             return result;
         }
 
@@ -177,10 +207,8 @@ namespace EchoPhase.Clients
         public bool Delete(string userId, string keyName)
         {
             var result = Delete(UserKey(userId, keyName));
-
             if (result)
-                IndexRemoveAsync(userId, keyName).GetAwaiter().GetResult();
-
+                IndexRemove(userId, keyName);
             return result;
         }
 

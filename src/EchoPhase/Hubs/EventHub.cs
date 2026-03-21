@@ -4,7 +4,6 @@
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
 using EchoPhase.Interfaces.Services;
-using EchoPhase.Services.Internal;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -17,13 +16,16 @@ namespace EchoPhase.Hubs
     {
         private readonly IUserConnectionManager _userConnectionManager;
         private readonly IUserService _userService;
+        private readonly IHostApplicationLifetime _lifetime;
 
         public EventHub(
-                IUserConnectionManager userConnectionManager,
-                IUserService userService)
+            IUserConnectionManager userConnectionManager,
+            IUserService userService,
+            IHostApplicationLifetime lifetime)
         {
             _userConnectionManager = userConnectionManager;
             _userService = userService;
+            _lifetime = lifetime;
         }
 
         public async Task Echo(string message)
@@ -44,7 +46,6 @@ namespace EchoPhase.Hubs
             }
 
             var recipientConnectionId = _userConnectionManager.GetConnectionId(sender.Id);
-
             if (recipientConnectionId is null)
             {
                 Console.WriteLine("Can't find connection id.");
@@ -57,7 +58,7 @@ namespace EchoPhase.Hubs
 
         public override async Task OnConnectedAsync()
         {
-            if (ShutdownService.IsShuttingDown)
+            if (_lifetime.ApplicationStopping.IsCancellationRequested)
             {
                 await Clients.Caller.SendAsync("ShutdownNotification", "Server is shutting down. Disconnecting...");
                 Console.WriteLine("Connection attempt rejected due to server shutdown.");
@@ -81,7 +82,6 @@ namespace EchoPhase.Hubs
             }
 
             _userConnectionManager.KeepUserConnection(user.Id, Context.ConnectionId);
-
             await base.OnConnectedAsync();
         }
 
@@ -99,7 +99,6 @@ namespace EchoPhase.Hubs
             }
 
             _userConnectionManager.RemoveUserConnection(user.Id, Context.ConnectionId);
-
             await base.OnDisconnectedAsync(exception);
         }
     }

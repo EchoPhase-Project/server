@@ -1,7 +1,6 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using EchoPhase.Clients.Providers;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Types.Result;
@@ -12,16 +11,16 @@ namespace EchoPhase.Clients
     {
         private readonly ExternalTokenRepository _repository;
         private readonly IClientTokenProviderRegistry _registry;
-        private readonly ClientAccessProvider _cache;
+        private readonly ClientSecretVault _vault;
 
         public ExternalTokenService(
             ExternalTokenRepository repository,
             IClientTokenProviderRegistry registry,
-            ClientAccessProvider cache)
+            ClientSecretVault vault)
         {
             _repository = repository;
             _registry = registry;
-            _cache = cache;
+            _vault = vault;
         }
 
         public async Task<IServiceResult<byte[]>> GetAsync(
@@ -46,7 +45,7 @@ namespace EchoPhase.Clients
         public async Task<int> SetAsync(ExternalToken entity)
         {
             var result = await _repository.Set(entity);
-            await _cache.InvalidateAsync(entity.UserId, entity.ProviderName, entity.TokenName);
+            await _vault.DeleteAsync(entity.UserId.ToString(), $"{entity.ProviderName}:{entity.TokenName}");
             return result;
         }
 
@@ -62,7 +61,7 @@ namespace EchoPhase.Clients
 
             _repository.Remove(token);
             await _repository.SaveAsync();
-            await _cache.InvalidateAsync(userId, providerName, tokenName);
+            await _vault.DeleteAsync(userId.ToString(), $"{providerName}:{tokenName}");
             return true;
         }
 
@@ -73,12 +72,10 @@ namespace EchoPhase.Clients
                 .ToList();
 
             foreach (var token in tokens)
-            {
                 _repository.Remove(token);
-                await _cache.InvalidateAsync(userId, token.ProviderName, token.TokenName);
-            }
 
             await _repository.SaveAsync();
+            await _vault.DeleteAllAsync(userId.ToString());
         }
 
         public IEnumerable<string> GetKeyNames(Guid userId)

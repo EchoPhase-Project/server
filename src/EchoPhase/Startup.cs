@@ -28,7 +28,6 @@ using EchoPhase.Security.Authorization.Extensions;
 using EchoPhase.Security.BitMasks.Extensions;
 using EchoPhase.Security.Cryptography.Extensions;
 using EchoPhase.Security.Hashers.Extensions;
-using EchoPhase.Services.Internal;
 using EchoPhase.WebSockets.Extensions;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
@@ -145,7 +144,6 @@ namespace EchoPhase
 
             services.AddRunners();
 
-            services.AddHostedService<ShutdownService>();
             services.AddScheduling();
 
             services.AddWebSocket();

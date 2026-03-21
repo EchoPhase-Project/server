@@ -53,7 +53,8 @@ namespace EchoPhase.DAL.Postgres.Repositories.Queries
         public override ExternalToken? FirstOrDefault()
         {
             var token = base.FirstOrDefault();
-            token?.Value = _aes.Decrypt(token.Value);
+            if (token is { } t)
+                t.Value = _aes.Decrypt(t.Value);
             return token;
         }
 

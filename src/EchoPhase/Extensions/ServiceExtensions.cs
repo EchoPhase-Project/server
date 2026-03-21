@@ -44,7 +44,6 @@ namespace EchoPhase.Extensions
         public static IServiceCollection AddDiscordClient(this IServiceCollection services)
         {
             services.AddSingleton<IClientSecretVault, ClientSecretVault>();
-            services.AddScoped<ClientAccessProvider>();
             services.AddScoped<IExternalTokenService, ExternalTokenService>();
             services.AddScoped<IClientTokenProviderRegistry>(
                 sp => new ClientTokenProviderRegistry(sp));

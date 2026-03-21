@@ -63,15 +63,13 @@ namespace EchoPhase.Runners.Blocks
                 }
                 catch (Exception ex)
                 {
-                    var error = new BlockError
+                    context.Errors.Add(new BlockError
                     {
                         Id = id,
                         Type = ex.GetType().Name,
                         Message = ex.Message
-                    };
-
-                    context.Errors.Add(error);
-                    throw;
+                    });
+                    return context;
                 }
 
                 foreach (var nextId in next)

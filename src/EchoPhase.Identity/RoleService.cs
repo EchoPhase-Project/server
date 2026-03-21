@@ -50,7 +50,7 @@ namespace EchoPhase.Identity
             var role = new UserRole { Name = roleName };
             var result = await _roleManager.CreateAsync(role);
             if (!result.Succeeded)
-                throw new Exception($"Failed to create role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                throw new InvalidOperationException($"Failed to create role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
         }
 
         /// <summary>
@@ -85,7 +85,7 @@ namespace EchoPhase.Identity
 
             var result = await _userManager.AddToRoleAsync(user, roleName);
             if (!result.Succeeded)
-                throw new Exception($"Failed to add to role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                throw new InvalidOperationException($"Failed to add to role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
         }
 
         /// <summary>
@@ -119,7 +119,7 @@ namespace EchoPhase.Identity
 
             var result = await _userManager.RemoveFromRoleAsync(user, roleName);
             if (!result.Succeeded)
-                throw new Exception($"Failed to remove from role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                throw new InvalidOperationException($"Failed to remove from role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
         }
 
         /// <summary>

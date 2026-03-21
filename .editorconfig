@@ -72,28 +72,25 @@ dotnet_naming_rule.local_function_pascalcase.symbols = local_function
 dotnet_naming_rule.local_function_pascalcase.style = pascalcase
 
 # all_lower for private constants/static readonlys
-dotnet_naming_style.all_lower.capitalization = all_lower
-dotnet_naming_style.all_lower.word_separator = _
-
 dotnet_naming_symbols.private_constants.applicable_accessibilities = private
 dotnet_naming_symbols.private_constants.required_modifiers = const
 dotnet_naming_symbols.private_constants.applicable_kinds = field
 dotnet_naming_rule.private_const_all_lower.severity = warning
 dotnet_naming_rule.private_const_all_lower.symbols = private_constants
-dotnet_naming_rule.private_const_all_lower.style = all_lower
+dotnet_naming_rule.private_const_all_lower.style = pascalcase
 
 dotnet_naming_symbols.private_static_readonly.applicable_accessibilities = private
 dotnet_naming_symbols.private_static_readonly.required_modifiers = static,readonly
 dotnet_naming_symbols.private_static_readonly.applicable_kinds = field
 dotnet_naming_rule.private_static_readonly_all_lower.severity = warning
 dotnet_naming_rule.private_static_readonly_all_lower.symbols = private_static_readonly
-dotnet_naming_rule.private_static_readonly_all_lower.style = all_lower
+dotnet_naming_rule.private_static_readonly_all_lower.style = pascalcase
 
 dotnet_naming_symbols.local_constants.applicable_kinds = local
 dotnet_naming_symbols.local_constants.required_modifiers = const
 dotnet_naming_rule.local_const_all_lower.severity = warning
 dotnet_naming_rule.local_const_all_lower.symbols = local_constants
-dotnet_naming_rule.local_const_all_lower.style = all_lower
+dotnet_naming_rule.local_const_all_lower.style = pascalcase
 
 # ALL_UPPER for public constants/static readonlys
 dotnet_naming_style.all_upper.capitalization = all_upper

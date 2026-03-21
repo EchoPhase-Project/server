@@ -40,9 +40,9 @@ namespace EchoPhase.Runners.Blocks.Handlers
 
                 if (!result.TryGetValue(out var flag))
                     if (result.TryGetError(out var err))
-                        throw new Exception(err.Message);
+                        throw new InvalidOperationException(err.Message);
                     else
-                        throw new Exception("Unknown error");
+                        throw new InvalidOperationException("Unknown error");
 
                 if (!flag)
                     break;

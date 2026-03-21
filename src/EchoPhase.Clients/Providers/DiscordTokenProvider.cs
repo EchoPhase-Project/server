@@ -11,26 +11,26 @@ namespace EchoPhase.Clients.Providers
     public class DiscordTokenProvider : IClientTokenProvider
     {
         private readonly ExternalTokenRepository _repository;
-        private readonly ClientAccessProvider _cache;
+        private readonly ClientSecretVault _vault;
 
         public DiscordTokenProvider(
             ExternalTokenRepository repository,
-            ClientAccessProvider cache)
+            ClientSecretVault vault)
         {
             _repository = repository;
-            _cache = cache;
+            _vault = vault;
         }
 
         public async Task<byte[]> ResolveAsync(Guid userId, string tokenName)
         {
-            var result = await _cache.GetOrSetAsync(userId, "Discord", tokenName, async () =>
+            var result = await _vault.GetOrSetAsync(userId.ToString(), $"Discord:{tokenName}", async () =>
                 _repository.Query()
                     .WithUserIds(userId)
                     .WithProviderNames("Discord")
                     .WithTokenNames(tokenName)
                     .FirstOrDefault()?.Value
                     ?? throw new KeyNotFoundException(
-                        $"Token 'Discord:{tokenName}' not found for user '{userId}'."));
+                        $"Token 'Discord:{tokenName}' not found for user '{userId}'."), TimeSpan.FromHours(4));
 
             return result.GetValueOrThrow();
         }

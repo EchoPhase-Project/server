@@ -35,6 +35,6 @@ namespace EchoPhase.DAL.Scylla.Models
             State = state;
         }
 
-        public TrackedEntity Clone() => new TrackedEntity(Entity, State);
+        public TrackedEntity Clone() => new(EntityType, Entity, State);
     }
 }

@@ -28,13 +28,15 @@ namespace EchoPhase.Security.Antiforgery
         public void Set()
         {
             var context = GetContext();
-            var payload = new CsrfPayload(
-                UserId: context.User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "anonymous",
-                Random: Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+            var userId = context.User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "anonymous";
 
-            var json = JsonSerializer.Serialize(payload);
-            var cookieToken = ToUrlSafeBase64(_aes.EncryptToBase64(json));
-            var headerToken = ToUrlSafeBase64(_aes.EncryptToBase64(json));
+            var binding = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+            var cookiePayload = new CsrfPayload(UserId: userId, Random: binding + ":cookie");
+            var headerPayload = new CsrfPayload(UserId: userId, Random: binding + ":header");
+
+            var cookieToken = ToUrlSafeBase64(_aes.EncryptToBase64(JsonSerializer.Serialize(cookiePayload)));
+            var headerToken = ToUrlSafeBase64(_aes.EncryptToBase64(JsonSerializer.Serialize(headerPayload)));
 
             context.Response.Cookies.Append(CookieName, cookieToken, BuildCookieOptions(context));
             context.Response.Headers[HeaderName] = headerToken;
@@ -73,9 +75,17 @@ namespace EchoPhase.Security.Antiforgery
                 throw new InvalidOperationException("CSRF token tampered or invalid.");
             }
 
-            if (cookiePayload.UserId != headerPayload.UserId ||
-                cookiePayload.Random != headerPayload.Random)
-                throw new InvalidOperationException("CSRF token mismatch.");
+            var cookieBinding = cookiePayload.Random.Replace(":cookie", "");
+            var headerBinding = headerPayload.Random.Replace(":header", "");
+
+            if (cookieBinding != headerBinding)
+                throw new InvalidOperationException("CSRF token binding mismatch.");
+
+            if (cookiePayload.Random == headerPayload.Random)
+                throw new InvalidOperationException("CSRF tokens must differ.");
+
+            if (cookiePayload.UserId != headerPayload.UserId)
+                throw new InvalidOperationException("CSRF token user mismatch.");
 
             var currentUserId = context.User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "anonymous";
             if (cookiePayload.UserId != currentUserId)

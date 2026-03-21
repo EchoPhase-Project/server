@@ -42,9 +42,9 @@ namespace EchoPhase.Runners.Blocks.Handlers
                     var result = Eval.Process<string>(_lexer, _parser, raw, context.Variables);
                     if (!result.TryGetValue(out var processed))
                         if (result.TryGetError(out var err))
-                            throw new Exception(err.Message);
+                            throw new InvalidOperationException(err.Message);
                         else
-                            throw new Exception("Unknown error");
+                            throw new InvalidOperationException("Unknown error");
                     value = TryParsePrimitive(processed);
                     break;
 

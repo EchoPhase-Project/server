@@ -11,6 +11,7 @@ using EchoPhase.Identity;
 using EchoPhase.Security.Authentication.Jwt.Claims;
 using EchoPhase.Types.Repository;
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 
 namespace EchoPhase.Security.Authentication.Jwt.Providers
 {
@@ -113,12 +114,11 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
                 ?? throw new UnauthorizedAccessException("Invalid refresh token.");
 
             var isReused = existing.Audits.Any(a => a.Token == refreshToken);
-
             if (isReused)
             {
                 _db.RefreshTokens.Remove(existing);
                 await _db.SaveChangesAsync();
-                throw new UnauthorizedAccessException("Refresh token reuse detected. Re-authentication required.");
+                throw new UnauthorizedAccessException("Refresh token reuse detected.");
             }
 
             if (existing.RefreshValue != refreshToken)
@@ -148,7 +148,15 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
 
             existing.RefreshValue = GenerateSecureToken();
             _db.RefreshTokens.Update(existing);
-            await _db.SaveChangesAsync();
+
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new UnauthorizedAccessException("Refresh token already used. Please re-authenticate.");
+            }
 
             var jwt = await _jwtService.GenerateTokenAsync(user, _settings.Lifetime, context);
             return new TokenPair
@@ -185,7 +193,11 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
         public Task<CursorPage<RefreshToken>> GetSessionsAsync(Guid userId, CursorOptions? cursor = null)
         {
             var query = _repository.Query()
-                .WithUserIds(userId);
+                .WithUserIds(userId)
+                .Include(t => t.Intents)
+                .Include(t => t.Scopes)
+                .Include(t => t.Permissions);
+
 
             if (cursor is not null)
                 query.WithCursor(cursor);

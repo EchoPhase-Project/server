@@ -10,6 +10,7 @@ using EchoPhase.WebSockets.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 
 namespace EchoPhase.WebSockets
 {
@@ -18,6 +19,7 @@ namespace EchoPhase.WebSockets
         private readonly WebSocketOptions _settings;
 
         private readonly ConcurrentDictionary<Guid, List<WebSocketConnection>> _connections = new();
+        private readonly ConcurrentDictionary<WebSocket, Guid> _socketToConnectionId = new();
         private readonly SemaphoreSlim _connectionLock = new(1, 1);
 
         private readonly ICacheContext _cacheContext;
@@ -26,11 +28,25 @@ namespace EchoPhase.WebSockets
         public WebSocketConnectionManager(
             ICacheContext cacheContext,
             ILogger<WebSocketConnectionManager> logger,
-            IOptions<WebSocketOptions> settings)
+            IOptions<WebSocketOptions> settings,
+            IHostApplicationLifetime lifetime)
         {
             _cacheContext = cacheContext;
             _logger = logger;
             _settings = settings.Value;
+
+            lifetime.ApplicationStopping.Register(OnApplicationStopping);
+            lifetime.ApplicationStopped.Register(OnApplicationStopped);
+        }
+
+        private void OnApplicationStopping()
+        {
+            CloseAllConnectionsAsync().GetAwaiter().GetResult();
+        }
+
+        private void OnApplicationStopped()
+        {
+            AbortAllConnections();
         }
 
         public async Task AddConnectionAsync(Guid userId, WebSocket webSocket, HttpContext context)
@@ -51,6 +67,8 @@ namespace EchoPhase.WebSockets
                         existingConnections.Add(connection);
                         return existingConnections;
                     });
+
+                _socketToConnectionId[webSocket] = connection.Id;
 
                 await _cacheContext
                     .Entry<WebSocketCache>(connection.Id.ToString())
@@ -187,6 +205,8 @@ namespace EchoPhase.WebSockets
                     }
                 }
 
+                _socketToConnectionId.TryRemove(connection.WebSocket, out _);
+
                 connection.Dispose();
             }
             finally
@@ -314,12 +334,14 @@ namespace EchoPhase.WebSockets
 
         public async Task<Guid> GetUserIdAsync(WebSocket webSocket)
         {
-            var cacheKey = webSocket.GetHashCode().ToString();
+            if (!_socketToConnectionId.TryGetValue(webSocket, out var connectionId))
+                return Guid.Empty;
 
+            var cacheKey = connectionId.ToString();
             var webSocketCache = await _cacheContext
                 .Entry<WebSocketCache>(cacheKey)
                 .GetOrSetAsync(
-                    () => Task.FromResult(FindUserIdByWebSocket(webSocket)),
+                    () => Task.FromResult(FindUserIdByConnectionId(connectionId)),
                     TimeSpan.FromMinutes(10));
 
             return webSocketCache.UserId;
@@ -336,6 +358,15 @@ namespace EchoPhase.WebSockets
                     TimeSpan.FromMinutes(10));
 
             return webSocketCache.UserId;
+        }
+
+        private WebSocketCache FindUserIdByConnectionId(Guid connectionId)
+        {
+            foreach (var (userId, connections) in _connections)
+                if (connections.Any(c => c.Id == connectionId))
+                    return new WebSocketCache { UserId = userId };
+
+            return new WebSocketCache { UserId = Guid.Empty };
         }
 
         private WebSocketCache FindUserIdByConnection(WebSocketConnection connection)
