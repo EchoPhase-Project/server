@@ -13,8 +13,8 @@ http:
     type: json
     data: |-
       {
-        Name: "{{DiscordKeyName}}",
-        Value: "{{DiscordToken}}" 
+        "Name": "{{DiscordKeyName}}",
+        "Value": "{{DiscordToken}}" 
       }
   auth: inherit
 

@@ -4,8 +4,8 @@ info:
   seq: 4
 
 http:
-  method: POST
-  url: "{{baseUrl}}/auth/logout"
+  method: DELETE
+  url: "{{baseUrl}}/sessions/current"
   headers:
     - name: X-CSRF-TOKEN
       value: "{{X-CSRF-TOKEN}}"

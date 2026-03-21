@@ -5,12 +5,12 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/discord/api/users/@me/guilds?keyName={{DiscordKeyName}}"
+  url: "{{baseUrl}}/discord/api/users/@me/guilds?tokenName={{DiscordKeyName}}"
   headers:
     - name: X-CSRF-TOKEN
       value: "{{X-CSRF-TOKEN}}"
   params:
-    - name: keyName
+    - name: tokenName
       value: "{{DiscordKeyName}}"
       type: query
   auth: inherit
