@@ -1,16 +1,14 @@
-using EchoPhase.Controllers.Api.v1.Dto.Auth;
 using EchoPhase.Controllers.Api.v1.Dto;
+using EchoPhase.Controllers.Api.v1.Dto.Auth;
 using EchoPhase.Identity;
 using EchoPhase.Projection;
+using EchoPhase.Security.Antiforgery.Attributes;
+using EchoPhase.Security.Authentication.Extensions;
+using EchoPhase.Security.Authentication.Jwt.Claims;
 using EchoPhase.Security.Authentication.Jwt.Providers;
 using EchoPhase.Types.Repository;
-using EchoPhase.Security.Authentication.Jwt.Claims;
-using EchoPhase.Security.Antiforgery.Attributes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using EchoPhase.Security.Authorization.Attributes;
-using EchoPhase.Security.BitMasks.Constants;
-using EchoPhase.Security.Authentication.Extensions;
 
 namespace EchoPhase.Controllers.Api.v1
 {
@@ -44,12 +42,12 @@ namespace EchoPhase.Controllers.Api.v1
             var tokenPair = dto.Claims is null
                 ? await _refreshTokenProvider.CreateAsync(user, dto.DeviceId)
                 : await _refreshTokenProvider.CreateAsync(user, dto.DeviceId, new ClaimsEnrichmentContext
-                  {
-                      User                 = user,
-                      RequestedScopes      = dto.Claims.Scopes      ?? [],
-                      RequestedIntents     = dto.Claims.Intents     ?? [],
-                      RequestedPermissions = dto.Claims.Permissions ?? new Dictionary<string, string[]>()
-                  });
+                {
+                    User = user,
+                    RequestedScopes = dto.Claims.Scopes ?? [],
+                    RequestedIntents = dto.Claims.Intents ?? [],
+                    RequestedPermissions = dto.Claims.Permissions ?? new Dictionary<string, string[]>()
+                });
 
             return Ok(tokenPair);
         }

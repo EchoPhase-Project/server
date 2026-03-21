@@ -42,12 +42,14 @@ namespace EchoPhase.Types.Result.Extensions
                 action(value);
         }
 
-        public static Task<U?> OnSuccessAsync<T, U>(
+        public static async Task<U?> OnSuccessAsync<T, U>(
             this IServiceResult<T> result,
-            Func<T, Task<U>> func
-        ) => (result.TryGetValue(out var value))
-                ? func(value).ContinueWith(t => (U?)t.Result)
-                : Task.FromResult(default(U));
+            Func<T, Task<U>> func)
+        {
+            if (result.TryGetValue(out var value))
+                return await func(value);
+            return default;
+        }
 
         public static Task OnSuccessAsync<T>(
             this IServiceResult<T> result,
@@ -74,12 +76,14 @@ namespace EchoPhase.Types.Result.Extensions
                 action(err);
         }
 
-        public static Task<U?> OnFailureAsync<T, U>(
+        public static async Task<U?> OnFailureAsync<T, U>(
             this IServiceResult<T> result,
-            Func<IServiceError, Task<U>> func
-        ) => (result.TryGetError(out var err))
-                ? func(err).ContinueWith(t => (U?)t.Result)
-                : Task.FromResult(default(U));
+            Func<IServiceError, Task<U>> func)
+        {
+            if (result.TryGetError(out var err))
+                return await func(err);
+            return default;
+        }
 
         public static Task OnFailureAsync<T>(
             this IServiceResult<T> result,

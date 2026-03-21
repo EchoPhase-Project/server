@@ -4,10 +4,10 @@ using EchoPhase.Configuration.Authentication.Refresh;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
-using EchoPhase.Types.Repository;
-using Microsoft.Extensions.Options;
 using EchoPhase.Identity;
 using EchoPhase.Security.Authentication.Jwt.Claims;
+using EchoPhase.Types.Repository;
+using Microsoft.Extensions.Options;
 
 namespace EchoPhase.Security.Authentication.Jwt.Providers
 {
@@ -55,8 +55,8 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
         {
             var entry = new RefreshToken
             {
-                UserId       = user.Id,
-                DeviceId     = deviceId,
+                UserId = user.Id,
+                DeviceId = deviceId,
                 RefreshValue = GenerateSecureToken()
             };
 
@@ -66,22 +66,22 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
                     .Select(s => new RefreshTokenScope
                     {
                         RefreshTokenId = entry.Id,
-                        Value          = s
+                        Value = s
                     }).ToList();
 
                 entry.Intents = context.RequestedIntents
                     .Select(i => new RefreshTokenIntent
                     {
                         RefreshTokenId = entry.Id,
-                        Value          = i
+                        Value = i
                     }).ToList();
 
                 entry.Permissions = context.RequestedPermissions
                     .SelectMany(kvp => kvp.Value.Select(p => new RefreshTokenPermissionEntry
                     {
                         RefreshTokenId = entry.Id,
-                        Resource       = kvp.Key,
-                        Permission     = p
+                        Resource = kvp.Key,
+                        Permission = p
                     })).ToList();
             }
 
@@ -91,41 +91,53 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             var jwt = await _jwtService.GenerateTokenAsync(user, _settings.Lifetime, context);
             return new TokenInitial
             {
-                Id     = entry.Id,
+                Id = entry.Id,
                 Tokens = new TokenPair
                 {
-                    AccessToken  = jwt,
+                    AccessToken = jwt,
                     RefreshToken = entry.RefreshValue
                 }
             };
         }
 
-        public async Task<TokenPair> RefreshAsync(
-            Guid id,
-            string refreshToken)
+        public async Task<TokenPair> RefreshAsync(Guid id, string refreshToken)
         {
-            var existing = _repository.Get(x =>
-            {
-                x.Ids           = [id];
-                x.RefreshValues = [refreshToken];
-            }).Data.FirstOrDefault();
+            var existing = _repository.Query()
+                .WithIds(id)
+                .WithClaims()
+                .WithAudits()
+                .FirstOrDefault()
+                ?? throw new UnauthorizedAccessException("Invalid refresh token.");
 
-            if (existing is null)
+            var isReused = existing.Audits.Any(a => a.Token == refreshToken);
+
+            if (isReused)
+            {
+                _db.RefreshTokens.Remove(existing);
+                await _db.SaveChangesAsync();
+                throw new UnauthorizedAccessException("Refresh token reuse detected. Re-authentication required.");
+            }
+
+            if (existing.RefreshValue != refreshToken)
                 throw new UnauthorizedAccessException("Invalid refresh token.");
 
-            var user = _userRepository.Get(opts =>
-            {
-                opts.Ids = [existing.UserId];
-            }).Data.FirstOrDefault();
+            var user = _userRepository.Query()
+                .WithIds(existing.UserId)
+                .FirstOrDefault()
+                ?? throw new InvalidOperationException("Invalid UserId.");
 
-            if (user is null)
-                throw new InvalidOperationException("Invalid UserId.");
+            var audit = new RefreshTokenAudit
+            {
+                RefreshTokenId = existing.Id,
+                Token = refreshToken
+            };
+            _db.RefreshTokenAudits.Add(audit);
 
             var context = new ClaimsEnrichmentContext
             {
-                User                 = user,
-                RequestedScopes      = existing.Scopes.Select(s => s.Value).ToList(),
-                RequestedIntents     = existing.Intents.Select(i => i.Value).ToList(),
+                User = user,
+                RequestedScopes = existing.Scopes.Select(s => s.Value).ToList(),
+                RequestedIntents = existing.Intents.Select(i => i.Value).ToList(),
                 RequestedPermissions = existing.Permissions
                     .GroupBy(p => p.Resource)
                     .ToDictionary(g => g.Key, g => g.Select(p => p.Permission).ToArray())
@@ -138,18 +150,17 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             var jwt = await _jwtService.GenerateTokenAsync(user, _settings.Lifetime, context);
             return new TokenPair
             {
-                AccessToken  = jwt,
+                AccessToken = jwt,
                 RefreshToken = existing.RefreshValue
             };
         }
 
-        public async Task RevokeAsync(Guid userId, Guid Id)
+        public async Task RevokeAsync(Guid userId, Guid id)
         {
-            var existing = _repository.Get(x =>
-            {
-                x.Ids = [Id];
-                x.UserIds = [userId];
-            }).Data.FirstOrDefault();
+            var existing = _repository.Query()
+                .WithIds(id)
+                .WithUserIds(userId)
+                .FirstOrDefault();
 
             if (existing is not null)
             {
@@ -160,18 +171,23 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
 
         public async Task RevokeAllAsync(Guid userId)
         {
-            var tokens = _repository.Get(x => x.UserIds = [userId]).Data;
+            var tokens = _repository.Query()
+                .WithUserIds(userId)
+                .ToList();
+
             _db.RefreshTokens.RemoveRange(tokens);
             await _db.SaveChangesAsync();
         }
 
         public Task<CursorPage<RefreshToken>> GetSessionsAsync(Guid userId, CursorOptions? cursor = null)
         {
-            var tokens = _repository.Get(
-                x => x.UserIds = [userId],
-                cursor
-            );
-            return Task.FromResult(tokens);
+            var query = _repository.Query()
+                .WithUserIds(userId);
+
+            if (cursor is not null)
+                query.WithCursor(cursor);
+
+            return Task.FromResult(query.ToPage());
         }
     }
 }

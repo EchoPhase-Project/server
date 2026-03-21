@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
@@ -20,7 +20,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Claims
 
             var identity = new ClaimsIdentity(
                 authenticationType: JwtBearerDefaults.AuthenticationScheme,
-                nameType:           JwtRegisteredClaimNames.Name.ToString());
+                nameType: JwtRegisteredClaimNames.Name.ToString());
 
             if (user.Id != Guid.Empty)
                 identity.AddClaim(new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()));

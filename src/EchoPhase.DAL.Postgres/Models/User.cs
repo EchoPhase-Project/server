@@ -3,21 +3,21 @@ using EchoPhase.DAL.Abstractions;
 using EchoPhase.Projection.Attributes;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using UUIDNext;
 
 namespace EchoPhase.DAL.Postgres.Models
 {
     [Comment("Authorised User Model")]
     public class User : IdentityUser<Guid>, ITrackingEntity, IDisposable, IIdentifiable
     {
-        [Expose]
-        public string Name
-        {
-            get; set;
-        }
+        [Expose] public override Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
+        [Expose] public override string? UserName { get; set; }
+        [Expose] public string Name { get; set; }
 
         public string? ProfileImageName { get; set; } = default;
 
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+        public ICollection<ExternalToken> ExternalTokens { get; set; } = new List<ExternalToken>();
 
         public ICollection<WebHook> WebHooks { get; set; } = new List<WebHook>();
 

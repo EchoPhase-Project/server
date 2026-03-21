@@ -30,11 +30,14 @@ namespace EchoPhase.Controllers.Api.v1
             if (string.IsNullOrWhiteSpace(username))
                 return BadRequest("Username is required.");
 
-            var users = _userRepository.Get(x => x.UserNames = [username]);
-            if (!users.Data.Any())
+            var users = _userRepository.Query()
+                .WithUserNames(username)
+                .ToList();
+
+            if (!users.Any())
                 return NotFound();
 
-            return Ok(users.Data.Select(user =>
+            return Ok(users.Select(user =>
                 _projector.For(user).Include(u => u.Id, u => u.Name, u => u.UserName).Build()));
         }
     }

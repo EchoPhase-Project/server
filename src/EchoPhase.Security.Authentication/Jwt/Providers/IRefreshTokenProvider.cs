@@ -1,6 +1,6 @@
 using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.Types.Repository;
 using EchoPhase.Security.Authentication.Jwt.Claims;
+using EchoPhase.Types.Repository;
 
 namespace EchoPhase.Security.Authentication.Jwt.Providers
 {

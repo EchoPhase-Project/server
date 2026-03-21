@@ -4,6 +4,7 @@ using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using UUIDNext;
 
 namespace EchoPhase.DAL.Postgres
 {
@@ -22,11 +23,13 @@ namespace EchoPhase.DAL.Postgres
 
         public override DbSet<User> Users { get; set; } = default!;
 
+        public DbSet<ExternalToken> ExternalTokens { get; set; } = default!;
         public DbSet<RefreshToken> RefreshTokens { get; set; } = default!;
         public DbSet<WebHook> WebHooks { get; set; } = default!;
-        public DbSet<RefreshTokenScope>           RefreshTokenScopes           { get; set; } = default!;
-        public DbSet<RefreshTokenIntent>          RefreshTokenIntents          { get; set; } = default!;
+        public DbSet<RefreshTokenScope> RefreshTokenScopes { get; set; } = default!;
+        public DbSet<RefreshTokenIntent> RefreshTokenIntents { get; set; } = default!;
         public DbSet<RefreshTokenPermissionEntry> RefreshTokenPermissionEntries { get; set; } = default!;
+        public DbSet<RefreshTokenAudit> RefreshTokenAudits { get; set; } = default!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -101,11 +104,27 @@ namespace EchoPhase.DAL.Postgres
                 entity.Property(it => it.Name).IsRequired();
             });
 
+            builder.Entity<ExternalToken>(entity =>
+            {
+                entity.ToTable("ExternalTokens");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.UserId, e.ProviderName, e.TokenName }).IsUnique();
+                entity.HasOne(e => e.User)
+                      .WithMany(u => u.ExternalTokens)
+                      .HasForeignKey(e => e.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
             builder.Entity<RefreshToken>(entity =>
             {
                 entity.ToTable("RefreshTokens");
                 entity.HasKey(e => e.Id);
                 entity.HasIndex(t => new { t.RefreshValue, t.UserId }).IsUnique();
+                entity.HasMany(t => t.Audits)
+                      .WithOne(a => a.RefreshToken)
+                      .HasForeignKey(a => a.RefreshTokenId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
                 entity.HasOne(t => t.User)
                       .WithMany(u => u.RefreshTokens)
                       .HasForeignKey(t => t.UserId)
@@ -147,6 +166,12 @@ namespace EchoPhase.DAL.Postgres
                 entity.HasKey(e => e.Id);
                 entity.HasIndex(e => new { e.RefreshTokenId, e.Resource, e.Permission }).IsUnique();
             });
+
+            builder.Entity<RefreshTokenAudit>(entity =>
+            {
+                entity.ToTable("RefreshTokenAudits");
+                entity.HasKey(e => e.Id);
+            });
         }
 
         public override int SaveChanges()
@@ -185,7 +210,7 @@ namespace EchoPhase.DAL.Postgres
 
             foreach (var entry in concurrentEntries)
             {
-                entry.Entity.ConcurrencyStamp = Guid.NewGuid();
+                entry.Entity.ConcurrencyStamp = Uuid.NewDatabaseFriendly(UUIDNext.Database.PostgreSql);
             }
         }
     }

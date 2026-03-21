@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using EchoPhase.DAL.Abstractions;
+using UUIDNext;
 
 namespace EchoPhase.DAL.Postgres.Models
 {
@@ -8,41 +9,33 @@ namespace EchoPhase.DAL.Postgres.Models
         public Guid Id
         {
             get; set;
-        }
+        } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
 
         public WebHookStatus Status { get; set; } = WebHookStatus.Enabled;
 
-        private Guid _userId;
         public Guid UserId
         {
-            get
-            {
-                return _userId;
-            }
+            get;
             set
             {
                 if (value == Guid.Empty)
                     throw new InvalidOperationException("Guid cannot be empty.");
 
-                _userId = value;
+                field = value;
             }
         }
 
-        private string _url = string.Empty;
         public string Url
         {
-            get
-            {
-                return _url;
-            }
+            get;
             set
             {
                 if (string.IsNullOrWhiteSpace(value) || !IsValidUrl(value))
                     throw new InvalidOperationException("Invalid URL.");
 
-                _url = value;
+                field = value;
             }
-        }
+        } = string.Empty;
 
         public User? User
         {
@@ -57,7 +50,7 @@ namespace EchoPhase.DAL.Postgres.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         [ConcurrencyCheck]
-        public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
+        public Guid ConcurrencyStamp { get; set; } = Uuid.NewRandom();
 
         private bool IsValidUrl(string url)
         {

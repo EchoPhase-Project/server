@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using EchoPhase.Security.Authentication.Jwt;
+using EchoPhase.Security.Authentication.Jwt.Helpers;
+using EchoPhase.Security.Authentication.Jwt.Providers;
 using EchoPhase.Security.Authentication.Options;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -8,26 +10,24 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using EchoPhase.Security.Authentication.Jwt.Helpers;
-using EchoPhase.Security.Authentication.Jwt.Providers;
 
 namespace EchoPhase.Security.Authentication.Handlers
 {
     public class RefreshHandler : AuthenticationHandler<RefreshOptions>
     {
-        private readonly IJwtTokenProvider    _jwt;
+        private readonly IJwtTokenProvider _jwt;
         private readonly IRefreshTokenProvider _refresh;
 
         public RefreshHandler(
-            IJwtTokenProvider      jwt,
-            IRefreshTokenProvider  refresh,
+            IJwtTokenProvider jwt,
+            IRefreshTokenProvider refresh,
             IOptionsMonitor<RefreshOptions> options,
             ILoggerFactory logger,
-            UrlEncoder     encoder)
+            UrlEncoder encoder)
             : base(options, logger, encoder)
         {
-            _jwt         = jwt;
-            _refresh     = refresh;
+            _jwt = jwt;
+            _refresh = refresh;
         }
 
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -99,7 +99,7 @@ namespace EchoPhase.Security.Authentication.Handlers
         private async Task<ClaimsPrincipal?> TrySilentRefreshAsync()
         {
             if (!Request.Cookies.TryGetValue(CookieNames.RefreshToken, out var refreshToken) ||
-                !Request.Cookies.TryGetValue(CookieNames.RefreshId,    out var refreshIdRaw) ||
+                !Request.Cookies.TryGetValue(CookieNames.RefreshId, out var refreshIdRaw) ||
                 !Guid.TryParse(refreshIdRaw, out var refreshId))
             {
                 return null;

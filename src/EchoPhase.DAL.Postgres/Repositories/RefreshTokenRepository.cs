@@ -1,42 +1,29 @@
 using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.DAL.Postgres.Repositories.Options;
+using EchoPhase.DAL.Postgres.Repositories.Queries;
 using EchoPhase.Types.Repository;
-using Microsoft.EntityFrameworkCore;
+
+// ── RefreshTokenRepository ────────────────────────────────────────────────────
 
 namespace EchoPhase.DAL.Postgres.Repositories
 {
-    public class RefreshTokenRepository
-        : RepositoryBase<RefreshToken, RefreshTokenOptions, RefreshTokenSearchOptions>
+    public class RefreshTokenRepository : RepositoryBase<RefreshToken>
     {
-        private readonly PostgresContext _dbContext;
+        private readonly PostgresContext _context;
 
-        public RefreshTokenRepository(PostgresContext dbContext) : base()
+        public RefreshTokenRepository(PostgresContext context)
         {
-            _dbContext = dbContext;
+            _context = context;
         }
+
+        public new RefreshTokenQuery Query() => new(Build());
 
         public override IQueryable<RefreshToken> Build()
-        {
-            IQueryable<RefreshToken> query = _dbContext.RefreshTokens;
-            if (_options.IncludeUser)
-                query = query.Include(q => q.User);
-            if (_options.IncludeClaims)
-                query = query
-                    .Include(q => q.Scopes)
-                    .Include(q => q.Intents)
-                    .Include(q => q.Permissions);
-            return query;
-        }
+            => _context.RefreshTokens;
 
-        protected override IQueryable<RefreshToken> ApplyExtraFilters(
-            IQueryable<RefreshToken> query,
-            RefreshTokenSearchOptions opts)
-        {
-            if (opts.Ids           is { Count: > 0 }) query = query.Where(x => opts.Ids.Contains(x.Id));
-            if (opts.UserIds       is { Count: > 0 }) query = query.Where(x => opts.UserIds.Contains(x.UserId));
-            if (opts.DeviceIds     is { Count: > 0 }) query = query.Where(x => x.DeviceId != null && opts.DeviceIds.Contains(x.DeviceId));
-            if (opts.RefreshValues is { Count: > 0 }) query = query.Where(x => x.RefreshValue != null && opts.RefreshValues.Contains(x.RefreshValue));
-            return query;
-        }
+        public override void Add(RefreshToken entity) => _context.RefreshTokens.Add(entity);
+        public override void Update(RefreshToken entity) => _context.RefreshTokens.Update(entity);
+        public override void Remove(RefreshToken entity) => _context.RefreshTokens.Remove(entity);
+        public override Task<int> SaveAsync(CancellationToken ct = default)
+            => _context.SaveChangesAsync(ct);
     }
 }

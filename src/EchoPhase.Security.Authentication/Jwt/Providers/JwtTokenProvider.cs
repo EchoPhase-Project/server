@@ -4,13 +4,13 @@ using EchoPhase.Configuration.Authentication;
 using EchoPhase.Configuration.Authentication.Bearer;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
+using EchoPhase.Security.Authentication.Jwt.Claims;
 using EchoPhase.Security.Cryptography.Vaults;
 using EchoPhase.Types.Result.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using EchoPhase.Security.Authentication.Jwt.Claims;
 
 namespace EchoPhase.Security.Authentication.Jwt.Providers
 {
@@ -55,15 +55,15 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             if (user is null) throw new ArgumentNullException(nameof(user));
 
             var principal = await _principalFactory.CreateAsync(user, context);
-            var identity  = (ClaimsIdentity)principal.Identity!;
+            var identity = (ClaimsIdentity)principal.Identity!;
 
-            var tokenHandler     = new JwtSecurityTokenHandler();
-            var tokenDescriptor  = new SecurityTokenDescriptor
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject            = identity,
-                Expires            = DateTime.UtcNow + (lifetime ?? _settings.Lifetime),
-                Issuer             = _settings.Issuer,
-                Audience           = _settings.Audience,
+                Subject = identity,
+                Expires = DateTime.UtcNow + (lifetime ?? _settings.Lifetime),
+                Issuer = _settings.Issuer,
+                Audience = _settings.Audience,
                 SigningCredentials = new SigningCredentials(
                     new SymmetricSecurityKey(_key),
                     SecurityAlgorithms.HmacSha256Signature)
@@ -81,15 +81,15 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             tokenHandler.InboundClaimTypeMap.Clear();
             var tokenValidationParameters = new TokenValidationParameters
             {
-                AuthenticationType           = JwtBearerDefaults.AuthenticationScheme,
-                ValidateIssuerSigningKey     = true,
-                IssuerSigningKey             = new SymmetricSecurityKey(_key),
-                ValidateIssuer               = true,
-                ValidIssuer                  = _settings.ValidIssuer,
-                ValidateAudience             = true,
-                ValidAudiences               = _settings.ValidAudiences,
-                ValidateLifetime             = true,
-                ClockSkew                    = TimeSpan.Zero
+                AuthenticationType = JwtBearerDefaults.AuthenticationScheme,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(_key),
+                ValidateIssuer = true,
+                ValidIssuer = _settings.ValidIssuer,
+                ValidateAudience = true,
+                ValidAudiences = _settings.ValidAudiences,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
             };
 
             var claims = tokenHandler.ValidateToken(token, tokenValidationParameters, out _);

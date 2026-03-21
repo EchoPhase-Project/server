@@ -1,39 +1,29 @@
 using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.DAL.Postgres.Repositories.Options;
+using EchoPhase.DAL.Postgres.Repositories.Queries;
 using EchoPhase.Types.Repository;
-using Microsoft.EntityFrameworkCore;
+
+// ── UserRepository ────────────────────────────────────────────────────────────
 
 namespace EchoPhase.DAL.Postgres.Repositories
 {
-    public class UserRepository
-        : RepositoryBase<User, UserOptions, UserSearchOptions>
+    public class UserRepository : RepositoryBase<User>
     {
-        private readonly PostgresContext _dbContext;
+        private readonly PostgresContext _context;
 
-        public UserRepository(PostgresContext dbContext) : base()
+        public UserRepository(PostgresContext context)
         {
-            _dbContext = dbContext;
+            _context = context;
         }
+
+        public new UserQuery Query() => new(Build());
 
         public override IQueryable<User> Build()
-        {
-            IQueryable<User> query = _dbContext.Users;
-            if (_options.IncludeWebHooks)
-                query = query.Include(q => q.WebHooks);
-            if (_options.IncludeRefreshTokens)
-                query = query.Include(q => q.RefreshTokens);
-            return query;
-        }
+            => _context.Users;
 
-        protected override IQueryable<User> ApplyExtraFilters(
-            IQueryable<User> query,
-            UserSearchOptions opts)
-        {
-            if (opts.Ids       is { Count: > 0 }) query = query.Where(x => opts.Ids.Contains(x.Id));
-            if (opts.Names     is { Count: > 0 }) query = query.Where(x => opts.Names.Contains(x.Name));
-            if (opts.UserNames is { Count: > 0 }) query = query.Where(x => x.UserName != null && opts.UserNames.Contains(x.UserName));
-            if (opts.Emails    is { Count: > 0 }) query = query.Where(x => x.Email != null && opts.Emails.Contains(x.Email));
-            return query;
-        }
+        public override void Add(User entity) => _context.Users.Add(entity);
+        public override void Update(User entity) => _context.Users.Update(entity);
+        public override void Remove(User entity) => _context.Users.Remove(entity);
+        public override Task<int> SaveAsync(CancellationToken ct = default)
+            => _context.SaveChangesAsync(ct);
     }
 }

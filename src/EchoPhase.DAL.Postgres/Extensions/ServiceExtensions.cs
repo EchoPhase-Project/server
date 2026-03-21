@@ -26,6 +26,7 @@ namespace EchoPhase.DAL.Postgres.Extensions
             services.AddScoped<WebHookRepository>();
             services.AddScoped<UserRepository>();
             services.AddScoped<RefreshTokenRepository>();
+            services.AddScoped<ExternalTokenRepository>();
 
             return services;
         }

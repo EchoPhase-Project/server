@@ -1,54 +1,32 @@
 using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.DAL.Postgres.Repositories.Options;
+using EchoPhase.DAL.Postgres.Repositories.Queries;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Types.Repository;
-using EchoPhase.Types.Result.Extensions;
-using Microsoft.EntityFrameworkCore;
+
+// ── WebHookRepository ─────────────────────────────────────────────────────────
 
 namespace EchoPhase.DAL.Postgres.Repositories
 {
-    public class WebHookRepository
-        : RepositoryBase<WebHook, WebHookOptions, WebHookSearchOptions>
+    public class WebHookRepository : RepositoryBase<WebHook>
     {
-        private readonly PostgresContext _dbContext;
-        private readonly IntentsBitMask  _intentsService;
+        private readonly PostgresContext _context;
+        private readonly IntentsBitMask _intentsBitmask;
 
-        public WebHookRepository(PostgresContext dbContext, IntentsBitMask intentsService)
-            : base()
+        public WebHookRepository(PostgresContext context, IntentsBitMask intentsBitmask)
         {
-            _dbContext       = dbContext;
-            _intentsService  = intentsService;
+            _context = context;
+            _intentsBitmask = intentsBitmask;
         }
+
+        public new WebHookQuery Query() => new(Build(), _intentsBitmask);
 
         public override IQueryable<WebHook> Build()
-        {
-            IQueryable<WebHook> query = _dbContext.WebHooks;
-            if (_options.IncludeUser)
-                query = query.Include(q => q.User);
-            return query;
-        }
+            => _context.WebHooks;
 
-        protected override IQueryable<WebHook> ApplyExtraFilters(
-            IQueryable<WebHook> query,
-            WebHookSearchOptions opts)
-        {
-            if (opts.Ids      is { Count: > 0 }) query = query.Where(x => opts.Ids.Contains(x.Id));
-            if (opts.UserIds  is { Count: > 0 }) query = query.Where(x => opts.UserIds.Contains(x.UserId));
-            if (opts.Names    is { Count: > 0 }) query = query.Where(x => opts.Names.Contains(x.Name));
-            if (opts.Urls     is { Count: > 0 }) query = query.Where(x => opts.Urls.Contains(x.Url));
-
-            if (opts.Intents is { Count: > 0 })
-                query = query
-                    .AsEnumerable()
-                    .Where(w =>
-                    {
-                        if (_intentsService.Deserialize(w.Intents).TryGetValue(out var value))
-                            return _intentsService.Has(value, opts.Intents.ToArray());
-                        return false;
-                    })
-                    .AsQueryable();
-
-            return query;
-        }
+        public override void Add(WebHook entity) => _context.WebHooks.Add(entity);
+        public override void Update(WebHook entity) => _context.WebHooks.Update(entity);
+        public override void Remove(WebHook entity) => _context.WebHooks.Remove(entity);
+        public override Task<int> SaveAsync(CancellationToken ct = default)
+            => _context.SaveChangesAsync(ct);
     }
 }

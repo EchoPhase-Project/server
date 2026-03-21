@@ -2,7 +2,6 @@ using EchoPhase.Controllers.Api.v1.Dto.Auth;
 using EchoPhase.Identity;
 using EchoPhase.Projection;
 using EchoPhase.Security.Authentication;
-using EchoPhase.Security.Antiforgery.Attributes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,17 +12,17 @@ namespace EchoPhase.Controllers.Api.v1
     public class AuthenticationController : ControllerBase
     {
         private readonly IAuthenticationService _authService;
-        private readonly IUserService           _userService;
-        private readonly Projector              _projector;
+        private readonly IUserService _userService;
+        private readonly Projector _projector;
 
         public AuthenticationController(
             IAuthenticationService authService,
-            IUserService           userService,
-            Projector              projector)
+            IUserService userService,
+            Projector projector)
         {
-            _authService        = authService;
-            _userService        = userService;
-            _projector          = projector;
+            _authService = authService;
+            _userService = userService;
+            _projector = projector;
         }
 
         [HttpPost("register")]
@@ -66,38 +65,5 @@ namespace EchoPhase.Controllers.Api.v1
 
             return Ok(projected);
         }
-
-        [Authorize]
-        [HttpPost("logout")]
-        [ValidateAntiForgery]
-        public async Task<IActionResult> Logout()
-        {
-            var user = await _userService.GetAsync(User);
-            if (user is null)
-                return Unauthorized();
-
-            var result = await _authService.LogoutAsync(user.Id);
-            if (!result.Successful)
-                return BadRequest(result.Error);
-
-            return NoContent();
-        }
-
-        /*
-        [HttpPost("logout-all")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> LogoutAll()
-        {
-            var user = await _userService.GetAsync(User);
-            if (user is null)
-                return Unauthorized();
-
-            var result = await _authService.LogoutAllAsync(user.Id);
-            if (!result.Successful)
-                return BadRequest(result.Error);
-
-            return NoContent();
-        }
-        */
     }
 }

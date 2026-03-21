@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
-using Microsoft.Extensions.DependencyInjection;
 using EchoPhase.Security.Authentication.Jwt.Claims.Providers;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Security.Authentication.Jwt.Claims
 {

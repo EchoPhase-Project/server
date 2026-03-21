@@ -19,10 +19,9 @@ namespace EchoPhase.Cli.Commands.User.Roles.Remove
 
         public override async Task<int> ExecuteAsync(CommandContext context, RemoveSettings settings, CancellationToken cancellationToken)
         {
-            var users = _userRepository.Get(opts =>
-            {
-                opts.UserNames = new HashSet<string> { settings.Username };
-            }).Data.ToHashSet();
+            var users = _userRepository.Query()
+                .WithUserNames(settings.Username)
+                .ToHashSet();
 
             if (users is { Count: 0 })
             {

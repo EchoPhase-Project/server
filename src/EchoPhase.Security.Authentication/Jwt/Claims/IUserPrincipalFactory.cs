@@ -1,6 +1,5 @@
-using EchoPhase.DAL.Postgres.Models;
 using System.Security.Claims;
-using EchoPhase.Security.Authentication.Jwt.Claims;
+using EchoPhase.DAL.Postgres.Models;
 
 namespace EchoPhase.Security.Authentication.Jwt.Claims
 {

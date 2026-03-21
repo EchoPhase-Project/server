@@ -1,16 +1,16 @@
+using EchoPhase.DAL.Abstractions;
+
 namespace EchoPhase.Types.Repository
 {
-    public interface IRepositoryBase<TEntity, TO>
+    public interface IRepositoryBase<TEntity>
+        where TEntity : class, ITrackingEntity, IIdentifiable
     {
-        void WithOptions(TO options);
-        void WithOptions(Action<TO> configure);
         IQueryable<TEntity> Build();
-    }
-
-    public interface IRepositoryBase
-    {
-        void WithOptions(object options);
-        void WithOptions(Action<object> configure);
-        IQueryable<T> Build<T>();
+        RepositoryQuery<TEntity> Query();
+        void Add(TEntity entity);
+        void Update(TEntity entity);
+        void Remove(TEntity entity);
+        Task<int> SaveAsync(CancellationToken ct = default);
+        Task<int> Set(TEntity entity, Action<TEntity>? configure = null, CancellationToken ct = default);
     }
 }

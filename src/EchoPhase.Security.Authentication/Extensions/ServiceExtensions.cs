@@ -1,13 +1,13 @@
+using System.IdentityModel.Tokens.Jwt;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.Security.Authentication.Jwt.Providers;
+using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Security.Authentication.Jwt.Claims;
+using EchoPhase.Security.Authentication.Jwt.Providers;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
-using EchoPhase.Security.Authentication.Jwt;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using System.IdentityModel.Tokens.Jwt;
 
 namespace EchoPhase.Security.Authentication.Extensions
 {
@@ -61,8 +61,8 @@ namespace EchoPhase.Security.Authentication.Extensions
             services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultSignInScheme       = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultSignInScheme = JwtBearerDefaults.AuthenticationScheme;
             })
                 .AddRefresh()
                 .AddCookie(options =>

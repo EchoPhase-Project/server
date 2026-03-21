@@ -1,6 +1,6 @@
+using System.Security.Claims;
 using EchoPhase.Identity;
 using EchoPhase.Security.BitMasks;
-using System.Security.Claims;
 using EchoPhase.Types.Result.Extensions;
 
 namespace EchoPhase.Security.Authentication.Jwt.Claims.Providers

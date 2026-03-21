@@ -18,10 +18,53 @@ namespace EchoPhase.DAL.Postgres.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("EchoPhase")
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.ExternalToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("ProviderName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TokenName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("Value")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "ProviderName", "TokenName")
+                        .IsUnique();
+
+                    b.ToTable("ExternalTokens", "EchoPhase");
+                });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshToken", b =>
                 {
@@ -61,6 +104,40 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .IsUnique();
 
                     b.ToTable("RefreshTokens", "EchoPhase");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshTokenAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("RefreshTokenId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RefreshTokenId");
+
+                    b.ToTable("RefreshTokenAudits", "EchoPhase");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshTokenIntent", b =>
@@ -413,6 +490,17 @@ namespace EchoPhase.DAL.Postgres.Migrations
                     b.ToTable("AspNetUserTokens", "EchoPhase");
                 });
 
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.ExternalToken", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
+                        .WithMany("ExternalTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshToken", b =>
                 {
                     b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
@@ -422,6 +510,17 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshTokenAudit", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.RefreshToken", "RefreshToken")
+                        .WithMany("Audits")
+                        .HasForeignKey("RefreshTokenId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RefreshToken");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshTokenIntent", b =>
@@ -521,6 +620,8 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.RefreshToken", b =>
                 {
+                    b.Navigation("Audits");
+
                     b.Navigation("Intents");
 
                     b.Navigation("Permissions");
@@ -530,6 +631,8 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.User", b =>
                 {
+                    b.Navigation("ExternalTokens");
+
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("WebHooks");
