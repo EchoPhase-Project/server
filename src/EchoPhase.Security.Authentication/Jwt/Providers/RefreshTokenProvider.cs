@@ -9,10 +9,10 @@ using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Identity;
 using EchoPhase.Security.Authentication.Jwt.Claims;
-using EchoPhase.Types.Repository;
-using Microsoft.Extensions.Options;
-using Microsoft.EntityFrameworkCore;
 using EchoPhase.Security.Authentication.Jwt.Exceptions;
+using EchoPhase.Types.Repository;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EchoPhase.Security.Authentication.Jwt.Providers
 {

@@ -8,9 +8,9 @@ using EchoPhase.DAL.Redis.Interfaces;
 using EchoPhase.DAL.Redis.Models;
 using EchoPhase.WebSockets.Exceptions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Hosting;
 
 namespace EchoPhase.WebSockets
 {
@@ -374,17 +374,6 @@ namespace EchoPhase.WebSockets
             foreach (var (userId, connections) in _connections)
             {
                 if (connections.Contains(connection))
-                    return new WebSocketCache { UserId = userId };
-            }
-
-            return new WebSocketCache { UserId = Guid.Empty };
-        }
-
-        private WebSocketCache FindUserIdByWebSocket(WebSocket webSocket)
-        {
-            foreach (var (userId, connections) in _connections)
-            {
-                if (connections.Any(conn => conn.WebSocket == webSocket))
                     return new WebSocketCache { UserId = userId };
             }
 

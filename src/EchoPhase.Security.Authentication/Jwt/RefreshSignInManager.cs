@@ -4,12 +4,12 @@
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Security.Authentication.Jwt.Claims;
+using EchoPhase.Security.Authentication.Jwt.Exceptions;
 using EchoPhase.Security.Authentication.Jwt.Helpers;
 using EchoPhase.Security.Authentication.Jwt.Providers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
-using EchoPhase.Security.Authentication.Jwt.Exceptions;
 
 namespace EchoPhase.Security.Authentication.Jwt
 {

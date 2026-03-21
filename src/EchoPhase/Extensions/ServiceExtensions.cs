@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using EchoPhase.Clients;
 using EchoPhase.Clients.Discord;
-using EchoPhase.Clients.Providers;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
 using EchoPhase.Interfaces.Services;
