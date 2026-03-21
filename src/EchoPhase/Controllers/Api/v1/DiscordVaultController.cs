@@ -1,5 +1,7 @@
-using EchoPhase.Clients.Discord;
+using System.Text;
+using EchoPhase.Clients;
 using EchoPhase.Controllers.Api.v1.Dto.Discord;
+using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
 using EchoPhase.Security.Antiforgery.Attributes;
 using Microsoft.AspNetCore.Mvc;
@@ -10,12 +12,15 @@ namespace EchoPhase.Controllers.Api.v1
     [Route("/api/v1/discord/vault")]
     public class DiscordVaultController : ControllerBase
     {
-        private readonly IDiscordSecretVault _vault;
+        private readonly IExternalTokenService _tokenService;
         private readonly IUserService _userService;
+        private readonly string _providerName = "Discord";
 
-        public DiscordVaultController(IDiscordSecretVault vault, IUserService userService)
+        public DiscordVaultController(
+            IExternalTokenService tokenService,
+            IUserService userService)
         {
-            _vault = vault;
+            _tokenService = tokenService;
             _userService = userService;
         }
 
@@ -26,7 +31,7 @@ namespace EchoPhase.Controllers.Api.v1
             if (user is null)
                 return Unauthorized();
 
-            var keys = await _vault.GetUserKeyNamesAsync(user.Id.ToString());
+            var keys = _tokenService.GetKeyNames(user.Id);
             return Ok(keys);
         }
 
@@ -38,10 +43,15 @@ namespace EchoPhase.Controllers.Api.v1
             if (user is null)
                 return Unauthorized();
 
-            var result = await _vault.SetAsync(user.Id.ToString(), dto.Name, dto.Value);
-            if (!result)
-                return StatusCode(StatusCodes.Status500InternalServerError);
+            var entity = new ExternalToken
+            {
+                UserId = user.Id,
+                ProviderName = _providerName,
+                TokenName = dto.Name,
+                Value = Encoding.UTF8.GetBytes(dto.Value)
+            };
 
+            await _tokenService.SetAsync(entity);
             return NoContent();
         }
 
@@ -53,14 +63,14 @@ namespace EchoPhase.Controllers.Api.v1
             if (user is null)
                 return Unauthorized();
 
-            var result = await _vault.DeleteAsync(user.Id.ToString(), dto.Name);
-            if (!result)
+            var deleted = await _tokenService.DeleteAsync(user.Id, _providerName, dto.Name);
+            if (!deleted)
                 return NotFound();
 
             return NoContent();
         }
 
-        [HttpDelete]
+        [HttpDelete("all")]
         [ValidateAntiForgery]
         public async Task<IActionResult> DeleteAll()
         {
@@ -68,9 +78,8 @@ namespace EchoPhase.Controllers.Api.v1
             if (user is null)
                 return Unauthorized();
 
-            await _vault.DeleteAllAsync(user.Id.ToString());
+            await _tokenService.DeleteAllAsync(user.Id);
             return NoContent();
         }
     }
 }
-

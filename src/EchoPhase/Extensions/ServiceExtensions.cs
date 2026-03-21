@@ -1,9 +1,11 @@
 using System.Globalization;
 using System.Net.Http.Headers;
+using EchoPhase.Clients;
 using EchoPhase.Clients.Discord;
+using EchoPhase.Clients.Providers;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
-using EchoPhase.Interfaces;
+using EchoPhase.Interfaces.Services;
 using EchoPhase.Services.Events;
 using EchoPhase.WebHooks;
 using Microsoft.AspNetCore.Identity;
@@ -38,7 +40,11 @@ namespace EchoPhase.Extensions
 
         public static IServiceCollection AddDiscordClient(this IServiceCollection services)
         {
-            services.AddSingleton<IDiscordSecretVault, DiscordSecretVault>();
+            services.AddSingleton<IClientSecretVault, ClientSecretVault>();
+            services.AddScoped<ClientAccessProvider>();
+            services.AddScoped<IExternalTokenService, ExternalTokenService>();
+            services.AddScoped<IClientTokenProviderRegistry>(
+                sp => new ClientTokenProviderRegistry(sp));
             services.AddHttpClient<IDiscordClient, DiscordClient>("Discord", (serviceProvider, client) =>
                     {
                         client.BaseAddress = new Uri("https://discord.com/api/v10/");
@@ -83,10 +89,7 @@ namespace EchoPhase.Extensions
                 o.AreaViewLocationFormats.Add("/Areas/Shared/Views/{0}" + RazorViewEngine.ViewExtension);
             });
 
-            services.AddMvc()
-                .AddNewtonsoftJson(options =>
-                    options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
-                );
+            services.AddMvc();
 
             return services;
         }

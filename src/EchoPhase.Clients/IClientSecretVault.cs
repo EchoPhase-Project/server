@@ -1,9 +1,9 @@
 using EchoPhase.Types.Result;
 using StackExchange.Redis;
 
-namespace EchoPhase.Clients.Discord
+namespace EchoPhase.Clients
 {
-    public interface IDiscordSecretVault
+    public interface IClientSecretVault
     {
         // --------------------------
         // Exists
@@ -48,12 +48,18 @@ namespace EchoPhase.Clients.Discord
         Task<IServiceResult<T>> GetOrSetAsync<T>(
             string userId,
             string keyName,
-            Func<Task<T>>? generator = null);
+            Func<Task<T>>? generator = null,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None);
 
         Task<IServiceResult<T>> GetOrSetAsync<T>(
             string userId,
             string keyName,
-            Func<T> generator);
+            Func<T> generator,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None);
 
         // --------------------------
         // Delete

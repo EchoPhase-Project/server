@@ -6,18 +6,14 @@ using EchoPhase.Types.Result;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
-// --------------------------
-// Discord
-// --------------------------
-
-namespace EchoPhase.Clients.Discord
+namespace EchoPhase.Clients
 {
-    public sealed class DiscordSecretVault : SecretVaultBase, IDiscordSecretVault
+    public sealed class ClientSecretVault : SecretVaultBase, IClientSecretVault
     {
-        protected override string KeyPrefix => "discord_";
+        protected override string KeyPrefix => "client_";
         private const string IndexSuffix = "__index";
 
-        public DiscordSecretVault(
+        public ClientSecretVault(
             IConnectionMultiplexer redis,
             AesGcm aesGcm,
             IOptions<DatabaseOptions> settings,
@@ -29,14 +25,13 @@ namespace EchoPhase.Clients.Discord
         // --------------------------
 
         private string UserKey(string userId, string keyName) =>
-            $"discord:{userId}:{keyName}";
+            $"client:{userId}:{keyName}";
 
-        // Index хранится по UUID ключу — Prefixed шифрует путь
         private string IndexKey(string userId) =>
-            Prefixed($"discord:{userId}{IndexSuffix}");
+            Prefixed($"client:{userId}{IndexSuffix}");
 
         // --------------------------
-        // Index helpers — содержимое шифруется через AesGcm
+        // Index helpers
         // --------------------------
 
         private async Task<HashSet<string>> IndexGetAsync(string userId)
@@ -130,7 +125,6 @@ namespace EchoPhase.Clients.Discord
             var result = Set(UserKey(userId, keyName), value, expiry, keepTtl, when, flags);
 
             if (result)
-                // Синхронный Set — запускаем async index через GetAwaiter
                 IndexAddAsync(userId, keyName).GetAwaiter().GetResult();
 
             return result;
@@ -143,21 +137,25 @@ namespace EchoPhase.Clients.Discord
         public async Task<IServiceResult<T>> GetOrSetAsync<T>(
             string userId,
             string keyName,
-            Func<Task<T>>? generator = null)
+            Func<Task<T>>? generator = null,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None)
         {
-            var result = await GetOrSetAsync(UserKey(userId, keyName), generator);
-
+            var result = await GetOrSetAsync(UserKey(userId, keyName), generator, expiry, keepTtl, flags);
             if (result.Successful)
                 await IndexAddAsync(userId, keyName);
-
             return result;
         }
 
         public Task<IServiceResult<T>> GetOrSetAsync<T>(
             string userId,
             string keyName,
-            Func<T> generator) =>
-            GetOrSetAsync(userId, keyName, () => Task.FromResult(generator()));
+            Func<T> generator,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None) =>
+            GetOrSetAsync(userId, keyName, () => Task.FromResult(generator()), expiry, keepTtl, flags);
 
         // --------------------------
         // Delete
