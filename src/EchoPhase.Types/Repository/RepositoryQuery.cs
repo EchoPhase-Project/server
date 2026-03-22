@@ -68,6 +68,13 @@ namespace EchoPhase.Types.Repository
             return this;
         }
 
+        public RepositoryQuery<TEntity> AsNoTracking()
+        {
+            _query = _query.AsNoTracking();
+            return this;
+        }
+
+
         // ── Cursor (string / opaque) ──────────────────────────────────────────
 
         /// <summary>

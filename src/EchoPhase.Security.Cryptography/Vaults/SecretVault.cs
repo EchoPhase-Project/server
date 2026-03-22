@@ -14,8 +14,6 @@ namespace EchoPhase.Security.Cryptography.Vaults
 {
     public sealed class SecretVault : SecretVaultBase, ISecretVault
     {
-        protected override string KeyPrefix => "secret_";
-
         public SecretVault(
             IConnectionMultiplexer redis,
             AesGcm aesGcm,

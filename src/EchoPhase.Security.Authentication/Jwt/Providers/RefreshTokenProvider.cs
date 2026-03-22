@@ -118,8 +118,8 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             if (isReused)
             {
                 var userId = existing.UserId;
-                _db.RefreshTokens.Remove(existing);
-                await _db.SaveChangesAsync();
+                _repository.Remove(existing);
+                await _repository.SaveAsync();
                 throw new RefreshTokenReusedException(userId);
             }
 

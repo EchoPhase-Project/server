@@ -69,7 +69,7 @@ namespace EchoPhase.Identity
 
         public async Task<string> GetOrSetCodeAsync(User user)
         {
-            TimeSpan duration = TimeSpan.FromMinutes(20);
+            var duration = TimeSpan.FromMinutes(20);
 
             QrUserCache qrUserCache = await _cacheContext
                 .Entry<QrUserCache>(user.Id.ToString())
@@ -150,11 +150,11 @@ namespace EchoPhase.Identity
             if (userId == Guid.Empty)
                 throw new ArgumentNullException(nameof(userId));
 
-            string result = (String.IsNullOrEmpty(filename))
+            string result = String.IsNullOrEmpty(filename)
                 ? Path.Combine("files", userId.ToString(), "image")
                 : Path.Combine("files", userId.ToString(), "image", filename);
 
-            return (root)
+            return root
                 ? Path.Combine(_environment.ContentRootPath, result)
                 : result;
         }

@@ -83,17 +83,6 @@ namespace EchoPhase.Security.Cryptography.Vaults
         }
 
         // --------------------------
-        // Key prefix
-        // --------------------------
-
-        /// <summary>
-        /// Short vault-type prefix, e.g. <c>"secret_"</c> or <c>"client_"</c>.
-        /// Subclasses declare this; it is used by the convenience constructor to
-        /// build the default <see cref="TenantUuidKeyStrategy"/>.
-        /// </summary>
-        protected abstract string KeyPrefix { get; }
-
-        // --------------------------
         // Exists
         // --------------------------
 

@@ -3,6 +3,7 @@
 
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
+using EchoPhase.Projection;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication;
 using EchoPhase.Security.Authentication.Attributes;
@@ -19,16 +20,17 @@ namespace EchoPhase.Controllers.Api.v1
     {
         private readonly IAuthenticationService _authService;
         private readonly IRefreshTokenProvider _refreshProvider;
-        private readonly IUserService _userService;
+        private readonly Projector _projector;
 
         public SessionController(
             IAuthenticationService authService,
             IRefreshTokenProvider refreshProvider,
-            IUserService userService)
+            IUserService userService,
+            Projector projector)
         {
             _authService = authService;
             _refreshProvider = refreshProvider;
-            _userService = userService;
+            _projector = projector;
         }
 
         private User currentUser =>
@@ -38,7 +40,11 @@ namespace EchoPhase.Controllers.Api.v1
         public async Task<IActionResult> GetSessions([FromQuery] CursorOptions? cursor)
         {
             var sessions = await _refreshProvider.GetSessionsAsync(currentUser.Id, cursor);
-            return Ok(sessions);
+            var projected = _projector
+                .For(sessions)
+                .Build();
+
+            return Ok(projected);
         }
 
         [HttpDelete("current")]

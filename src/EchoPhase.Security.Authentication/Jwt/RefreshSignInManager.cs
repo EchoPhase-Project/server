@@ -68,14 +68,18 @@ namespace EchoPhase.Security.Authentication.Jwt
         {
             await _refresh.RevokeAsync(userId, tokenId);
             await InvalidateUserAsync(userId);
-            TokenCookieHelper.Clear(_httpContext.HttpContext!.Response);
+            var context = _httpContext.HttpContext
+                          ?? throw new InvalidOperationException("HttpContext is not available.");
+            TokenCookieHelper.Clear(context.Response);
         }
 
         public async Task LogoutAllAsync(Guid userId)
         {
             await _refresh.RevokeAllAsync(userId);
             await InvalidateUserAsync(userId);
-            TokenCookieHelper.Clear(_httpContext.HttpContext!.Response);
+            var context = _httpContext.HttpContext
+                          ?? throw new InvalidOperationException("HttpContext is not available.");
+            TokenCookieHelper.Clear(context.Response);
         }
 
         public async Task<TokenPair> RefreshAsync(Guid refreshId, string refreshToken)

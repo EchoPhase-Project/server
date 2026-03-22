@@ -13,8 +13,6 @@ namespace EchoPhase.Clients
 {
     public sealed class ClientSecretVault : SecretVaultBase, IClientSecretVault
     {
-        protected override string KeyPrefix => "client_";
-
         public ClientSecretVault(
             IConnectionMultiplexer redis,
             AesGcm aesGcm,

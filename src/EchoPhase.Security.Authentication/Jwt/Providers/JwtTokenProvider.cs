@@ -6,7 +6,7 @@ using System.Security.Claims;
 using EchoPhase.Configuration.Authentication;
 using EchoPhase.Configuration.Authentication.Bearer;
 using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.Identity;
+using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Security.Authentication.Jwt.Claims;
 using EchoPhase.Security.Cryptography.Vaults;
 using EchoPhase.Types.Result.Extensions;
@@ -21,7 +21,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
     {
         private readonly ILogger<JwtTokenProvider> _logger;
         private readonly BearerOptions _settings;
-        private readonly IUserService _userService;
+        private readonly UserRepository _userRepository;
         private readonly IUserPrincipalFactory _principalFactory;
         private readonly byte[] _key;
 
@@ -29,13 +29,13 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             ILogger<JwtTokenProvider> logger,
             IOptions<AuthenticationOptions> settings,
             IKeyVault keyVault,
-            IUserService userService,
+            UserRepository userRepository,
             IUserPrincipalFactory principalFactory
         )
         {
             _logger = logger;
             _settings = settings.Value.Bearer;
-            _userService = userService;
+            _userRepository = userRepository;
             _principalFactory = principalFactory;
 
             var result = keyVault.GetOrSet(_settings.Key);
@@ -92,14 +92,41 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
                 ClockSkew = TimeSpan.Zero
             };
 
-            var claims = tokenHandler.ValidateToken(token, tokenValidationParameters, out _);
+            ClaimsPrincipal claims;
+            try
+            {
+                claims = tokenHandler.ValidateToken(token, tokenValidationParameters, out _);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("JWT signature/lifetime validation failed: {Message}", ex.Message);
+                return null;
+            }
 
-            var user = await _userService.GetAsync(claims) ??
-                throw new InvalidOperationException("Invalid user.");
+            var sub = claims.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (sub is null || !Guid.TryParse(sub, out var userId))
+            {
+                _logger.LogWarning("JWT missing or invalid 'sub' claim");
+                return null;
+            }
+
+            var user = _userRepository.Query()
+                .WithIds(userId)
+                .FirstOrDefault();
+
+            if (user is null)
+            {
+                _logger.LogWarning("User {UserId} not found in DB", userId);
+                return null;
+            }
 
             var stamp = claims.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+
             if (stamp != user.SecurityStamp)
+            {
+                _logger.LogWarning("SecurityStamp mismatch for user {UserId}", userId);
                 throw new SecurityTokenExpiredException("Security stamp mismatch.");
+            }
 
             return claims;
         }

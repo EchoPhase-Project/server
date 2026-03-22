@@ -7,9 +7,9 @@ using EchoPhase.Identity;
 using EchoPhase.Projection;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
+using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Security.Authentication.Jwt.Claims;
 using EchoPhase.Security.Authentication.Jwt.Providers;
-using EchoPhase.Types.Repository;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,16 +22,18 @@ namespace EchoPhase.Controllers.Api.v1
         private readonly IRefreshTokenProvider _refreshTokenProvider;
         private readonly IUserService _userService;
         private readonly Projector _projector;
+        private readonly RefreshSignInManager _refreshSignInManager;
 
         public RefreshTokenController(
             IRefreshTokenProvider refreshTokenProvider,
             IUserService userService,
-            Projector projector
-            )
+            Projector projector,
+            RefreshSignInManager refreshSignInManager)
         {
             _refreshTokenProvider = refreshTokenProvider;
             _userService = userService;
             _projector = projector;
+            _refreshSignInManager = refreshSignInManager;
         }
 
         [HttpPost("new")]
@@ -59,7 +61,7 @@ namespace EchoPhase.Controllers.Api.v1
         [AllowAnonymous]
         public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
         {
-            var tokenPair = await _refreshTokenProvider.RefreshAsync(request.RefreshId, request.RefreshToken);
+            var tokenPair = await _refreshSignInManager.RefreshAsync(request.RefreshId, request.RefreshToken);
             return Ok(tokenPair);
         }
 
@@ -74,32 +76,6 @@ namespace EchoPhase.Controllers.Api.v1
             await _refreshTokenProvider.RevokeAsync(user.Id, request.RefreshId);
             await _userService.UpdateSecurityStampAsync(user);
             return NoContent();
-        }
-
-        [HttpDelete("all")]
-        [ValidateAntiForgery]
-        public async Task<IActionResult> RevokeAll()
-        {
-            var userId = User.GetUserId();
-            await _refreshTokenProvider.RevokeAllAsync(userId);
-            return NoContent();
-        }
-
-        [HttpGet("sessions")]
-        public async Task<IActionResult> GetSessions([FromQuery] CursorDto dto)
-        {
-            var userId = User.GetUserId();
-            var sessions = await _refreshTokenProvider.GetSessionsAsync(userId, new CursorOptions
-            {
-                After = dto.After,
-                Limit = dto.Limit
-            });
-
-            var projected = _projector
-                .For(sessions)
-                .Build();
-
-            return Ok(projected);
         }
     }
 }
