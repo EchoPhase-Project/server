@@ -5,10 +5,11 @@ using System.Linq.Expressions;
 using EchoPhase.DAL.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
-// ── RepositoryQuery<TEntity> ──────────────────────────────────────────────────
-
 namespace EchoPhase.Types.Repository
 {
+    /// <summary>
+    /// Fluent query builder for EF Core repositories.
+    /// </summary>
     public class RepositoryQuery<TEntity>
         where TEntity : class, ITrackingEntity, IIdentifiable
     {
@@ -67,8 +68,11 @@ namespace EchoPhase.Types.Repository
             return this;
         }
 
-        // ── Cursor ────────────────────────────────────────────────────────────
+        // ── Cursor (string / opaque) ──────────────────────────────────────────
 
+        /// <summary>
+        /// Applies opaque base64 string cursor pagination — backward-compatible path.
+        /// </summary>
         public RepositoryQuery<TEntity> WithCursor(CursorOptions cursor)
         {
             var decoded = CursorEncoder.Decode(cursor.After);
@@ -95,6 +99,46 @@ namespace EchoPhase.Types.Repository
             return WithCursor(cursor);
         }
 
+        // ── Cursor (typed) ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Typed cursor overload.  The caller provides a predicate that filters records
+        /// "after" the cursor value — no base64 encoding needed.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// query.WithCursor(
+        ///     options,
+        ///     after => x => x.Id > after);
+        /// </code>
+        /// </example>
+        public RepositoryQuery<TEntity> WithCursor<TCursor>(
+            CursorOptions<TCursor> options,
+            Func<TCursor, Expression<Func<TEntity, bool>>> afterPredicate,
+            Func<TEntity, TCursor> cursorSelector)
+            where TCursor : notnull
+        {
+            if (options.After is not null)
+                _query = _query.Where(afterPredicate(options.After));
+
+            _query = _query
+                .OrderBy(x => x.CreatedAt)
+                .ThenBy(x => EF.Property<Guid>(x, "Id"))
+                .Take(options.Limit + 1);
+
+            // Store as opaque cursor by mapping through the provided selector
+            _cursor = new CursorOptions { Limit = options.Limit };
+            _typedCursorSelector = entity =>
+            {
+                var val = cursorSelector(entity);
+                return val?.ToString() ?? string.Empty;
+            };
+
+            return this;
+        }
+
+        private Func<TEntity, string>? _typedCursorSelector;
+
         // ── Terminals ─────────────────────────────────────────────────────────
 
         public virtual TEntity? FirstOrDefault()
@@ -118,6 +162,10 @@ namespace EchoPhase.Types.Repository
         public virtual int Count()
             => _query.Count();
 
+        /// <summary>
+        /// Materialises the query into a <see cref="CursorPage{T}"/>.
+        /// Works with both the opaque-string cursor and the typed cursor overloads.
+        /// </summary>
         public virtual CursorPage<TEntity> ToPage()
         {
             var items = _query.ToList();
@@ -128,9 +176,14 @@ namespace EchoPhase.Types.Repository
             var hasMore = items.Count > _cursor.Limit;
             if (hasMore) items.RemoveAt(items.Count - 1);
 
-            var nextCursor = hasMore
-                ? CursorEncoder.Encode(items.Last().Id, items.Last().CreatedAt)
-                : null;
+            string? nextCursor = null;
+            if (hasMore)
+            {
+                var last = items.Last();
+                nextCursor = _typedCursorSelector is not null
+                    ? _typedCursorSelector(last)
+                    : CursorEncoder.Encode(last.Id, last.CreatedAt);
+            }
 
             return new CursorPage<TEntity> { Data = items, NextCursor = nextCursor };
         }

@@ -3,9 +3,12 @@
 
 namespace EchoPhase.Types.Repository
 {
-    public class CursorOptions
+    public class CursorOptions<TCursor>
+        where TCursor : notnull
     {
-        public string? After { get; set; } = null;
+        public TCursor? After { get; set; } = default;
         public int Limit { get; set; } = 20;
     }
+
+    public class CursorOptions : CursorOptions<string> { }
 }

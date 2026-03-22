@@ -13,11 +13,13 @@ helm-install:
         --create-namespace
 
 # Upgrade or install helm chart
+# Upgrade or install helm chart
 helm-upgrade:
     helm upgrade --install {{HELM_RELEASE}} {{HELM_DIR}} \
         --namespace {{HELM_NAMESPACE}} \
         --values {{HELM_DIR}}/{{HELM_VALUES}} \
-        --create-namespace
+        --create-namespace \
+        --wait
     kubectl rollout restart deployment -n {{HELM_NAMESPACE}}
 
 # Uninstall helm release

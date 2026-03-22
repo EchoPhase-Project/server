@@ -5,16 +5,18 @@ using EchoPhase.Projection.Attributes;
 
 namespace EchoPhase.Types.Repository
 {
-    public class CursorPage<T>
+    public class CursorPage<T, TCursor>
+        where TCursor : notnull
     {
         [Expose]
         public IEnumerable<T> Data { get; init; } = [];
+
         [Expose]
-        public string? NextCursor
-        {
-            get; init;
-        }
+        public TCursor? NextCursor { get; init; } = default;
+
         [Expose]
         public bool HasMore => NextCursor is not null;
     }
+
+    public class CursorPage<T> : CursorPage<T, string> { }
 }

@@ -2,29 +2,31 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Net.Http.Headers;
-using System.Net.Mime;
-using System.Text;
-using System.Text.Json;
-using EchoPhase.Clients.Helpers;
+using EchoPhase.Clients.Abstractions;
 using EchoPhase.Clients.Models;
 
 namespace EchoPhase.Clients
 {
     public abstract class ClientBase
     {
-        private readonly HttpClient _client;
-        private readonly QueryStringBuilder _queryStringBuilder;
-        private static readonly JsonSerializerOptions _jsonOptions =
-            new(JsonSerializerDefaults.Web);
+        private readonly HttpSender _sender;
 
         protected ClientBase(HttpClient client)
         {
-            _client = client;
-            _queryStringBuilder = new QueryStringBuilder();
+            _sender = new HttpSender(client);
         }
-        protected AuthenticationHeaderValue WithAuth(string scheme, string token) =>
-            new AuthenticationHeaderValue(scheme, token);
 
+        // ── protected helpers for subclasses ─────────────────────────────────
+
+        protected static AuthenticationHeaderValue WithAuth(string scheme, string token) =>
+            new(scheme, token);
+
+        // ── typed response (IClientResponse<TR, TE>) ─────────────────────────
+
+        /// <summary>
+        /// Sends a request and deserialises both success and error bodies into
+        /// strongly-typed wrappers.
+        /// </summary>
         protected async Task<IClientResponse<TR, TE>> SendAsync<TQ, TB, TR, TE>(
             string uri,
             HttpMethod method,
@@ -37,37 +39,74 @@ namespace EchoPhase.Clients
             where TR : class
             where TE : class
         {
-            var baseUri = _client.BaseAddress
-                ?? throw new InvalidOperationException("HttpClient.BaseAddress is not set.");
+            var (statusCode, stream) = await _sender
+                .SendAsync(uri, method, query, body, auth, ct);
 
-            string url = query != null
-                ? new UriBuilder(new Uri(baseUri, uri)) { Query = _queryStringBuilder.Build(query) }.ToString()
-                : new Uri(baseUri, uri).ToString();
-
-            using var httpRequest = new HttpRequestMessage(method, url);
-
-            if (auth != null)
-                httpRequest.Headers.Authorization = auth;
-
-            if (body != null)
+            await using (stream)
             {
-                httpRequest.Content = new StringContent(
-                    JsonSerializer.Serialize(body, _jsonOptions),
-                    Encoding.UTF8,
-                    MediaTypeNames.Application.Json);
+                return await HttpSender
+                    .ReadClientResponseAsync<TR, TE>(stream, statusCode, ct);
             }
+        }
 
-            using var response = await _client.SendAsync(httpRequest, ct);
-            var apiResponse = new ClientResponse<TR, TE> { StatusCode = response.StatusCode };
+        // ── discriminated Result<TR> (used by Discord / Twitch bases) ────────
 
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        /// <summary>
+        /// Sends a request and returns a <see cref="Result{TR}"/> whose error
+        /// side is produced by <paramref name="readError"/>.
+        /// </summary>
+        protected async Task<Result<TR>> SendRawAsync<TQ, TB, TR, TErr>(
+            string uri,
+            HttpMethod method,
+            TQ? query,
+            TB? body,
+            AuthenticationHeaderValue? auth,
+            Func<System.IO.Stream, CancellationToken, Task<TErr?>> readError,
+            Func<TErr?, ApiError> toApiError,
+            CancellationToken ct = default)
+            where TQ : class
+            where TB : class
+            where TR : class
+        {
+            var (statusCode, stream) = await _sender
+                .SendAsync(uri, method, query, body, auth, ct);
 
-            if (response.IsSuccessStatusCode)
-                apiResponse.Data = await JsonSerializer.DeserializeAsync<TR>(stream, _jsonOptions, ct);
-            else
-                apiResponse.Error = await JsonSerializer.DeserializeAsync<TE>(stream, _jsonOptions, ct);
+            await using (stream)
+            {
+                return await HttpSender
+                    .ReadResultAsync<TR, TErr>(stream, statusCode, readError, toApiError, ct);
+            }
+        }
 
-            return apiResponse;
+        // ── paged result ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Sends a request and returns a <see cref="PagedResult{TR}"/> using
+        /// a wrapper DTO that carries both <c>data</c> and pagination info.
+        /// </summary>
+        protected async Task<PagedResult<TR>> SendPagedAsync<TQ, TB, TWrapper, TR>(
+            string uri,
+            HttpMethod method,
+            TQ? query,
+            TB? body,
+            AuthenticationHeaderValue? auth,
+            Func<TWrapper, TR> selectData,
+            Func<TWrapper, IPageInfo?> selectPage,
+            Func<System.IO.Stream, CancellationToken, Task<ApiError?>> readError,
+            CancellationToken ct = default)
+            where TQ : class
+            where TB : class
+            where TWrapper : class
+        {
+            var (statusCode, stream) = await _sender
+                .SendAsync(uri, method, query, body, auth, ct);
+
+            await using (stream)
+            {
+                return await HttpSender
+                    .ReadPagedResultAsync<TWrapper, TR>(
+                        stream, statusCode, selectData, selectPage, readError, ct);
+            }
         }
     }
 }

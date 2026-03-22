@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using EchoPhase.DAL.Postgres.Interceptors;
 using EchoPhase.DAL.Postgres.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,19 +13,22 @@ namespace EchoPhase.DAL.Postgres.Extensions
     {
         public static IServiceCollection AddPostgres(this IServiceCollection services)
         {
-            using (var serviceProvider = services.BuildServiceProvider())
-            {
-                var settings = serviceProvider
-                    .GetRequiredService<IOptions<Configuration.Database.DatabaseOptions>>().Value.Postgres;
+            using var serviceProvider = services.BuildServiceProvider();
 
-                services.AddDbContext<PostgresContext>(options =>
-                    options.UseNpgsql(settings.ConnectionString, o =>
+            var settings = serviceProvider
+                .GetRequiredService<IOptions<Configuration.Database.DatabaseOptions>>().Value.Postgres;
+
+            services.AddSingleton<AuditInterceptor>();
+
+            services.AddDbContext<PostgresContext>((sp, options) =>
+                options
+                    .UseNpgsql(settings.ConnectionString, o =>
                     {
                         o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
                         o.EnableRetryOnFailure(maxRetryCount: 3);
                         o.MigrationsHistoryTable("__EFMigrationsHistory", "public");
-                    }));
-            }
+                    })
+                    .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
 
             services.AddScoped<WebHookRepository>();
             services.AddScoped<UserRepository>();

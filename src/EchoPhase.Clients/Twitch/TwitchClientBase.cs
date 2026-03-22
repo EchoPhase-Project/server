@@ -9,19 +9,26 @@ using EchoPhase.Clients.Twitch.Models;
 
 namespace EchoPhase.Clients.Twitch
 {
-    public abstract class TwitchClientBase
-    {
-        private readonly HttpSender _sender;
+    using System.Net.Http.Headers;
+    using System.Text.Json;
+    using EchoPhase.Clients.Abstractions;
+    using EchoPhase.Clients.Twitch.Models;
 
-        private static readonly JsonSerializerOptions _jsonOptions =
+    public abstract class TwitchClientBase : ClientBase
+    {
+        private static readonly JsonSerializerOptions JsonOptions =
             new(JsonSerializerDefaults.Web);
 
-        protected TwitchClientBase(HttpClient client)
+        protected TwitchClientBase(HttpClient client) : base(client)
         {
-            _sender = new HttpSender(client);
         }
 
-        protected async Task<PagedResult<IEnumerable<TR>>> SendAsync<TQ, TB, TR>(
+        /// <summary>
+        /// Sends a Twitch API request authenticated with a Bearer token and
+        /// returns a paged result.  The Twitch response envelope wraps data
+        /// inside a <c>data</c> array plus a <c>pagination</c> cursor object.
+        /// </summary>
+        protected Task<PagedResult<IEnumerable<TR>>> SendAsync<TQ, TB, TR>(
             string uri,
             HttpMethod method,
             TQ? query,
@@ -32,37 +39,31 @@ namespace EchoPhase.Clients.Twitch
             where TB : class
             where TR : class
         {
-            var (statusCode, stream) = await _sender.SendAsync(
-                uri, method, query, body,
-                new AuthenticationHeaderValue("Bearer", bearerToken),
-                ct);
+            var auth = new AuthenticationHeaderValue("Bearer", bearerToken);
 
-            await using (stream)
-            {
-                if (statusCode >= HttpStatusCode.OK && statusCode < HttpStatusCode.MultipleChoices)
+            return SendPagedAsync<TQ, TB, TwitchApiResponseDto<TR>, IEnumerable<TR>>(
+                uri, method, query, body, auth,
+                selectData: wrapper => wrapper.Data ?? Enumerable.Empty<TR>(),
+                selectPage: wrapper => wrapper.Pagination is null
+                    ? null
+                    : new PageInfo(wrapper.Pagination.Cursor),
+                readError: async (stream, token) =>
                 {
-                    var wrapper = await JsonSerializer.DeserializeAsync<TwitchApiResponseDto<TR>>(
-                        stream, _jsonOptions, ct);
+                    var err = await JsonSerializer.DeserializeAsync<TwitchApiError>(
+                        stream, JsonOptions, token);
 
-                    if (wrapper is null)
-                        return PagedResult<IEnumerable<TR>>.Fail(
-                            new ApiError((int)statusCode, "Response deserialization returned null."),
-                            statusCode);
-
-                    return PagedResult<IEnumerable<TR>>.Ok(
-                        wrapper.Data,
-                        new PageInfo(wrapper.Pagination?.Cursor),
-                        statusCode);
-                }
-
-                var error = await JsonSerializer.DeserializeAsync<TwitchApiError>(stream, _jsonOptions, ct);
-                return PagedResult<IEnumerable<TR>>.Fail(
-                    new ApiError((int)statusCode, error?.Message),
-                    statusCode);
-            }
+                    return err is null
+                        ? null
+                        : new ApiError(0, err.Message);
+                },
+                ct);
         }
 
-        protected async Task<Result<TR>> SendRawAsync<TQ, TB, TR>(
+        /// <summary>
+        /// Sends a Twitch API request and returns a plain <see cref="Result{TR}"/>
+        /// (non-paged variant).
+        /// </summary>
+        protected Task<Result<TR>> SendRawAsync<TQ, TB, TR>(
             string uri,
             HttpMethod method,
             TQ? query,
@@ -73,30 +74,16 @@ namespace EchoPhase.Clients.Twitch
             where TB : class
             where TR : class
         {
-            var (statusCode, stream) = await _sender.SendAsync(
-                uri, method, query, body,
-                new AuthenticationHeaderValue("Bearer", bearerToken),
+            var auth = new AuthenticationHeaderValue("Bearer", bearerToken);
+
+            return SendRawAsync<TQ, TB, TR, TwitchApiError>(
+                uri, method, query, body, auth,
+                readError: (stream, token) =>
+                    JsonSerializer.DeserializeAsync<TwitchApiError>(
+                        stream, JsonOptions, token).AsTask(),
+                toApiError: err =>
+                    new ApiError(0, err?.Message),
                 ct);
-
-            await using (stream)
-            {
-                if (statusCode >= HttpStatusCode.OK && statusCode < HttpStatusCode.MultipleChoices)
-                {
-                    var data = await JsonSerializer.DeserializeAsync<TR>(stream, _jsonOptions, ct);
-
-                    if (data is null)
-                        return Result<TR>.Fail(
-                            new ApiError((int)statusCode, "Response deserialization returned null."),
-                            statusCode);
-
-                    return Result<TR>.Ok(data, statusCode);
-                }
-
-                var error = await JsonSerializer.DeserializeAsync<TwitchApiError>(stream, _jsonOptions, ct);
-                return Result<TR>.Fail(
-                    new ApiError((int)statusCode, error?.Message),
-                    statusCode);
-            }
         }
     }
 }

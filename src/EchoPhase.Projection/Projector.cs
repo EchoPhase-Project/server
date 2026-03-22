@@ -29,26 +29,21 @@ namespace EchoPhase.Projection
         public CollectionProjectionBuilder<T> ForCollection<T>(IEnumerable<T> source) =>
             new(source, _defaultOptions.Clone());
 
+        // ── Entry point ───────────────────────────────────────────────────────
+
         internal object? Execute<T>(
             T source,
             ProjectionOptions options,
             IReadOnlyList<Expression<Func<T, object?>>> includeProperties,
-            IReadOnlyDictionary<string, CollectionConfig>? collectionConfigs = null)
+            IReadOnlyDictionary<string, ICollectionConfig>? collectionConfigs = null)
         {
             if (source == null) return null;
 
             HashSet<string>? fields;
             if (includeProperties.Count > 0)
-            {
-                fields = includeProperties.Select(ExtractMemberPath)
-                                          .ToHashSet(StringComparer.Ordinal);
-            }
+                fields = includeProperties.Select(ExtractMemberPath).ToHashSet(StringComparer.Ordinal);
             else
-            {
-                fields = options.IncludeOnlyExpose
-                    ? new HashSet<string>(StringComparer.Ordinal)
-                    : null;
-            }
+                fields = options.IncludeOnlyExpose ? new HashSet<string>(StringComparer.Ordinal) : null;
 
             if (fields != null && options.IncludeOnlyExpose)
             {
@@ -63,17 +58,19 @@ namespace EchoPhase.Projection
             }
 
             var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
-            collectionConfigs ??= new Dictionary<string, CollectionConfig>();
+            collectionConfigs ??= new Dictionary<string, ICollectionConfig>();
 
             return options.UseExpando
                 ? ProjectToExpando(source!, fields, visited, options, collectionConfigs)
                 : ProjectToDictionary(source!, fields, visited, options, collectionConfigs);
         }
 
+        // ── Projection ────────────────────────────────────────────────────────
+
         private Dictionary<string, object?> ProjectToDictionary(
             object source, ISet<string>? includePaths,
             HashSet<object> visited, ProjectionOptions options,
-            IReadOnlyDictionary<string, CollectionConfig> collectionConfigs)
+            IReadOnlyDictionary<string, ICollectionConfig> collectionConfigs)
         {
             var dict = new Dictionary<string, object?>();
             FillDict(dict, source, includePaths, visited, options, collectionConfigs,
@@ -84,7 +81,7 @@ namespace EchoPhase.Projection
         private ExpandoObject ProjectToExpando(
             object source, ISet<string>? includePaths,
             HashSet<object> visited, ProjectionOptions options,
-            IReadOnlyDictionary<string, CollectionConfig> collectionConfigs)
+            IReadOnlyDictionary<string, ICollectionConfig> collectionConfigs)
         {
             var expando = new ExpandoObject();
             FillDict(expando, source, includePaths, visited, options, collectionConfigs,
@@ -95,9 +92,9 @@ namespace EchoPhase.Projection
         private object? ConvertToObject(
             object? source, ISet<string>? includePaths,
             HashSet<object> visited, ProjectionOptions options,
-            IReadOnlyDictionary<string, CollectionConfig> collectionConfigs,
+            IReadOnlyDictionary<string, ICollectionConfig> collectionConfigs,
             Func<object, ISet<string>?, HashSet<object>, object?> recursion,
-            CollectionConfig? collectionConfig = null)
+            ICollectionConfig? collectionConfig = null)
         {
             if (source == null) return null;
 
@@ -141,8 +138,9 @@ namespace EchoPhase.Projection
                 foreach (var item in enumerable)
                 {
                     if (item == null) { list.Add(null); continue; }
+                    // Use typed ApplyBoxed — the cast happens inside CollectionConfig<TItem>
                     list.Add(collectionConfig != null
-                        ? collectionConfig.Apply(this, item).Build()
+                        ? collectionConfig.ApplyBoxed(this, item).Build()
                         : ConvertToObject(item, includePaths, visited, options, collectionConfigs, recursion));
                 }
                 return list;
@@ -164,7 +162,7 @@ namespace EchoPhase.Projection
             IDictionary<string, object?> dict,
             object source, ISet<string>? includePaths,
             HashSet<object> visited, ProjectionOptions options,
-            IReadOnlyDictionary<string, CollectionConfig> collectionConfigs,
+            IReadOnlyDictionary<string, ICollectionConfig> collectionConfigs,
             Func<object, ISet<string>?, HashSet<object>, object?> recursion)
         {
             bool ShouldInclude(string path)
@@ -204,15 +202,15 @@ namespace EchoPhase.Projection
             }
         }
 
+        // ── Path / reflection helpers ─────────────────────────────────────────
+
         private void CollectExposePaths(ISet<string> fields, Type type, string basePath, HashSet<Type> visitedTypes)
         {
             if (!visitedTypes.Add(type)) return;
 
             foreach (var (prop, isExposed) in GetCachedProperties(type))
             {
-                var path = basePath.Length == 0
-                    ? prop.Name
-                    : string.Concat(basePath, ".", prop.Name);
+                var path = basePath.Length == 0 ? prop.Name : string.Concat(basePath, ".", prop.Name);
 
                 if (isExposed) fields.Add(path);
                 if (!isExposed) continue;

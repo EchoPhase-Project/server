@@ -23,6 +23,8 @@ namespace EchoPhase.Clients
             _vault = vault;
         }
 
+        // ── Read ─────────────────────────────────────────────────────────────
+
         public async Task<IServiceResult<byte[]>> GetAsync(
             Guid userId,
             string providerName,
@@ -42,14 +44,23 @@ namespace EchoPhase.Clients
             }
         }
 
+        // ── Write ────────────────────────────────────────────────────────────
+
         public async Task<int> SetAsync(ExternalToken entity)
         {
-            var result = await _repository.Set(entity);
-            await _vault.DeleteAsync(entity.UserId.ToString(), $"{entity.ProviderName}:{entity.TokenName}");
-            return result;
+            var cacheKey = $"{entity.ProviderName}:{entity.TokenName}";
+
+            await _vault.DeleteAsync(entity.UserId.ToString(), cacheKey);
+
+            return await _repository.Set(entity);
         }
 
-        public async Task<bool> DeleteAsync(Guid userId, string providerName, string tokenName)
+        // ── Delete ───────────────────────────────────────────────────────────
+
+        public async Task<bool> DeleteAsync(
+            Guid userId,
+            string providerName,
+            string tokenName)
         {
             var token = _repository.Query()
                 .WithUserIds(userId)
@@ -57,11 +68,16 @@ namespace EchoPhase.Clients
                 .WithTokenNames(tokenName)
                 .FirstOrDefault();
 
-            if (token is null) return false;
+            if (token is null)
+                return false;
 
             _repository.Remove(token);
             await _repository.SaveAsync();
+
+            // Best-effort cache eviction; a failure here is non-fatal because
+            // the DB row is already gone – the cache entry will simply expire.
             await _vault.DeleteAsync(userId.ToString(), $"{providerName}:{tokenName}");
+
             return true;
         }
 
@@ -75,15 +91,17 @@ namespace EchoPhase.Clients
                 _repository.Remove(token);
 
             await _repository.SaveAsync();
+
+            // Atomic bulk eviction via Redis Set membership.
             await _vault.DeleteAllAsync(userId.ToString());
         }
 
-        public IEnumerable<string> GetKeyNames(Guid userId)
-        {
-            return _repository.Query()
+        // ── Index ────────────────────────────────────────────────────────────
+
+        public IEnumerable<string> GetKeyNames(Guid userId) =>
+            _repository.Query()
                 .WithUserIds(userId)
                 .ToList()
                 .Select(t => $"{t.ProviderName}:{t.TokenName}");
-        }
     }
 }

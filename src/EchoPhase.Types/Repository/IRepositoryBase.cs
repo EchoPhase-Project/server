@@ -5,15 +5,10 @@ using EchoPhase.DAL.Abstractions;
 
 namespace EchoPhase.Types.Repository
 {
+    /// <summary>
+    /// Full read/write repository contract.
+    /// </summary>
     public interface IRepositoryBase<TEntity>
-        where TEntity : class, ITrackingEntity, IIdentifiable
-    {
-        IQueryable<TEntity> Build();
-        RepositoryQuery<TEntity> Query();
-        void Add(TEntity entity);
-        void Update(TEntity entity);
-        void Remove(TEntity entity);
-        Task<int> SaveAsync(CancellationToken ct = default);
-        Task<int> Set(TEntity entity, Action<TEntity>? configure = null, CancellationToken ct = default);
-    }
+        : IReadRepository<TEntity>, IWriteRepository<TEntity>
+        where TEntity : class, ITrackingEntity, IIdentifiable { }
 }

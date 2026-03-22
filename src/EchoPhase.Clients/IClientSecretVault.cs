@@ -64,6 +64,19 @@ namespace EchoPhase.Clients
             bool keepTtl = false,
             CommandFlags flags = CommandFlags.None);
 
+        /// <summary>
+        /// Synchronous counterpart of <see cref="GetOrSetAsync{T}(string,string,Func{T},TimeSpan?,bool,CommandFlags)"/>.
+        /// Returns the cached value if it exists, otherwise calls <paramref name="generator"/>,
+        /// stores the result, and returns it.
+        /// </summary>
+        IServiceResult<T> GetOrSet<T>(
+            string userId,
+            string keyName,
+            Func<T>? generator = null,
+            TimeSpan? expiry = null,
+            bool keepTtl = false,
+            CommandFlags flags = CommandFlags.None);
+
         // --------------------------
         // Delete
         // --------------------------
@@ -77,6 +90,18 @@ namespace EchoPhase.Clients
         // --------------------------
 
         Task<IEnumerable<string>> GetUserKeyNamesAsync(string userId);
+
+        /// <summary>
+        /// Synchronous version of <see cref="GetUserKeyNamesAsync"/>.
+        /// Returns the set of key names registered under <paramref name="userId"/>.
+        /// </summary>
+        IEnumerable<string> GetUserKeyNames(string userId);
+
         Task<IDictionary<string, IServiceResult<T>>> GetAllAsync<T>(string userId);
+
+        /// <summary>
+        /// Synchronous version of <see cref="GetAllAsync{T}"/>.
+        /// </summary>
+        IDictionary<string, IServiceResult<T>> GetAll<T>(string userId);
     }
 }
