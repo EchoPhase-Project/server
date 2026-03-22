@@ -5,15 +5,12 @@ using EchoPhase.Runners.Roslyn.Contexts;
 
 namespace EchoPhase.Runners.Roslyn
 {
-    public class ScriptGlobals<T> : IScriptGlobals<T>
+    /// <summary>
+    /// Globals object passed to Roslyn scripts.
+    /// </summary>
+    public class ScriptGlobals<T>
     {
-        public required T Payload
-        {
-            set; get;
-        }
-        public required IScriptContext Context
-        {
-            set; get;
-        }
+        public required T Payload { get; set; }
+        public required IScriptContext Context { get; set; }
     }
 }

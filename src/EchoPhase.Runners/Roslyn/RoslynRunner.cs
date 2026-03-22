@@ -18,14 +18,12 @@ namespace EchoPhase.Runners.Roslyn
         private readonly IServiceProvider _serviceProvider;
         private readonly ISecurityValidator _validator;
         private readonly RunnerOptions _settings;
-
         private readonly ISet<string> _imports;
 
         public RoslynRunner(
             IServiceProvider serviceProvider,
             IOptions<RunnerOptions> settings,
-            ISecurityValidator validator
-        )
+            ISecurityValidator validator)
         {
             _serviceProvider = serviceProvider;
             _settings = settings.Value;
@@ -36,29 +34,32 @@ namespace EchoPhase.Runners.Roslyn
             };
         }
 
-        public async Task RunAsync<TI, T>(string code, TI payload) where T : TI
+        public async Task RunAsync<TPayload>(string code, TPayload payload)
         {
             var diagnostics = _validator.Validate(code).ToArray();
             if (diagnostics.Length > 0)
-                throw new InvalidOperationException("Script validation failed:\n" + string.Join("\n", diagnostics));
+                throw new InvalidOperationException(
+                    "Script validation failed:\n" + string.Join("\n", diagnostics));
 
             var context = new ScriptContext
             {
                 DiscordClient = GetService<IDiscordClient>()
             };
-            var globals = new ScriptGlobals<TI> { Payload = payload, Context = context };
+
+            var globals = new ScriptGlobals<TPayload> { Payload = payload, Context = context };
 
             var references = AppDomain.CurrentDomain
                 .GetAssemblies()
-                .Where(a => a.IsDynamic == false)
+                .Where(a => !a.IsDynamic)
                 .Select(a => MetadataReference.CreateFromFile(a.Location));
 
             var options = ScriptOptions.Default
                 .WithReferences(references)
                 .WithImports(_imports);
 
-            var clientScript = CSharpScript.Create(code, options, typeof(IScriptGlobals<TI>));
-            await clientScript.RunAsync(globals);
+            // Globals type is ScriptGlobals<TPayload> — concrete, no interface wrapper.
+            var script = CSharpScript.Create(code, options, typeof(ScriptGlobals<TPayload>));
+            await script.RunAsync(globals);
         }
 
         private T GetService<T>() where T : notnull =>
