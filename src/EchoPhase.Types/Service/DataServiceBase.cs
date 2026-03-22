@@ -6,6 +6,10 @@ using EchoPhase.Types.Repository;
 
 namespace EchoPhase.Types.Service
 {
+    /// <summary>
+    /// Base implementation for services that own a repository.
+    /// Implements the full <see cref="IDataServiceBase{TEntity,TR}"/>.
+    /// </summary>
     public abstract class DataServiceBase<TEntity, TR> : IDataServiceBase<TEntity, TR>
         where TR : IRepositoryBase<TEntity>
         where TEntity : class, ITrackingEntity, IIdentifiable
