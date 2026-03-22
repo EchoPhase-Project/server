@@ -1,15 +1,14 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using EchoPhase.Configuration.Database;
 using EchoPhase.Configuration.Database.Redis;
+using EchoPhase.Security.Cryptography.Vaults.Strategies;
 using EchoPhase.Types.Result;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
-using UUIDNext;
 
 // --------------------------
 // Base
@@ -22,27 +21,77 @@ namespace EchoPhase.Security.Cryptography.Vaults
         protected readonly IDatabase Db;
         protected readonly IConnectionMultiplexer Redis;
         protected readonly AesGcm AesGcm;
-        protected readonly RedisOptions Settings;
         protected readonly JsonSerializerOptions JsonOptions;
-        protected abstract string KeyPrefix { get; }
 
-        private static readonly ConcurrentDictionary<string, string> _keyCache = new();
+        /// <summary>
+        /// Redis options — available when the <see cref="DatabaseOptions"/> convenience
+        /// constructor is used.  Exposed so subclasses (e.g. <c>ClientSecretVault</c>)
+        /// can build additional keys such as index sets without bypassing the strategy.
+        /// </summary>
+        protected readonly RedisOptions Settings;
 
+        /// <summary>Strategy that translates logical key names to Redis storage keys.</summary>
+        private readonly IKeyStrategy _keyStrategy;
+
+        // --------------------------
+        // Constructors
+        // --------------------------
+
+        /// <summary>
+        /// Primary constructor — accepts an explicit <see cref="IKeyStrategy"/>.
+        /// Use this for full control over key generation (custom tenant scope, testing, etc.).
+        /// </summary>
         protected SecretVaultBase(
             IConnectionMultiplexer redis,
             AesGcm aesGcm,
-            IOptions<DatabaseOptions> settings,
+            IKeyStrategy keyStrategy,
+            RedisOptions redisOptions,
             JsonSerializerOptions? jsonOptions = null)
         {
             Redis = redis;
             Db = redis.GetDatabase();
             AesGcm = aesGcm;
-            Settings = settings.Value.Redis;
+            _keyStrategy = keyStrategy;
+            Settings = redisOptions;
             JsonOptions = jsonOptions ?? new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
         }
+
+        /// <summary>
+        /// Convenience constructor — builds a <see cref="TenantUuidKeyStrategy"/> automatically
+        /// from <see cref="DatabaseOptions"/> and the supplied <paramref name="keyPrefix"/>.
+        /// Retains full backward compatibility for <see cref="SecretVault"/> and
+        /// <see cref="ClientSecretVault"/> (neither needs to change its constructor signature).
+        /// The prefix is passed explicitly because virtual/abstract members cannot be
+        /// called from within a constructor chain.
+        /// </summary>
+        protected SecretVaultBase(
+            IConnectionMultiplexer redis,
+            AesGcm aesGcm,
+            string keyPrefix,
+            IOptions<DatabaseOptions> settings,
+            JsonSerializerOptions? jsonOptions = null)
+            : this(
+                redis,
+                aesGcm,
+                new TenantUuidKeyStrategy(keyPrefix, settings.Value.Redis),
+                settings.Value.Redis,
+                jsonOptions)
+        {
+        }
+
+        // --------------------------
+        // Key prefix
+        // --------------------------
+
+        /// <summary>
+        /// Short vault-type prefix, e.g. <c>"secret_"</c> or <c>"client_"</c>.
+        /// Subclasses declare this; it is used by the convenience constructor to
+        /// build the default <see cref="TenantUuidKeyStrategy"/>.
+        /// </summary>
+        protected abstract string KeyPrefix { get; }
 
         // --------------------------
         // Exists
@@ -207,16 +256,12 @@ namespace EchoPhase.Security.Cryptography.Vaults
                 err.Set("KeyNotFound", $"Failed to retrieve '{key}' from storage."));
 
         // --------------------------
-        // Key generation — UUID v5
+        // Key generation — delegated to IKeyStrategy
         // --------------------------
 
-        protected string Prefixed(string key) =>
-            _keyCache.GetOrAdd(
-                $"{KeyPrefix}:{Settings.TenantId}:{key}",
-                raw =>
-                {
-                    var uuid = Uuid.NewNameBased(Settings.TenantId, raw);
-                    return $"{Settings.InstanceName}{uuid}";
-                });
+        /// <summary>
+        /// Translates a logical key into the final Redis key via the injected <see cref="IKeyStrategy"/>.
+        /// </summary>
+        protected string Prefixed(string key) => _keyStrategy.Build(key);
     }
 }

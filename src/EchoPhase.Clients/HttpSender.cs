@@ -6,9 +6,9 @@ using System.Net.Http.Headers;
 using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
+using EchoPhase.Clients.Abstractions;
 using EchoPhase.Clients.Helpers;
 using EchoPhase.Clients.Models;
-using EchoPhase.Clients.Abstractions;
 
 namespace EchoPhase.Clients
 {
@@ -47,7 +47,7 @@ namespace EchoPhase.Clients
 
             var url = query is not null
                 ? new UriBuilder(new Uri(baseUri, uri))
-                    { Query = _queryStringBuilder.Build(query) }.ToString()
+                { Query = _queryStringBuilder.Build(query) }.ToString()
                 : new Uri(baseUri, uri).ToString();
 
             using var request = new HttpRequestMessage(method, url);

@@ -91,11 +91,17 @@ namespace EchoPhase.Clients.Helpers
             {
                 queryParameters.Add($"{HttpUtility.UrlEncode(key)}={HttpUtility.UrlEncode(value.ToString())}");
             }
-            else if (value is IEnumerable<object> collection && !(value is string))
+            else if (value is IEnumerable<object> collection && value is not string)
             {
                 foreach (var item in collection)
                 {
-                    BuildQueryString(item, queryParameters, key);
+                    if (item == null)
+                        continue;
+
+                    if (IsSimple(item.GetType()))
+                        queryParameters.Add($"{HttpUtility.UrlEncode(key)}={HttpUtility.UrlEncode(item.ToString())}");
+                    else
+                        BuildQueryString(item, queryParameters, key);
                 }
             }
             else

@@ -15,24 +15,37 @@ namespace EchoPhase.Clients
     {
         protected override string KeyPrefix => "client_";
 
-        private string IndexSetKey(string userId) =>
-            $"{Settings.InstanceName}client_index:{Settings.TenantId}:{userId}";
-
         public ClientSecretVault(
             IConnectionMultiplexer redis,
             AesGcm aesGcm,
             IOptions<DatabaseOptions> settings,
             JsonSerializerOptions? jsonOptions = null)
-            : base(redis, aesGcm, settings, jsonOptions)
+            : base(redis, aesGcm, "client_", settings, jsonOptions)
         {
         }
 
-        // ── Key helper ───────────────────────────────────────────────────────
+        // --------------------------
+        // Index Set key
+        // --------------------------
 
-        private string UserKey(string userId, string keyName) =>
+        /// <summary>
+        /// Redis key for the per-user index Set that tracks every logical key name
+        /// stored by this user.  Uses the raw instance name + tenant id directly so
+        /// the index key is stable and predictable (not UUID-derived).
+        /// </summary>
+        private string IndexSetKey(string userId) =>
+            $"{Settings.InstanceName}client_index:{Settings.TenantId}:{userId}";
+
+        // --------------------------
+        // Logical key helper
+        // --------------------------
+
+        private static string UserKey(string userId, string keyName) =>
             $"client:{userId}:{keyName}";
 
-        // ── Exists ───────────────────────────────────────────────────────────
+        // --------------------------
+        // Exists
+        // --------------------------
 
         public Task<bool> ExistsAsync(string userId, string keyName) =>
             ExistsAsync(UserKey(userId, keyName));
@@ -40,7 +53,9 @@ namespace EchoPhase.Clients
         public bool Exists(string userId, string keyName) =>
             Exists(UserKey(userId, keyName));
 
-        // ── Get ──────────────────────────────────────────────────────────────
+        // --------------------------
+        // Get
+        // --------------------------
 
         public Task<IServiceResult<T>> GetAsync<T>(string userId, string keyName) =>
             GetAsync<T>(UserKey(userId, keyName));
@@ -48,11 +63,9 @@ namespace EchoPhase.Clients
         public IServiceResult<T> Get<T>(string userId, string keyName) =>
             Get<T>(UserKey(userId, keyName));
 
-        // ── Set ──────────────────────────────────────────────────────────────
-        //
-        // The caller (ExternalTokenService) writes to the DB first, then calls
-        // Set here.  If Redis is unavailable the DB row still exists, so on the
-        // next read GetOrSetAsync will re-populate the cache from the DB.
+        // --------------------------
+        // Set
+        // --------------------------
 
         public async Task<bool> SetAsync<T>(
             string userId,
@@ -66,7 +79,6 @@ namespace EchoPhase.Clients
             var stored = await SetAsync(UserKey(userId, keyName), value, expiry, keepTtl, when, flags);
 
             if (stored)
-                // SADD is atomic and idempotent – safe to call on every write.
                 await Db.SetAddAsync(IndexSetKey(userId), keyName);
 
             return stored;
@@ -89,7 +101,9 @@ namespace EchoPhase.Clients
             return stored;
         }
 
-        // ── GetOrSet ─────────────────────────────────────────────────────────
+        // --------------------------
+        // GetOrSet
+        // --------------------------
 
         public async Task<IServiceResult<T>> GetOrSetAsync<T>(
             string userId,
@@ -133,14 +147,15 @@ namespace EchoPhase.Clients
             return result;
         }
 
-        // ── Delete ───────────────────────────────────────────────────────────
+        // --------------------------
+        // Delete
+        // --------------------------
 
         public async Task<bool> DeleteAsync(string userId, string keyName)
         {
             var deleted = await DeleteAsync(UserKey(userId, keyName));
 
             if (deleted)
-                // SREM is atomic and idempotent.
                 await Db.SetRemoveAsync(IndexSetKey(userId), keyName);
 
             return deleted;
@@ -158,13 +173,12 @@ namespace EchoPhase.Clients
 
         /// <summary>
         /// Deletes all secrets for <paramref name="userId"/> plus the index Set
-        /// in a single pipelined batch, avoiding multiple round-trips.
+        /// in a single pipelined batch.
         /// </summary>
         public async Task DeleteAllAsync(string userId)
         {
             var members = await Db.SetMembersAsync(IndexSetKey(userId));
 
-            // Build list: one entry per secret key + the index Set itself.
             var redisKeys = members
                 .Select(m => (RedisKey)Prefixed(UserKey(userId, m!)))
                 .Append((RedisKey)IndexSetKey(userId))
@@ -174,7 +188,9 @@ namespace EchoPhase.Clients
                 await Db.KeyDeleteAsync(redisKeys);
         }
 
-        // ── Index ────────────────────────────────────────────────────────────
+        // --------------------------
+        // Index
+        // --------------------------
 
         public async Task<IEnumerable<string>> GetUserKeyNamesAsync(string userId)
         {
@@ -208,22 +224,6 @@ namespace EchoPhase.Clients
                 result[keyName] = Get<T>(userId, keyName);
 
             return result;
-        }
-
-        // ── Private helper ───────────────────────────────────────────────────
-
-        /// <summary>
-        /// Returns the full Redis key used by <see cref="SecretVaultBase"/> for
-        /// a logical key name.  Needed for bulk delete.
-        /// </summary>
-        private string Prefixed(string logicalKey)
-        {
-            // SecretVaultBase.Prefixed is private; replicate its logic here so
-            // DeleteAllAsync can compute the same cache key without reflection.
-            // The formula is: InstanceName + UUID-v5(TenantId, KeyPrefix+TenantId+logicalKey)
-            var raw = $"{KeyPrefix}tenant:{Settings.TenantId}:{logicalKey}";
-            var uuid = UUIDNext.Uuid.NewNameBased(Settings.TenantId, raw);
-            return $"{Settings.InstanceName}{uuid}";
         }
     }
 }

@@ -10,5 +10,6 @@ namespace EchoPhase.Types.Repository
     /// </summary>
     public interface IRepositoryBase<TEntity>
         : IReadRepository<TEntity>, IWriteRepository<TEntity>
-        where TEntity : class, ITrackingEntity, IIdentifiable { }
+        where TEntity : class, ITrackingEntity, IIdentifiable
+    { }
 }

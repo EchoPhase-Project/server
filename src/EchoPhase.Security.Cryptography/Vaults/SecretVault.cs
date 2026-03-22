@@ -21,6 +21,8 @@ namespace EchoPhase.Security.Cryptography.Vaults
             AesGcm aesGcm,
             IOptions<DatabaseOptions> settings,
             JsonSerializerOptions? jsonOptions = null)
-            : base(redis, aesGcm, settings, jsonOptions) { }
+            : base(redis, aesGcm, "secret_", settings, jsonOptions)
+        {
+        }
     }
 }

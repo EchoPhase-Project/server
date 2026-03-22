@@ -12,6 +12,15 @@ namespace EchoPhase.Clients.Helpers
             if (obj == null)
                 return new Dictionary<string, object?>();
 
+            var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            return BuildInternal(obj, visited);
+        }
+
+        private Dictionary<string, object?> BuildInternal(object? obj, HashSet<object> visited)
+        {
+            if (obj == null)
+                return new Dictionary<string, object?>();
+
             var result = new Dictionary<string, object?>();
             Type type = obj.GetType();
 
@@ -26,7 +35,7 @@ namespace EchoPhase.Clients.Helpers
                 foreach (var prop in props)
                 {
                     object? value = prop.GetValue(obj);
-                    result[prop.Name] = TransformValue(value);
+                    result[prop.Name] = TransformValue(value, visited);
                 }
             }
 
@@ -36,14 +45,14 @@ namespace EchoPhase.Clients.Helpers
                 foreach (var field in fields)
                 {
                     object? value = field.GetValue(obj);
-                    result[field.Name] = TransformValue(value);
+                    result[field.Name] = TransformValue(value, visited);
                 }
             }
 
             return result;
         }
 
-        private object? TransformValue(object? value)
+        private object? TransformValue(object? value, HashSet<object> visited)
         {
             if (value == null) return null;
 
@@ -51,17 +60,38 @@ namespace EchoPhase.Clients.Helpers
 
             if (IsSimple(type)) return value;
 
-            if (IsEnumerable(type))
-            {
-                var list = new List<object?>();
-                foreach (var item in (System.Collections.IEnumerable)value)
-                {
-                    list.Add(IsSimple(item?.GetType() ?? typeof(object)) ? item : Build(item));
-                }
-                return list;
-            }
+            if (!visited.Add(value))
+                return null;
 
-            return Build(value);
+            try
+            {
+                if (IsEnumerable(type))
+                {
+                    var list = new List<object?>();
+                    foreach (var item in (System.Collections.IEnumerable)value)
+                    {
+                        if (item == null)
+                        {
+                            list.Add(null);
+                        }
+                        else if (IsSimple(item.GetType()))
+                        {
+                            list.Add(item);
+                        }
+                        else
+                        {
+                            list.Add(BuildInternal(item, visited));
+                        }
+                    }
+                    return list;
+                }
+
+                return BuildInternal(value, visited);
+            }
+            finally
+            {
+                visited.Remove(value);
+            }
         }
     }
 }
