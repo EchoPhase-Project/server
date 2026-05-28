@@ -74,7 +74,6 @@ namespace EchoPhase.Types.Repository
             return this;
         }
 
-
         // ── Cursor (string / opaque) ──────────────────────────────────────────
 
         /// <summary>

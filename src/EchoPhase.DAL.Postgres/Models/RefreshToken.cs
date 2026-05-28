@@ -19,8 +19,8 @@ namespace EchoPhase.DAL.Postgres.Models
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         [ConcurrencyCheck] public Guid ConcurrencyStamp { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
-        [Expose] public ICollection<RefreshTokenScope> Scopes { get; set; } = [];
-        [Expose] public ICollection<RefreshTokenIntent> Intents { get; set; } = [];
+        [Expose] public string[] Scopes { get; set; } = [];
+        [Expose] public string[] Intents { get; set; } = [];
         [Expose] public ICollection<RefreshTokenPermissionEntry> Permissions { get; set; } = [];
     }
 
@@ -31,19 +31,9 @@ namespace EchoPhase.DAL.Postgres.Models
         public RefreshToken RefreshToken { get; set; } = default!;
     }
 
-    public class RefreshTokenScope : RefreshTokenClaim
-    {
-        [Expose] public string Value { get; set; } = string.Empty;
-    }
-
-    public class RefreshTokenIntent : RefreshTokenClaim
-    {
-        [Expose] public string Value { get; set; } = string.Empty;
-    }
-
     public class RefreshTokenPermissionEntry : RefreshTokenClaim
     {
         [Expose] public string Resource { get; set; } = string.Empty;
-        [Expose] public string Permission { get; set; } = string.Empty;
+        [Expose] public string[] Permissions { get; set; } = [];
     }
 }

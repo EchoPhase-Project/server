@@ -11,7 +11,31 @@ namespace EchoPhase.Runners.Blocks.Contexts
         public IEnumerable<IBlock> Blocks { get; set; } = new HashSet<IBlock>();
         public IDictionary<string, object> Variables { get; set; } = new Dictionary<string, object>();
         public IDictionary<string, int> LoopStates { get; set; } = new Dictionary<string, int>();
-        public IList<string> Output { get; set; } = new List<string>();
-        public IList<BlockError> Errors { get; set; } = new List<BlockError>();
+        public IList<string> Output { get; set; } = [];
+        public IList<BlockError> Errors { get; set; } = [];
+        public IServiceProvider Services { get; init; }
+
+        public BlockExecutionContext(IServiceProvider services)
+        {
+            Services = services;
+        }
+
+        public BlockExecutionContext(IEnumerable<int> startIds, IEnumerable<IBlock> blocks, IServiceProvider services)
+        {
+            StartIds = startIds;
+            Blocks = blocks;
+            Services = services;
+        }
+
+        public BlockExecutionContext Clone()
+        {
+            return new BlockExecutionContext(StartIds, Blocks, Services)
+            {
+                Variables = new Dictionary<string, object>(Variables),
+                Output = new List<string>(Output),
+                Errors = new List<BlockError>(Errors),
+                LoopStates = new Dictionary<string, int>(LoopStates),
+            };
+        }
     }
 }

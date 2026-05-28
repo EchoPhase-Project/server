@@ -12,10 +12,9 @@ namespace EchoPhase.Runners.Blocks.Handlers
     {
         private readonly BlocksRunner _runner;
 
-        public ForHandler(IServiceProvider serviceProvider)
-            : base(serviceProvider)
+        public ForHandler(BlocksRunner runner)
         {
-            _runner = GetService<BlocksRunner>();
+            _runner = runner;
         }
 
         public override async Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, ForParams param)

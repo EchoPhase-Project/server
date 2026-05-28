@@ -20,12 +20,11 @@ namespace EchoPhase.Runners.Blocks.Handlers
         private readonly ILexer<Token> _lexer;
         private readonly IParser<Token> _parser;
 
-        public IfHandler(IServiceProvider serviceProvider)
-            : base(serviceProvider)
+        public IfHandler(IProfiler profiler, ILexer<Token> lexer, IParser<Token> parser)
         {
-            _profiler = GetService<IProfiler>();
-            _lexer = GetService<ILexer<Token>>();
-            _parser = GetService<IParser<Token>>();
+            _profiler = profiler;
+            _lexer = lexer;
+            _parser = parser;
         }
 
         public override Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, IfParams param)

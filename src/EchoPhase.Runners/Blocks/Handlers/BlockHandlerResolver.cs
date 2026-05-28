@@ -7,16 +7,9 @@ namespace EchoPhase.Runners.Blocks.Handlers
 {
     public class BlockHandlerResolver
     {
-        private readonly IServiceProvider _serviceProvider;
-
-        public BlockHandlerResolver(IServiceProvider serviceProvider)
+        public IBlockHandler Get(IServiceProvider services, BlockTypes type)
         {
-            _serviceProvider = serviceProvider;
-        }
-
-        public IBlockHandler Get(BlockTypes type)
-        {
-            return _serviceProvider.GetKeyedService<IBlockHandler>(type)
+            return services.GetKeyedService<IBlockHandler>(type)
                 ?? throw new InvalidOperationException($"No handler for block type: {type}");
         }
     }

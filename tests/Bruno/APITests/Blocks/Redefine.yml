@@ -1,0 +1,70 @@
+info:
+  name: Redefine
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/blocks/run"
+  headers:
+    - name: ""
+      value: ""
+  body:
+    type: json
+    data: |-
+      {
+        "startIds": [1],
+        "blocks": [
+          {
+            "id": 1,
+            "type": "Set",
+            "params": {
+              "name": "user.name",
+              "value": "John",
+              "next": [2]
+            }
+          },
+          {
+            "id": 2,
+            "type": "Set",
+            "params": {
+              "name": "user.age",
+              "value": "30",
+              "next": [3]
+            }
+          },
+          {
+            "id": 3,
+            "type": "Set",  
+            "params": {
+              "name": "user.items[0]",                                                          
+              "value": "apple",
+              "next": [4]
+            }
+          },
+          {
+            "id": 4,
+            "type": "Set",
+            "params": {
+              "name": "user.items[1]",
+              "value": "banana",
+              "next": [5]
+            }
+          },
+          {
+            "id": 5,
+            "type": "Print",
+            "params": {
+              "text": "User: @user.name, Age: @user.age, Items: @user.items[0], @user.items[1]",
+              "next": []
+            }
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

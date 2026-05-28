@@ -21,13 +21,12 @@ namespace EchoPhase.Runners.Blocks.Handlers
         private readonly ILexer<Token> _lexer;
         private readonly IParser<Token> _parser;
 
-        public WhileHandler(IServiceProvider serviceProvider)
-            : base(serviceProvider)
+        public WhileHandler(BlocksRunner runner, IProfiler profiler, ILexer<Token> lexer, IParser<Token> parser)
         {
-            _runner = GetService<BlocksRunner>();
-            _profiler = GetService<IProfiler>();
-            _lexer = GetService<ILexer<Token>>();
-            _parser = GetService<IParser<Token>>();
+            _runner = runner;
+            _profiler = profiler;
+            _lexer = lexer;
+            _parser = parser;
         }
 
         public override async Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, WhileParams param)

@@ -74,6 +74,12 @@ namespace EchoPhase.Projection
             return this;
         }
 
+        public ProjectionBuilder<T> WithNestedContent()
+        {
+            _options.IncludeNestedContent = true;
+            return this;
+        }
+
         /// <summary>
         /// Re-interprets the source as <typeparamref name="TAs"/> for [Expose] resolution
         /// and Include expressions.

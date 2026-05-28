@@ -20,10 +20,8 @@ namespace EchoPhase.DAL.Postgres
         public DbSet<ExternalToken> ExternalTokens { get; set; } = default!;
         public DbSet<RefreshToken> RefreshTokens { get; set; } = default!;
         public DbSet<WebHook> WebHooks { get; set; } = default!;
-        public DbSet<RefreshTokenScope> RefreshTokenScopes { get; set; } = default!;
-        public DbSet<RefreshTokenIntent> RefreshTokenIntents { get; set; } = default!;
-        public DbSet<RefreshTokenPermissionEntry> RefreshTokenPermissionEntries { get; set; } = default!;
         public DbSet<RefreshTokenAudit> RefreshTokenAudits { get; set; } = default!;
+        public DbSet<RefreshTokenPermissionEntry> RefreshTokenPermissionEntries { get; set; } = default!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

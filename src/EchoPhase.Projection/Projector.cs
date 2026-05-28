@@ -181,7 +181,10 @@ namespace EchoPhase.Projection
                 foreach (var prop in jsonElem.EnumerateObject())
                 {
                     if (!ShouldInclude(prop.Name)) continue;
-                    dict[prop.Name] = ConvertToObject(prop.Value, SubPaths(includePaths, prop.Name),
+                    var subPaths = options.IncludeNestedContent && includePaths != null && includePaths.Contains(prop.Name)
+                        ? null
+                        : SubPaths(includePaths, prop.Name);
+                    dict[prop.Name] = ConvertToObject(prop.Value, subPaths,
                         visited, options, collectionConfigs, recursion);
                 }
                 return;
@@ -194,9 +197,13 @@ namespace EchoPhase.Projection
                 var val = prop.GetValue(source);
                 if (val is null) { dict[prop.Name] = null; continue; }
 
+                var subPaths = options.IncludeNestedContent && includePaths != null && includePaths.Contains(prop.Name)
+                    ? null
+                    : SubPaths(includePaths, prop.Name);
+
                 collectionConfigs.TryGetValue(prop.Name, out var colConfig);
                 dict[prop.Name] = ConvertToObject(
-                    val, SubPaths(includePaths, prop.Name),
+                    val, subPaths,
                     visited, options, collectionConfigs, recursion,
                     collectionConfig: colConfig);
             }

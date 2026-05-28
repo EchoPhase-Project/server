@@ -1,0 +1,69 @@
+info:
+  name: While
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{baseUrl}}/blocks/run"
+  headers:
+    - name: ""
+      value: ""
+  body:
+    type: json
+    data: |-
+      {                                                        
+        "startIds": [1],                  
+        "blocks": [
+          {          
+            "id": 1,    
+            "type": "Set",   
+            "params": {              
+              "name": "a",           
+              "value": "1",
+              "next": [2]
+            }             
+          },                         
+          {                   
+            "id": 2,
+            "type": "While",
+            "params": {
+              "condition": "a <= 3",
+              "bodyNext": [3],
+              "afterNext": [6]
+            }           
+          },                  
+          {                   
+            "id": 3,
+            "type": "Print",
+            "params": {
+              "text": "a = @a", 
+              "next": [4]
+            }          
+          },                              
+          {                   
+            "id": 4,          
+            "type": "Set",
+            "params": {
+              "name": "a",
+              "value": "@(a + 1)",
+              "next": []    
+            }          
+          },                            
+          {              
+            "id": 6,
+            "type": "Print",
+            "params": {
+              "text": "Loop finished",
+              "next": []    
+            }          
+          }                            
+        ]    
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -31,5 +31,10 @@ namespace EchoPhase.Runners.Blocks.Contexts
         {
             get; set;
         }
+        IServiceProvider Services
+        {
+            get; init;
+        }
+        BlockExecutionContext Clone();
     }
 }

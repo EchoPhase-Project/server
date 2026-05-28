@@ -9,7 +9,7 @@ namespace EchoPhase.Cli.Commands.Health.Check
         {
         }
 
-        public override async Task<int> ExecuteAsync(CommandContext context, CheckSettings settings, CancellationToken cancellationToken)
+        protected override async Task<int> ExecuteAsync(CommandContext context, CheckSettings settings, CancellationToken cancellationToken)
         {
             var url = "http://localhost:8080/health/live";
 

@@ -1,0 +1,52 @@
+info:
+  name: Define
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/blocks/run"
+  headers:
+    - name: ""
+      value: ""
+  body:
+    type: json
+    data: |-
+      {
+        "startIds": [1],
+        "blocks": [
+          {
+            "id": 1,
+            "type": "Set",
+            "params": {
+              "name": "user.name",
+              "value": "John",
+              "next": [2]
+            }
+          },
+          {
+            "id": 2,
+            "type": "Set",
+            "params": {
+              "name": "user.age",
+              "value": "30",
+              "next": [5]
+            }
+          },
+          {
+            "id": 5,
+            "type": "Print",
+            "params": {
+              "text": "User: @user.name, Age: @user.age",                                       
+              "next": []
+            }
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

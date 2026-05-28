@@ -20,12 +20,11 @@ namespace EchoPhase.Runners.Blocks.Handlers
         private readonly ILexer<TemplateToken> _lexer;
         private readonly IParser<TemplateToken> _parser;
 
-        public PrintHandler(IServiceProvider serviceProvider)
-            : base(serviceProvider)
+        public PrintHandler(IProfiler profiler, ILexer<TemplateToken> lexer, IParser<TemplateToken> parser)
         {
-            _profiler = GetService<IProfiler>();
-            _lexer = GetService<ILexer<TemplateToken>>();
-            _parser = GetService<IParser<TemplateToken>>();
+            _profiler = profiler;
+            _lexer = lexer;
+            _parser = parser;
         }
 
         public override Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, PrintParams param)

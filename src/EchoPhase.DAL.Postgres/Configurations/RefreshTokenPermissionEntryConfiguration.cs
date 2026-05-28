@@ -13,7 +13,10 @@ namespace EchoPhase.DAL.Postgres.Configurations
         {
             builder.ToTable("RefreshTokenPermissionEntries", PostgresContext.DefaultSchema);
             builder.HasKey(e => e.Id);
-            builder.HasIndex(e => new { e.RefreshTokenId, e.Resource, e.Permission }).IsUnique();
+            builder.HasIndex(e => new { e.RefreshTokenId, e.Resource }).IsUnique();
+
+            builder.Property(e => e.Permissions)
+                .HasColumnType("text[]");
         }
     }
 }

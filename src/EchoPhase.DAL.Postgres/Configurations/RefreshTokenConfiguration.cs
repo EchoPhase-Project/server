@@ -25,20 +25,15 @@ namespace EchoPhase.DAL.Postgres.Configurations
                 .HasForeignKey(a => a.RefreshTokenId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            builder.HasMany(t => t.Scopes)
-                .WithOne(s => s.RefreshToken)
-                .HasForeignKey(s => s.RefreshTokenId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            builder.HasMany(t => t.Intents)
-                .WithOne(i => i.RefreshToken)
-                .HasForeignKey(i => i.RefreshTokenId)
-                .OnDelete(DeleteBehavior.Cascade);
-
             builder.HasMany(t => t.Permissions)
                 .WithOne(p => p.RefreshToken)
                 .HasForeignKey(p => p.RefreshTokenId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Property(e => e.Scopes)
+                .HasColumnType("text[]");
+            builder.Property(e => e.Intents)
+                .HasColumnType("text[]");
         }
     }
 }

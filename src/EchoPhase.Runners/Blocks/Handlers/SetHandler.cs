@@ -21,13 +21,12 @@ namespace EchoPhase.Runners.Blocks.Handlers
         private readonly ILexer<PathToken> _pathLexer;
         private readonly IPathParser<PathToken> _pathParser;
 
-        public SetHandler(IServiceProvider serviceProvider)
-            : base(serviceProvider)
+        public SetHandler(ILexer<TemplateToken> lexer, IParser<TemplateToken> parser, ILexer<PathToken> pathLexer, IPathParser<PathToken> pathParser)
         {
-            _lexer = GetService<ILexer<TemplateToken>>();
-            _parser = GetService<IParser<TemplateToken>>();
-            _pathLexer = GetService<ILexer<PathToken>>();
-            _pathParser = GetService<IPathParser<PathToken>>();
+            _lexer = lexer;
+            _parser = parser;
+            _pathLexer = pathLexer;
+            _pathParser = pathParser;
         }
 
         public override Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, SetParams param)

@@ -26,6 +26,13 @@ namespace EchoPhase.Projection.Options
         public bool UseExpando { get; set; } = false;
 
         /// <summary>
+        /// When true, included fields that are collections or dictionaries
+        /// will have their full content projected recursively,
+        /// instead of being filtered by includePaths.
+        /// </summary>
+        public bool IncludeNestedContent { get; set; } = false;
+
+        /// <summary>
         /// Creates a shallow copy of the current options.
         /// Used by the builder so per-call overrides don't affect the projector's defaults.
         /// </summary>
@@ -34,6 +41,7 @@ namespace EchoPhase.Projection.Options
             IncludeOnlyExpose = IncludeOnlyExpose,
             IncludeSubPaths = IncludeSubPaths,
             UseExpando = UseExpando,
+            IncludeNestedContent = IncludeNestedContent,
         };
     }
 }

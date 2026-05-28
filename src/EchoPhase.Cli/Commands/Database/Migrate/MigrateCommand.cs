@@ -21,7 +21,7 @@ namespace EchoPhase.Cli.Commands.Database.Migrate
             _scyllaContext = scyllaContext;
         }
 
-        public override async Task<int> ExecuteAsync(CommandContext context, MigrateSettings settings, CancellationToken cancellationToken)
+        protected override async Task<int> ExecuteAsync(CommandContext context, MigrateSettings settings, CancellationToken cancellationToken)
         {
             var pgPendingMigrations = await _pgContext.Database.GetPendingMigrationsAsync();
             var scyllaPendingMigrations = await _scyllaContext.Database.GetPendingMigrationsAsync();

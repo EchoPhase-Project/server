@@ -63,12 +63,10 @@
     <PackageReference Include="Polly" />
     <PackageReference Include="Polly.Extensions.Http" />
     <PackageReference Include="Serilog.Extensions.Logging.File" />
-    <PackageReference Include="SixLabors.ImageSharp" />
     <PackageReference Include="Spectre.Console.Cli" />
     <PackageReference Include="Spectre.Console.Cli.Extensions.DependencyInjection" />
     <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
-    <PackageReference Include="System.Drawing.Common" />
 	<Protobuf Include="Protos/data.proto" GrpcServices="Server" />
 	<Protobuf Include="Protos/discord_token.proto" GrpcServices="Server" />
   </ItemGroup>

@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using UUIDNext;
+
 namespace EchoPhase.Configuration.Database.Redis
 {
     public class RedisOptions : IRedisOptions, IValidatable
@@ -11,7 +13,7 @@ namespace EchoPhase.Configuration.Database.Redis
         public Guid TenantId
         {
             get; set;
-        } = Guid.Empty;
+        } = Uuid.NewRandom();
 
         public IValidationResult Validate()
         {

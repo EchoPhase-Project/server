@@ -11,33 +11,32 @@ namespace EchoPhase.Runners.Blocks.Handlers
 {
     public abstract class BlockHandlerBase<TParam> : IBlockHandler<TParam>
     {
-        private readonly IServiceProvider _serviceProvider;
         private readonly JsonSerializerOptions _serializerOptions = new();
-
-        protected BlockHandlerBase(IServiceProvider serviceProvider)
-        {
-            _serviceProvider = serviceProvider;
-        }
 
         public Type ParamType => typeof(TParam);
 
-        protected T GetService<T>() where T : notnull
+        protected T GetService<T>(IBlockExecutionContext context) where T : notnull
         {
-            return _serviceProvider.GetRequiredService<T>();
+            return context.Services.GetRequiredService<T>();
         }
 
         public async Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, object param)
         {
             TParam? typedParam = default;
+
             if (param is null)
                 throw new ArgumentNullException("Missing params exception.");
+
             if (param is JsonElement jsonElement)
                 typedParam = jsonElement.Deserialize<TParam>(_serializerOptions);
             else if (param is TParam typed)
                 typedParam = typed;
+
             if (typedParam is null)
                 throw new InvalidCastException($"Invalid param type. Expected {typeof(TParam)}, got {param?.GetType()}.");
+
             await ValidateParamAsync(context, typedParam);
+
             return await ExecuteAsync(context, block, typedParam);
         }
 
@@ -51,9 +50,7 @@ namespace EchoPhase.Runners.Blocks.Handlers
 
             var result = validatableParam.Validate();
             if (!result.Successful)
-            {
                 throw new InvalidOperationException(result.Error.Value);
-            }
 
             await Task.CompletedTask;
         }

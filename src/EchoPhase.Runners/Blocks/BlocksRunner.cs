@@ -16,21 +16,8 @@ namespace EchoPhase.Runners.Blocks
             _resolver = resolver;
         }
 
-        public static IBlockExecutionContext Create(
-            IEnumerable<int>? startIds = null,
-            IEnumerable<IBlock>? blocks = null)
-        {
-            return new BlockExecutionContext
-            {
-                StartIds = startIds?.ToList() ?? new List<int>(),
-                Blocks = blocks?.ToList() ?? new List<IBlock>(),
-            };
-        }
-
         public async Task<IBlockExecutionContext> ExecuteAsync(IBlockExecutionContext context)
         {
-            context ??= new BlockExecutionContext();
-
             var dict = context.Blocks.ToDictionary(b => b.Id);
             var queue = new Queue<int>();
             var visited = new HashSet<int>();
@@ -54,7 +41,7 @@ namespace EchoPhase.Runners.Blocks
                     continue;
                 }
 
-                var handler = _resolver.Get(block.Type);
+                var handler = _resolver.Get(context.Services, block.Type);
 
                 IEnumerable<int> next = new HashSet<int>();
                 try

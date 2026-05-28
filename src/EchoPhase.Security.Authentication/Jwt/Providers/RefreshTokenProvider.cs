@@ -67,27 +67,15 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
 
             if (context is not null)
             {
-                entry.Scopes = context.RequestedScopes
-                    .Select(s => new RefreshTokenScope
-                    {
-                        RefreshTokenId = entry.Id,
-                        Value = s
-                    }).ToList();
-
-                entry.Intents = context.RequestedIntents
-                    .Select(i => new RefreshTokenIntent
-                    {
-                        RefreshTokenId = entry.Id,
-                        Value = i
-                    }).ToList();
-
+                entry.Scopes = context.RequestedScopes.ToArray();
+                entry.Intents = context.RequestedIntents.ToArray();
                 entry.Permissions = context.RequestedPermissions
-                    .SelectMany(kvp => kvp.Value.Select(p => new RefreshTokenPermissionEntry
+                    .Select(kvp => new RefreshTokenPermissionEntry
                     {
                         RefreshTokenId = entry.Id,
                         Resource = kvp.Key,
-                        Permission = p
-                    })).ToList();
+                        Permissions = kvp.Value.ToArray()
+                    }).ToList();
             }
 
             _db.RefreshTokens.Add(entry);
@@ -141,11 +129,10 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             var context = new ClaimsEnrichmentContext
             {
                 User = user,
-                RequestedScopes = existing.Scopes.Select(s => s.Value).ToList(),
-                RequestedIntents = existing.Intents.Select(i => i.Value).ToList(),
+                RequestedScopes = existing.Scopes.ToList(),
+                RequestedIntents = existing.Intents.ToList(),
                 RequestedPermissions = existing.Permissions
-                    .GroupBy(p => p.Resource)
-                    .ToDictionary(g => g.Key, g => g.Select(p => p.Permission).ToArray())
+                    .ToDictionary(p => p.Resource, p => p.Permissions)
             };
 
             existing.RefreshValue = GenerateSecureToken();
@@ -196,8 +183,6 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
         {
             var query = _repository.Query()
                 .WithUserIds(userId)
-                .Include(t => t.Intents)
-                .Include(t => t.Scopes)
                 .Include(t => t.Permissions);
 
             if (cursor is not null)

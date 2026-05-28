@@ -149,8 +149,13 @@ namespace EchoPhase.Scripting.Parsers
 
                     if (current is IDictionary<string, object?> dict)
                     {
-                        if (!dict.ContainsKey(propName))
-                            dict[propName] = new Dictionary<string, object?>();
+                        if (!dict.ContainsKey(propName) || dict[propName] == null)
+                        {
+                            bool nextIsIndex = pos < _tokens.Count && _tokens[pos].Type == PathTokenType.LBracket;
+                            dict[propName] = nextIsIndex
+                                ? new List<object?>()
+                                : new Dictionary<string, object?>();
+                        }
                         current = dict[propName];
                     }
                     else
@@ -161,7 +166,7 @@ namespace EchoPhase.Scripting.Parsers
                 }
                 else if (token.Type == PathTokenType.LBracket)
                 {
-                    if (_pos >= _tokens.Count || _tokens[pos].Type != PathTokenType.Expression)
+                    if (pos >= _tokens.Count || _tokens[pos].Type != PathTokenType.Expression)
                         throw new InvalidOperationException("Expected expression inside brackets.");
 
                     string innerExprText = _tokens[pos++].Value;

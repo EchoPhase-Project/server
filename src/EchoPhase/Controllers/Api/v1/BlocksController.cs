@@ -4,6 +4,7 @@
 using EchoPhase.Controllers.Api.v1.Dto.Blocks;
 using EchoPhase.Projection;
 using EchoPhase.Runners.Blocks;
+using EchoPhase.Runners.Blocks.Contexts;
 using EchoPhase.Security.Antiforgery.Attributes;
 using Microsoft.AspNetCore.Mvc;
 
@@ -29,10 +30,10 @@ namespace EchoPhase.Controllers.Api.v1
             if (request.Blocks.Count == 0)
                 return BadRequest("At least one block is required.");
 
-            var context = BlocksRunner.Create(request.StartIds, request.Blocks);
+            IBlockExecutionContext context = new BlockExecutionContext(request.StartIds, request.Blocks, HttpContext.RequestServices);
             context = await _runner.ExecuteAsync(context);
 
-            return Ok(_projector.For(context).Include(ctx => ctx.Errors, ctx => ctx.Output, ctx => ctx.Variables).Build());
+            return Ok(_projector.For(context).Include(ctx => ctx.Errors, ctx => ctx.Output, ctx => ctx.Variables).WithNestedContent().Build());
         }
     }
 }

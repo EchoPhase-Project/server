@@ -1,0 +1,89 @@
+info:
+  name: For If
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{baseUrl}}/blocks/run"
+  headers:
+    - name: ""
+      value: ""
+  body:
+    type: json
+    data: |-
+      {                                                        
+        "startIds": [1],                  
+        "blocks": [
+          {               
+            "id": 1,    
+            "type": "Set",   
+            "params": {              
+              "name": "i",           
+              "value": "0",
+              "next": [2]
+            }             
+          },                         
+          {                   
+            "id": 2,
+            "type": "For",  
+            "params": {
+              "counterVar": "j",    
+              "start": 1,     
+              "end": 3,       
+              "step": 1,        
+              "bodyNext": [3],             
+              "afterNext": [7]                                     
+            }           
+          },       
+          {
+            "id": 3,
+            "type": "If", 
+            "params": {
+              "condition": "(j % 2) == 0",
+              "trueNext": [4],
+              "falseNext": [5]
+            }
+          },
+          {
+            "id": 4,
+            "type": "Print",
+            "params": {
+              "text": "Even number: @j",
+              "next": [6]     
+            }                 
+          },            
+          {                   
+            "id": 5,          
+            "type": "Print",
+            "params": {     
+              "text": "Odd number: @j",
+              "next": [6]      
+            }            
+          },           
+          {                                 
+            "id": 6,          
+            "type": "Set",    
+            "params": {   
+              "name": "i",
+              "value": "@(i + j)",
+              "next": []         
+            }               
+          },           
+          {                             
+            "id": 7,     
+            "type": "Print",
+            "params": {     
+              "text": "Loop ended, sum = @i",
+              "next": []              
+            }               
+          }            
+        ]                              
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

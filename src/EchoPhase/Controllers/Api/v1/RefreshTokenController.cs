@@ -1,12 +1,10 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using EchoPhase.Controllers.Api.v1.Dto;
 using EchoPhase.Controllers.Api.v1.Dto.Auth;
 using EchoPhase.Identity;
 using EchoPhase.Projection;
 using EchoPhase.Security.Antiforgery.Attributes;
-using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Security.Authentication.Jwt.Claims;
 using EchoPhase.Security.Authentication.Jwt.Providers;

@@ -18,7 +18,7 @@ namespace EchoPhase.Cli.Commands.User.Create
             _userService = userService;
         }
 
-        public override async Task<int> ExecuteAsync(CommandContext context, CreateSettings settings, CancellationToken cancellationToken)
+        protected override async Task<int> ExecuteAsync(CommandContext context, CreateSettings settings, CancellationToken cancellationToken)
         {
             var password = settings.Password;
             if (password.TryFromBase64String(out var bytes))

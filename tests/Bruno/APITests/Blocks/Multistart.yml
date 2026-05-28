@@ -1,0 +1,60 @@
+info:
+  name: Multistart
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{baseUrl}}/blocks/run"
+  headers:
+    - name: ""
+      value: ""
+  body:
+    type: json
+    data: |-
+      {
+        "startIds": [1, 10],
+        "blocks": [
+          {
+            "id": 1,
+            "type": "Set",
+            "params": {
+              "name": "a",
+              "value": "1",
+              "next": [2]
+            }
+          },
+          {
+            "id": 2,
+            "type": "Print",
+            "params": {
+              "text": "Chain A: a = @a",
+              "next": []
+            }
+          },
+          {
+            "id": 10,
+            "type": "Set",
+            "params": {
+              "name": "b",
+              "value": "99",
+              "next": [11]
+            }
+          },
+          {
+            "id": 11,
+            "type": "Print",
+            "params": {
+              "text": "Chain B: b = @b",
+              "next": []
+            }
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
