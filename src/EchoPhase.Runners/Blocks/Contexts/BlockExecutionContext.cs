@@ -14,22 +14,24 @@ namespace EchoPhase.Runners.Blocks.Contexts
         public IList<string> Output { get; set; } = [];
         public IList<BlockError> Errors { get; set; } = [];
         public IServiceProvider Services { get; init; }
+        public Guid UserId { get; init; } = Guid.Empty;
 
         public BlockExecutionContext(IServiceProvider services)
         {
             Services = services;
         }
 
-        public BlockExecutionContext(IEnumerable<int> startIds, IEnumerable<IBlock> blocks, IServiceProvider services)
+        public BlockExecutionContext(IEnumerable<int> startIds, IEnumerable<IBlock> blocks, IServiceProvider services, Guid userId)
         {
             StartIds = startIds;
             Blocks = blocks;
             Services = services;
+            UserId = userId;
         }
 
         public BlockExecutionContext Clone()
         {
-            return new BlockExecutionContext(StartIds, Blocks, Services)
+            return new BlockExecutionContext(StartIds, Blocks, Services, UserId)
             {
                 Variables = new Dictionary<string, object>(Variables),
                 Output = new List<string>(Output),

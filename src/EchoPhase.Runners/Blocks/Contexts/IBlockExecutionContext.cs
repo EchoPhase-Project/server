@@ -35,6 +35,10 @@ namespace EchoPhase.Runners.Blocks.Contexts
         {
             get; init;
         }
+        Guid UserId
+        {
+            get; init;
+        }
         BlockExecutionContext Clone();
     }
 }

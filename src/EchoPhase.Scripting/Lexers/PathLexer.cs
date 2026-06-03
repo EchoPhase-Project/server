@@ -80,6 +80,7 @@ namespace EchoPhase.Scripting.Lexers
 
                             i++;
                         }
+                        i--;
 
                         if (bracketDepth != 0)
                             throw new InvalidOperationException("Unterminated brackets in path expression.");

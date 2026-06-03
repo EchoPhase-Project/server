@@ -12,6 +12,7 @@ namespace EchoPhase.Runners.Blocks
         Print,
         If,
         For,
-        While
+        While,
+        DiscordGetUserGuilds
     }
 }

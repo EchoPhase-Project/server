@@ -21,6 +21,7 @@ namespace EchoPhase.Runners.Extensions
             services.AddKeyedTransient<IBlockHandler, IfHandler>(BlockTypes.If);
             services.AddKeyedTransient<IBlockHandler, ForHandler>(BlockTypes.For);
             services.AddKeyedTransient<IBlockHandler, WhileHandler>(BlockTypes.While);
+            services.AddKeyedTransient<IBlockHandler, DiscordGetUserGuildsHandler>(BlockTypes.DiscordGetUserGuilds);
 
             services.AddSingleton<BlockHandlerResolver>();
             services.AddTransient<BlocksRunner>();

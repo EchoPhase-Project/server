@@ -5,13 +5,16 @@ using EchoPhase.Controllers.Api.v1.Dto.Blocks;
 using EchoPhase.Projection;
 using EchoPhase.Runners.Blocks;
 using EchoPhase.Runners.Blocks.Contexts;
+using EchoPhase.Security.Authentication.Attributes;
 using EchoPhase.Security.Antiforgery.Attributes;
+using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Controllers.Api.v1
 {
     [ApiController]
     [Route("api/v1/blocks")]
+    [RequireUser]
     public class BlocksController : ControllerBase
     {
         private readonly BlocksRunner _runner;
@@ -23,6 +26,8 @@ namespace EchoPhase.Controllers.Api.v1
             _projector = projector;
         }
 
+        private User CurrentUser => HttpContext.Items["User"] as User;
+
         [HttpPost("run")]
         [ValidateAntiForgery]
         public async Task<IActionResult> RunBlocks([FromBody] RunBlocksRequest request)
@@ -30,7 +35,7 @@ namespace EchoPhase.Controllers.Api.v1
             if (request.Blocks.Count == 0)
                 return BadRequest("At least one block is required.");
 
-            IBlockExecutionContext context = new BlockExecutionContext(request.StartIds, request.Blocks, HttpContext.RequestServices);
+            IBlockExecutionContext context = new BlockExecutionContext(request.StartIds, request.Blocks, HttpContext.RequestServices, CurrentUser.Id);
             context = await _runner.ExecuteAsync(context);
 
             return Ok(_projector.For(context).Include(ctx => ctx.Errors, ctx => ctx.Output, ctx => ctx.Variables).WithNestedContent().Build());
