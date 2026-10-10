@@ -6,188 +6,144 @@ It allows you to easily automate tasks, connect different services, and manage t
 
 ## Commands
 
-This project uses [just](https://github.com/casey/just) as a command runner for Docker operations.
+Tools, environment and tasks are defined for [mise](https://mise.jdx.dev):
 
-### Prerequisites
+| File | What |
+|---|---|
+| `mise.toml` | tool versions (.NET SDK, Node, helm, kubectl, oras, oasdiff) and `[env]` |
+| `mise.lock` | exact versions, download URLs and checksums of those tools |
+| `mise-tasks/*.toml` | tasks: `dotnet`, `docker`, `helm`, `registry`, `openapi` |
+| `scripts/` | helpers the tasks use (image tag, Helm arguments, registry pruning) |
 
-Install just:
+### Setup
+
 ```bash
-# macOS
-brew install just
-
-# Linux
-curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
-
-# Windows
-scoop install just
+mise install --locked          # tools exactly as mise.lock records them
+eval "$(mise activate zsh)"    # in ~/.zshrc (or bash/fish): tools and [env] in this repo
 ```
 
-### Quick Start
+Without shell activation, prefix commands with `mise exec --`.
 
-**Show all available commands:**
+### Tasks
+
 ```bash
-just
+mise tasks                     # list all tasks
+mise run                       # pick one interactively
+mise run <task> --help         # arguments and flags of a task
 ```
 
-### Frontend
+| Task | What |
+|---|---|
+| `test`, `test:verbose` | .NET tests (`mise run test -- --filter-class '*Argon2*'`) |
+| `lint` / `format` | check / apply code style |
+| `openapi` | export `artifacts/openapi.json` (skipped while sources are unchanged) |
+| `openapi:check [--base tag]` | fail on breaking API changes against a published contract |
+| `openapi:publish` | push the contract as `echophase/openapi:<tag>` and `latest` |
+| `docker:build [all\|server\|webapp]` | build images |
+| `docker:push [component] [--tag t]` | push with the image tag and `latest` |
+| `docker:publish [component] [--tag t]` | build and push |
+| `docker:info`, `image-tag` | registry, image names, this checkout's tag |
+| `docker:clean`, `clean` | remove local images / build outputs |
+| `check` | build both images, as CI does |
+| `helm:upgrade`, `helm:install` | deploy this checkout's tag (images must be published) |
+| `helm:diff`, `helm:template` | server-side dry run / local render |
+| `helm:status`, `helm:history`, `helm:rollback [rev]` | release state and rollback |
+| `helm:uninstall`, `helm:delete`, `rebuild` | destructive, ask for confirmation |
+| `registry:install` | in-cluster registry (`infra/registry`) |
+| `registry:prune [--keep n] [--dry-run]` | delete old tags, then garbage-collect |
+| `registry:migrate [--from host:port]` | copy all server/webapp tags from another registry |
+| `k3s:image-prune` | unused images in k3s's containerd (sudo) |
+| `isopoh:pack [--version v]` | pack Isopoh.Cryptography.Argon2 into `src/packages` |
 
-**Build Docker image:**
+### Environment
+
+`[env]` in `mise.toml` sets these unless they are already set, so one-off
+overrides work (`DOCKER_REGISTRY=registry.example mise run docker:publish`):
+
+| Variable | Default |
+|---|---|
+| `DOCKER_REGISTRY` | `localhost:30500` |
+| `SERVER_IMAGE`, `WEBAPP_IMAGE`, `OPENAPI_REPO` | `echophase/server`, `echophase/webapp`, `echophase/openapi` |
+| `HELM_RELEASE`, `HELM_NAMESPACE` | `echophase` |
+| `HELM_VALUES`, `HELM_SECRETS` | `values.k3s.yaml`, `secrets.yaml` (in `helm/`, used when present) |
+| `KUBECONFIG` | `~/.kube/config` |
+| `ISOPOH_DIR` | `../Isopoh.Cryptography.Argon2/Isopoh.Cryptography.Argon2` |
+| `IMAGE_TAG` | not set: computed from git (see below) |
+
+### Image tags
+
+Without `--tag` or `IMAGE_TAG`, images get one from git
+(`scripts/image-tag.sh`; `mise run image-tag` prints it):
+
+| Checkout | Tag |
+|---|---|
+| on release tag `v1.2.0` | `1.2.0` |
+| 3 commits after `v1.2.0` | `1.2.0-3-g938156d` |
+| no release tag yet | `0.0.0-g938156d` |
+| uncommitted changes | the above + `-dirty.20261010T153012` (newest change) |
+
+`helm:upgrade` deploys that same tag, so pods roll on every new build and
+`helm:rollback` restores the previous images too. It refuses to run until the
+images for the tag are in the registry (`mise run docker:publish`).
+
+### Local registry
+
+Inside k3s (`infra/registry/`): `localhost:30500` on the node only,
+`registry.registry.svc:5000` for pods.
+
 ```bash
-just docker-build-frontend
+mise run registry:install
+mise run docker:publish && mise run helm:upgrade
+mise run registry:prune --dry-run      # what would be deleted
 ```
 
-**Tag Docker image:**
-```bash
-just docker-tag-frontend          # uses default version
-just docker-tag-frontend 1.2.3    # uses specific version
+Credentials for the chart go in `helm/secrets.yaml` (gitignored; copy
+`helm/secrets.example.yaml`).
+
+### CI and releases
+
+GitHub Actions (`.github/workflows/test.yml`) checks every push and PR on Linux,
+Windows and macOS. Woodpecker in the local k3s (`.woodpecker/release.yaml`)
+does what needs the registry and the cluster: on pushes to `main` and manual
+runs it builds the images, publishes the API contract (failing on breaking
+changes) and deploys.
+
+```
+GitHub ─webhook─▶ tailscale funnel :8443 /api/hook ─▶ Woodpecker (k3s)
+you (tailnet) ──▶ tailscale serve  :9443 (UI, API)  ─▶ Woodpecker
 ```
 
-**Push Docker image:**
-```bash
-just docker-push-frontend         # uses default version
-just docker-push-frontend 1.2.3   # uses specific version
-```
+Setup, once:
 
-**All Docker commands at once:**
-```bash
-just docker-publish-frontend         # uses default version
-just docker-publish-frontend 2.0.0   # uses specific version
-```
+1. Tailscale admin: enable HTTPS certificates and the `funnel` node attribute;
+   then `sudo tailscale set --operator=$USER`.
+2. GitHub OAuth app with callback `https://<node>.<tailnet>.ts.net:9443/authorize`
+   (not 443: k3s's Traefik takes 443 on every node address, the tailscale one too).
+3. `cp mise.local.toml.example mise.local.toml` and fill it in.
+4. `mise run woodpecker:install && mise run tailscale:expose`
+5. In the Woodpecker UI: enable the repository and mark it trusted
+   (privileged image builds, the deploy step's ServiceAccount).
 
-#### Configuration
-
-**Environment variables (`.env`):**
-- `FRONTEND_IMAGE` - `echophase-frontend`
-- `DOCKER_REGISTRY` - `localhost:5000`
-- `VERSION` - `1.0.0` (default version)
-
-Build context: `./frontend/`
-
-### Backend
-
-**Build Docker image:**
-```bash
-just docker-build-backend
-```
-
-**Tag and push:**
-```bash
-just docker-publish-backend         # uses default version
-just docker-publish-backend 1.5.0   # uses specific version
-```
-
-#### Configuration
-
-**Environment variables (`.env`):**
-- `BACKEND_IMAGE` - `echophase`
-- `DOCKER_REGISTRY` - `localhost:5000`
-- `VERSION` - `1.0.0` (default version)
-
-Build context: `./src/`
-
-### Build Everything
-
-**Build, tag and push all images:**
-```bash
-just docker-publish-all            # uses default version
-just docker-publish-all 1.0.0      # uses specific version
-```
-
-This creates the following tags:
-- `localhost:5000/echophase-frontend:1.0.0`
-- `localhost:5000/echophase-frontend:latest`
-- `localhost:5000/echophase-backend:1.0.0`
-- `localhost:5000/echophase-backend:latest`
-
-### Utility Commands
-
-**Show Docker configuration:**
-```bash
-just docker-info
-```
-
-**Clean local images:**
-```bash
-just docker-clean
-```
-
-**Clean build artifacts:**
-```bash
-just clean
-```
-
-### Publishing Images
-
-Before continuing, make sure you have built the images and pushed them to any registry of your choice, since at the moment the images are not publicly available.
-It's best to do this locally _(default build)_.
-
-**Launching local registry:**
-```bash
-docker run -d -p 5000:5000 --name registry registry:2
-```
-
-**Publishing to local registry:**
-```bash
-just docker-publish-all 1.0.0
-```
-
-### Launching Cluster
-
-**Launching default Helm:**
-```bash
-helm install echophase helm --namespace echophase --create-namespace
-```
-
-## Advanced Usage
-
-### Custom Registry
+Then:
 
 ```bash
-DOCKER_REGISTRY=myregistry.com just docker-publish-all 2.0.0
-```
-
-### Custom Image Names
-
-```bash
-FRONTEND_IMAGE=my-frontend BACKEND_IMAGE=my-backend just docker-publish-all 1.5.0
-```
-
-### Environment Variables Override
-
-```bash
-DOCKER_REGISTRY=myregistry.com \
-FRONTEND_IMAGE=custom-frontend \
-BACKEND_IMAGE=custom-backend \
-VERSION=3.0.0 \
-just docker-publish-all
+mise run ci:run                    # release main now
+mise run ci:run --no-deploy        # images and contract only
+mise run ci:image                  # rebuild the step image after mise.lock changes
 ```
 
 ## Project Structure
 
 ```
 .
-├── frontend/         # Frontend application
+├── webapp/           # Web application (SolidJS + nginx)
 ├── src/              # Backend application
-├── helm/             # Kubernetes Helm charts
-├── compose/          # Docker Compose configuration
-├── justfile          # Main task runner
-├── just              # Specific tasks
-├── .env              # Environment configuration
+├── tests/            # Backend tests
+├── helm/             # Helm chart of the application
+├── infra/            # Cluster infrastructure (registry, Woodpecker, CI image)
+├── .woodpecker/      # Woodpecker pipelines
+├── mise-tasks/       # Tasks (mise run <task>)
+├── scripts/          # Helpers used by the tasks
+├── mise.toml         # Tools and environment
+└── mise.lock         # Locked tool versions and checksums
 ```
-
-## Docker Commands Reference
-
-| Command | Description |
-|---------|-------------|
-| `just docker-build-frontend` | Build frontend image |
-| `just docker-build-backend` | Build backend image |
-| `just docker-build-all` | Build all images |
-| `just docker-tag-frontend [version]` | Tag frontend image |
-| `just docker-tag-backend [version]` | Tag backend image |
-| `just docker-push-frontend [version]` | Push frontend to registry |
-| `just docker-push-backend [version]` | Push backend to registry |
-| `just docker-publish-frontend [version]` | Build, tag, and push frontend |
-| `just docker-publish-backend [version]` | Build, tag, and push backend |
-| `just docker-publish-all [version]` | Build, tag, and push everything |
-| `just docker-info` | Show Docker configuration |
-| `just docker-clean` | Remove local images |

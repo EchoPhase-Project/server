@@ -1,0 +1,86 @@
+# Docker images: build locally, push to $DOCKER_REGISTRY under the image tag
+# of this checkout (`mise run image-tag`) and "latest".
+
+["image-tag"]
+description = "Print the image tag of this checkout (<version>-g<sha>[-dirty.<time>])"
+run = "scripts/image-tag.sh"
+
+["docker:build"]
+description = "Build the server and/or webapp image"
+usage = '''
+arg "[component]" help="What to build" default="all" {
+  choices "all" "server" "webapp"
+}
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+. scripts/lib.sh
+component_images "$usage_component" | while read -r image context; do
+    echo "building $image from ./$context"
+    docker build -t "$image" "./$context"
+done
+'''
+
+["docker:push"]
+description = "Tag the built images with the image tag and latest, and push them"
+usage = '''
+arg "[component]" help="What to push" default="all" {
+  choices "all" "server" "webapp"
+}
+flag "--tag <tag>" help="Tag instead of this checkout's image tag" env="IMAGE_TAG"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+. scripts/lib.sh
+tag=${usage_tag:-$(image_tag)}
+component_images "$usage_component" | while read -r image context; do
+    for t in "$tag" latest; do
+        docker tag "$image" "$DOCKER_REGISTRY/$image:$t"
+        docker push -q "$DOCKER_REGISTRY/$image:$t"
+    done
+done
+'''
+
+["docker:publish"]
+description = "Build and push the server and/or webapp image"
+usage = '''
+arg "[component]" help="What to publish" default="all" {
+  choices "all" "server" "webapp"
+}
+flag "--tag <tag>" help="Tag instead of this checkout's image tag" env="IMAGE_TAG"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+mise run docker:build "$usage_component"
+mise run docker:push "$usage_component" ${usage_tag:+--tag "$usage_tag"}
+'''
+
+["docker:info"]
+description = "Show the registry, image names and this checkout's image tag"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+. scripts/lib.sh
+tag=$(image_tag)
+echo "registry:  $DOCKER_REGISTRY"
+echo "image tag: $tag"
+for image in "$SERVER_IMAGE" "$WEBAPP_IMAGE"; do
+    echo "  $DOCKER_REGISTRY/$image:$tag"
+done
+'''
+
+["docker:clean"]
+description = "Remove local echophase Docker images"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+ids=$(docker images --format '{{ "{{" }}.ID{{ "}}" }} {{ "{{" }}.Repository{{ "}}" }}' | awk '/echophase/ {print $1}' | sort -u)
+if [ -n "$ids" ]; then docker rmi -f $ids; else echo "no echophase images"; fi
+'''
+
+[check]
+description = "Build both images, as CI does"
+run = "mise run docker:build all"

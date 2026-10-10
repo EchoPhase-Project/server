@@ -1,0 +1,68 @@
+# The in-cluster image registry (infra/registry) and image cleanup.
+
+["registry:install"]
+description = "Deploy or update the in-cluster registry and its web UI"
+run = [
+  "kubectl apply -f infra/registry/registry.yaml",
+  "kubectl -n registry rollout status deploy/registry --timeout=180s",
+  "kubectl -n registry rollout status deploy/registry-ui --timeout=180s",
+]
+
+["registry:migrate"]
+description = "Copy the server and webapp images (all tags) from another registry"
+usage = 'flag "--from <registry>" help="Registry to copy from" default="localhost:5000"'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+for repo in "$SERVER_IMAGE" "$WEBAPP_IMAGE"; do
+    if ! list=$(curl -fsS "http://$usage_from/v2/$repo/tags/list"); then
+        echo "cannot list $repo in $usage_from" >&2
+        exit 1
+    fi
+    for tag in $(python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin).get("tags") or []))' <<<"$list"); do
+        echo "$usage_from/$repo:$tag -> $DOCKER_REGISTRY/$repo:$tag"
+        docker pull -q "$usage_from/$repo:$tag" >/dev/null
+        docker tag "$usage_from/$repo:$tag" "$DOCKER_REGISTRY/$repo:$tag"
+        docker push -q "$DOCKER_REGISTRY/$repo:$tag" >/dev/null
+    done
+done
+'''
+
+# Keeps the newest builds, latest, releases and every Helm revision's tags.
+["registry:prune"]
+description = "Delete old image and contract tags, then garbage-collect"
+usage = '''
+flag "--keep <n>" help="Newest builds to keep per repository" default="10"
+flag "-n --dry-run" help="Only list what would be deleted"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+scripts/registry-prune.py "$REGISTRY_API" "$usage_keep" "${usage_dry_run:-false}" \
+    "$SERVER_IMAGE" "$WEBAPP_IMAGE" "$OPENAPI_REPO"
+if [ "${usage_dry_run:-false}" = true ]; then
+    echo "dry run: nothing deleted"
+else
+    mise run registry:gc
+fi
+'''
+
+# Don't push while it runs: blobs of an upload in progress look unreferenced.
+["registry:gc"]
+description = "Remove blobs no manifest references any more"
+run = [
+  "kubectl -n registry exec deploy/registry -- registry garbage-collect /etc/distribution/config.yml",
+  "kubectl -n registry exec deploy/registry -- du -sh /var/lib/registry",
+]
+
+# containerd's store; needs root. kubelet also does this by itself once the
+# disk is 85% full.
+["k3s:image-prune"]
+description = "Remove images no container on the k3s node uses (sudo)"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+echo "images before: $(sudo k3s crictl images -q | wc -l)"
+sudo k3s crictl rmi --prune
+echo "images after: $(sudo k3s crictl images -q | wc -l)"
+'''

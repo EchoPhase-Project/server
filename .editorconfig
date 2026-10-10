@@ -18,6 +18,11 @@ indent_size = 2
 [g_*.cs]
 generated_code = true
 
+# EF Core migrations — generated with a BOM and without the file header
+[**/Migrations/*.cs]
+generated_code = true
+charset = utf-8-bom
+
 # YAML
 [*.{yaml,yml}]
 indent_size = 2
@@ -39,7 +44,7 @@ dotnet_naming_style.pascalcase.capitalization = pascal_case
 
 dotnet_naming_style.camelcase.capitalization = camel_case
 
-# _camelCase — used for ALL non-public instance and static fields
+# _camelCase — private/internal instance and mutable static fields
 dotnet_naming_style.underscore_camelcase.capitalization = camel_case
 dotnet_naming_style.underscore_camelcase.required_prefix = _
 
@@ -59,13 +64,13 @@ dotnet_naming_rule.private_methods_pascalcase.severity = warning
 dotnet_naming_rule.private_methods_pascalcase.symbols = private_methods
 dotnet_naming_rule.private_methods_pascalcase.style = pascalcase
 
-# ── Private props/events → camelCase ─────────────────────────────────────────
+# ── Private props/events → PascalCase ────────────────────────────────────────
 
-dotnet_naming_symbols.private_methods_props_events.applicable_accessibilities = private
-dotnet_naming_symbols.private_methods_props_events.applicable_kinds = property,event
-dotnet_naming_rule.private_methods_props_events_camelcase.severity = warning
-dotnet_naming_rule.private_methods_props_events_camelcase.symbols = private_methods_props_events
-dotnet_naming_rule.private_methods_props_events_camelcase.style = camelcase
+dotnet_naming_symbols.private_props_events.applicable_accessibilities = private
+dotnet_naming_symbols.private_props_events.applicable_kinds = property,event
+dotnet_naming_rule.private_props_events_pascalcase.severity = warning
+dotnet_naming_rule.private_props_events_pascalcase.symbols = private_props_events
+dotnet_naming_rule.private_props_events_pascalcase.style = pascalcase
 
 # ── Local functions → PascalCase ─────────────────────────────────────────────
 
@@ -74,43 +79,54 @@ dotnet_naming_rule.local_function_pascalcase.severity = warning
 dotnet_naming_rule.local_function_pascalcase.symbols = local_function
 dotnet_naming_rule.local_function_pascalcase.style = pascalcase
 
-# ── ALL non-public instance fields → _camelCase ───────────────────────────────
+# ── Private / internal instance fields → _camelCase ───────────────────────────
 #
 # Covers:
 #   private          TFoo _foo
 #   internal         TFoo _foo   (e.g. internal readonly ProjectionOptions _defaultOptions)
-#   protected        TFoo _foo
-#   protected internal TFoo _foo
-#   private protected  TFoo _foo
+#
+# protected fields are visible to derived types, so they stay PascalCase
+# (public_members above).
 
-dotnet_naming_symbols.nonpublic_instance_fields.applicable_accessibilities = private,internal,protected,protected_internal,private_protected
+dotnet_naming_symbols.nonpublic_instance_fields.applicable_accessibilities = private,internal
 dotnet_naming_symbols.nonpublic_instance_fields.applicable_kinds = field
 # Exclude static — handled separately below
 dotnet_naming_rule.nonpublic_instance_fields_underscore.severity = warning
 dotnet_naming_rule.nonpublic_instance_fields_underscore.symbols = nonpublic_instance_fields
 dotnet_naming_rule.nonpublic_instance_fields_underscore.style = underscore_camelcase
 
-# ── ALL non-public static fields → _camelCase ────────────────────────────────
+# ── Non-public mutable static fields → _camelCase ────────────────────────────
 #
 # Covers:
 #   private static          TFoo _foo
-#   private static readonly TFoo _foo   (e.g. _propCache, _exposePathCache)
 #   internal static         TFoo _foo
-#   internal static readonly TFoo _foo
-#   protected static readonly TFoo _foo
+#
+# static readonly is handled below; the rule with more modifiers wins.
 
-dotnet_naming_symbols.nonpublic_static_fields.applicable_accessibilities = private,internal,protected,protected_internal,private_protected
+dotnet_naming_symbols.nonpublic_static_fields.applicable_accessibilities = private,internal
 dotnet_naming_symbols.nonpublic_static_fields.applicable_kinds = field
 dotnet_naming_symbols.nonpublic_static_fields.required_modifiers = static
 dotnet_naming_rule.nonpublic_static_fields_underscore.severity = warning
 dotnet_naming_rule.nonpublic_static_fields_underscore.symbols = nonpublic_static_fields
 dotnet_naming_rule.nonpublic_static_fields_underscore.style = underscore_camelcase
 
-# ── Private constants → PascalCase ───────────────────────────────────────────
+# ── Non-public static readonly fields → PascalCase ───────────────────────────
+#
+#   private static readonly JsonSerializerOptions JsonOptions = ...;
+#   internal static readonly TimeSpan MinTokenLifetime = ...;
+
+dotnet_naming_symbols.nonpublic_static_readonly_fields.applicable_accessibilities = private,internal
+dotnet_naming_symbols.nonpublic_static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.nonpublic_static_readonly_fields.required_modifiers = static,readonly
+dotnet_naming_rule.nonpublic_static_readonly_fields_pascalcase.severity = warning
+dotnet_naming_rule.nonpublic_static_readonly_fields_pascalcase.symbols = nonpublic_static_readonly_fields
+dotnet_naming_rule.nonpublic_static_readonly_fields_pascalcase.style = pascalcase
+
+# ── Private / internal constants → PascalCase ─────────────────────────────────────────
 #
 # Private const string MyConst = "...";  →  PascalCase
 
-dotnet_naming_symbols.private_constants.applicable_accessibilities = private
+dotnet_naming_symbols.private_constants.applicable_accessibilities = private,internal,private_protected
 dotnet_naming_symbols.private_constants.required_modifiers = const
 dotnet_naming_symbols.private_constants.applicable_kinds = field
 dotnet_naming_rule.private_const_pascalcase.severity = warning

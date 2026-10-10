@@ -73,3 +73,14 @@ packages/
 
 # Development test dirs
 .drone.yml
+artifacts/
+
+# Local NuGet source with packages built from source (src/packages/README.md).
+!src/packages/
+!src/packages/*.nupkg
+
+# mise: per-machine settings and secrets (WOODPECKER_TOKEN, OAuth app)
+mise.local.toml
+mise.local.lock
+# NuGet symbol packages: not needed to restore
+src/packages/*.snupkg

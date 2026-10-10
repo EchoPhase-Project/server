@@ -1,0 +1,35 @@
+# The API contract as a registry artifact. The server publishes
+# artifacts/openapi.json next to its images, tagged like them (image-tag), plus
+# "latest". Clients (webapp, a native app) pull the tag they were built against:
+#   oras pull --plain-http localhost:30500/echophase/openapi:<tag>
+
+["openapi:check"]
+description = "Fail on breaking API changes against a published contract"
+depends = ["openapi"]
+usage = 'flag "--base <tag>" help="Published contract to compare with" default="latest"'
+dir = "{{config_root}}/artifacts"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+rm -rf openapi-base
+if ! oras pull --plain-http "$REGISTRY_API/$OPENAPI_REPO:$usage_base" -o openapi-base >/dev/null 2>&1; then
+    echo "no published contract '$usage_base' yet: nothing to compare"
+    exit 0
+fi
+oasdiff breaking openapi-base/openapi.json openapi.json --fail-on ERR
+echo "no breaking changes against $OPENAPI_REPO:$usage_base"
+'''
+
+["openapi:publish"]
+description = "Push artifacts/openapi.json as OPENAPI_REPO:<image tag> and latest"
+depends = ["openapi:check"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+. scripts/lib.sh
+tag=$(image_tag)
+cd artifacts
+oras push --plain-http --artifact-type application/vnd.echophase.openapi \
+    "$REGISTRY_API/$OPENAPI_REPO:$tag" openapi.json:application/vnd.oai.openapi+json
+oras tag --plain-http "$REGISTRY_API/$OPENAPI_REPO:$tag" latest
+'''

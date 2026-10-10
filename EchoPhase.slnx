@@ -3,6 +3,7 @@
     <Project Path="src/EchoPhase.Cli/EchoPhase.Cli.csproj" />
     <Project Path="src/EchoPhase.Clients/EchoPhase.Clients.csproj" />
     <Project Path="src/EchoPhase.Configuration/EchoPhase.Configuration.csproj" />
+    <Project Path="src/EchoPhase.Connections/EchoPhase.Connections.csproj" />
     <Project Path="src/EchoPhase.DAL.Abstractions/EchoPhase.DAL.Abstractions.csproj" />
     <Project Path="src/EchoPhase.DAL.Postgres/EchoPhase.DAL.Postgres.csproj" />
     <Project Path="src/EchoPhase.DAL.Redis/EchoPhase.DAL.Redis.csproj" />
@@ -12,7 +13,6 @@
     <Project Path="src/EchoPhase.Projection/EchoPhase.Projection.csproj" />
     <Project Path="src/EchoPhase.QRCodes/EchoPhase.QRCodes.csproj" />
     <Project Path="src/EchoPhase.Runners/EchoPhase.Runners.csproj" />
-    <Project Path="src/EchoPhase.Scheduling/EchoPhase.Scheduling.csproj" />
     <Project Path="src/EchoPhase.Scripting/EchoPhase.Scripting.csproj" />
     <Project Path="src/EchoPhase.Security.Antiforgery/EchoPhase.Security.Antiforgery.csproj" />
     <Project Path="src/EchoPhase.Security.Authentication/EchoPhase.Security.Authentication.csproj" />
@@ -26,9 +26,13 @@
     <Project Path="src/EchoPhase/EchoPhase.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/EchoPhase.Security.BitMasks.Tests/EchoPhase.Security.BitMasks.Tests.csproj" />
+    <Project Path="tests/EchoPhase.Security.Hashers.Tests/EchoPhase.Security.Hashers.Tests.csproj" />
     <Project Path="tests/EchoPhase.Security.Cryptography.Tests/EchoPhase.Security.Cryptography.Tests.csproj" />
+    <Project Path="tests/EchoPhase.Runners.Tests/EchoPhase.Runners.Tests.csproj" />
     <Project Path="tests/EchoPhase.Scripting.Tests/EchoPhase.Scripting.Tests.csproj" />
     <Project Path="tests/EchoPhase.Projection.Tests/EchoPhase.Projection.Tests.csproj" />
-    <Project Path="tests/EchoPhase.Scheduling.Tests/EchoPhase.Scheduling.Tests.csproj" />
+    <Project Path="tests/EchoPhase.DAL.Postgres.Tests/EchoPhase.DAL.Postgres.Tests.csproj" />
+    <Project Path="tests/EchoPhase.DAL.Scylla.Tests/EchoPhase.DAL.Scylla.Tests.csproj" />
   </Folder>
 </Solution>

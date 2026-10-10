@@ -1,0 +1,70 @@
+# .NET: tests, formatting, the OpenAPI export and the locally built packages.
+# Extra arguments go to the last command: `mise run test -- --filter Argon2`.
+
+[test]
+description = "Run the .NET tests"
+run = "dotnet test --solution EchoPhase.slnx"
+
+["test:verbose"]
+description = "Run the .NET tests with detailed output"
+run = "dotnet test --solution EchoPhase.slnx --output Detailed"
+
+[format]
+description = "Apply code style fixes (style first: its fixes may need re-wrapping)"
+run = [
+  "dotnet format style EchoPhase.slnx",
+  "dotnet format whitespace EchoPhase.slnx",
+]
+
+[lint]
+description = "Fail if formatting or code style would change anything"
+run = [
+  "dotnet format whitespace EchoPhase.slnx --verify-no-changes",
+  "dotnet format style EchoPhase.slnx --verify-no-changes",
+]
+
+# Building the host connects to nothing, so no database or configuration is
+# needed. Debug, because XML docs are generated only there. Skipped while
+# artifacts/openapi.json is newer than every source (`mise run openapi --force`).
+[openapi]
+description = "Export the API's OpenAPI document to artifacts/openapi.json"
+sources = [
+  "src/**/*.cs",
+  "src/**/*.csproj",
+  "src/*.props",
+  "!src/**/obj/**",
+  "!src/**/bin/**",
+]
+outputs = ["artifacts/openapi.json"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+dotnet tool restore --tool-manifest src/dotnet-tools.json
+dotnet build src/EchoPhase/EchoPhase.csproj -c Debug
+mkdir -p artifacts
+cd src/EchoPhase
+ASPNETCORE_ENVIRONMENT=Development \
+    dotnet swagger tofile --output ../../artifacts/openapi.json bin/Debug/net10.0/EchoPhase.dll v1
+'''
+
+# Isopoh.Cryptography.Argon2 is built from source (upstream v2 + our patches,
+# branch `echophase`): nuget.org still serves the 1.x API as 2.0.0.
+["isopoh:pack"]
+description = "Pack the Isopoh libraries from $ISOPOH_DIR into src/packages"
+usage = 'flag "--version <version>" help="Package version" default="2.1.0-echophase.2"'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+for p in SecureArray Blake2b Argon2; do
+    proj="$ISOPOH_DIR/lib/Isopoh.Cryptography.$p/Isopoh.Cryptography.$p.csproj"
+    dotnet build "$proj" -c Release -v q -p:GeneratePackageOnBuild=false
+    dotnet pack "$proj" -c Release --no-build -p:PackageVersion="$usage_version" -o src/packages
+done
+'''
+
+[clean]
+description = "Remove build outputs of the webapp and the solution"
+run = [
+  "rm -rf webapp/dist/ webapp/build/ webapp/node_modules/.cache/ artifacts/",
+  "dotnet clean EchoPhase.slnx -v q",
+]
