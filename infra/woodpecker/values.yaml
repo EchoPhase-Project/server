@@ -1,0 +1,55 @@
+# Values for the woodpecker-ci/helm chart (3.7.3). Host-specific values come
+# from mise.toml [env] (WOODPECKER_SERVER, WOODPECKER_ADMIN_USER) and the GitHub
+# OAuth app from mise.local.toml; `mise run woodpecker:install` passes them.
+
+server:
+  image:
+    tag: v3.18.1
+  env:
+    WOODPECKER_OPEN: "false"
+    WOODPECKER_GITHUB: "true"
+    # Set by woodpecker:install:
+    #   WOODPECKER_HOST                 https://<node>.<tailnet>.ts.net (tailscale serve)
+    #   WOODPECKER_EXPERT_WEBHOOK_HOST  same host, port 8443 (tailscale funnel)
+    #   WOODPECKER_ADMIN, WOODPECKER_REPO_OWNERS
+  # WOODPECKER_GITHUB_CLIENT / _SECRET (created by woodpecker:install).
+  extraSecretNamesForEnvFrom:
+    - woodpecker-github
+    # WOODPECKER_GRPC_SECRET (created once by woodpecker:install).
+    - woodpecker-grpc
+  persistentVolume:
+    enabled: true
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+agent:
+  replicaCount: 1
+  image:
+    tag: v3.18.1
+  env:
+    WOODPECKER_SERVER: woodpecker-server:9000
+    WOODPECKER_BACKEND: kubernetes
+    WOODPECKER_BACKEND_K8S_NAMESPACE: woodpecker-pipelines
+    WOODPECKER_BACKEND_K8S_NAMESPACE_PER_ORGANIZATION: "false"
+    WOODPECKER_BACKEND_K8S_VOLUME_SIZE: 10G
+    # local-path (k3s) only does ReadWriteOnce; one node, so all steps of a
+    # workflow land where the volume is anyway.
+    WOODPECKER_BACKEND_K8S_STORAGE_RWX: "false"
+    # The deploy step runs as ServiceAccount `deployer` (infra/woodpecker/cluster.yaml).
+    # Safe only because the repository owners are the only ones who push.
+    WOODPECKER_BACKEND_K8S_SERVICE_ACCOUNT_NAME_ALLOW_FROM_STEP: "true"
+    WOODPECKER_MAX_WORKFLOWS: "2"
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 256Mi

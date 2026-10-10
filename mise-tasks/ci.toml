@@ -1,0 +1,121 @@
+# Woodpecker CI (infra/woodpecker, .woodpecker/) and its step image (infra/ci).
+
+# The tag is a hash of what goes into the image, so it changes exactly when the
+# tool versions or the Dockerfile do. The pipelines pin it; this task rewrites
+# the pin (the `&ci-image` anchor in .woodpecker/*.yaml) to the new tag.
+["ci:image"]
+description = "Build and push the CI step image (mise + tools of mise.lock)"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+ctx=$(mktemp -d)
+trap 'rm -rf "$ctx"' EXIT
+cp infra/ci/Dockerfile mise.toml mise.lock "$ctx/"
+tag=$(cat "$ctx/Dockerfile" "$ctx/mise.lock" | sha256sum | cut -c1-12)
+image="$DOCKER_REGISTRY/echophase/ci"
+docker build -t "$image:$tag" "$ctx"
+docker tag "$image:$tag" "$image:latest"
+docker push -q "$image:$tag"
+docker push -q "$image:latest"
+for f in .woodpecker/*.yaml; do
+    [ -e "$f" ] || continue
+    sed -i -E "s#^(  - &ci-image ).*#\1$image:$tag#" "$f"
+done
+echo "$image:$tag"
+'''
+
+# Needs WOODPECKER_SERVER and the GitHub OAuth app in mise.local.toml (see
+# mise.local.toml.example); the app's secret goes into a Kubernetes Secret only.
+["woodpecker:install"]
+description = "Deploy or update Woodpecker CI (infra/woodpecker)"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+: "${WOODPECKER_SERVER:?set it in mise.local.toml (https://<node>.<tailnet>.ts.net)}"
+: "${WOODPECKER_GITHUB_CLIENT:?set it in mise.local.toml (GitHub OAuth app)}"
+: "${WOODPECKER_GITHUB_SECRET:?set it in mise.local.toml (GitHub OAuth app)}"
+# GitHub calls the same host on the funnel port, which only serves /api/hook.
+webhook_host() { echo "$WOODPECKER_SERVER" | sed -E 's#^(https://[^/:]+).*#\1:8443#'; }
+kubectl apply -f infra/woodpecker/cluster.yaml
+kubectl -n woodpecker create secret generic woodpecker-github \
+    --from-env-file=<(printf 'WOODPECKER_GITHUB_CLIENT=%s\nWOODPECKER_GITHUB_SECRET=%s\n' \
+        "$WOODPECKER_GITHUB_CLIENT" "$WOODPECKER_GITHUB_SECRET") \
+    --dry-run=client -o yaml | kubectl apply -f -
+# Signs the agents' gRPC sessions; kept across restarts (random once).
+if ! kubectl -n woodpecker get secret woodpecker-grpc >/dev/null 2>&1; then
+    kubectl -n woodpecker create secret generic woodpecker-grpc \
+        --from-env-file=<(printf 'WOODPECKER_GRPC_SECRET=%s\n' "$(head -c 32 /dev/urandom | base64 | tr -d '/+=')")
+fi
+helm upgrade --install woodpecker oci://ghcr.io/woodpecker-ci/helm/woodpecker --version 3.7.3 \
+    --namespace woodpecker --values infra/woodpecker/values.yaml \
+    --set-string "server.env.WOODPECKER_HOST=$WOODPECKER_SERVER" \
+    --set-string "server.env.WOODPECKER_EXPERT_WEBHOOK_HOST=$(webhook_host)" \
+    --set-string "server.env.WOODPECKER_ADMIN=$WOODPECKER_ADMIN_USER" \
+    --set-string "server.env.WOODPECKER_REPO_OWNERS=$WOODPECKER_ADMIN_USER" \
+    --wait
+echo "UI: $WOODPECKER_SERVER (after mise run tailscale:expose)"
+'''
+
+# Needs tailscale operator rights once: `sudo tailscale set --operator=$USER`,
+# plus HTTPS certificates and the funnel node attribute in the tailnet.
+# Not port 443: k3s's servicelb DNATs 443 on every node address, the tailscale
+# one included, to Traefik. The UI port is the one in WOODPECKER_SERVER.
+["tailscale:expose"]
+description = "Serve Woodpecker in the tailnet; open only its webhook path to the internet"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+: "${WOODPECKER_SERVER:?set it in mise.local.toml}"
+port=$(echo "$WOODPECKER_SERVER" | sed -nE 's#^https://[^/:]+:([0-9]+).*#\1#p')
+if [ -z "$port" ] || [ "$port" = 443 ]; then
+    echo "WOODPECKER_SERVER needs a port other than 443 (k3s's Traefik owns 443), e.g. :9443" >&2
+    exit 1
+fi
+# UI and API: tailnet only.
+tailscale serve --bg --https="$port" http://127.0.0.1:30800
+# GitHub webhooks: public, this one path only.
+tailscale funnel --bg --https=8443 --set-path=/api/hook http://127.0.0.1:30800/api/hook
+tailscale serve status
+'''
+
+["tailscale:unexpose"]
+description = "Remove the Woodpecker serve and funnel configuration"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+port=$(echo "${WOODPECKER_SERVER:-}" | sed -nE 's#^https://[^/:]+:([0-9]+).*#\1#p')
+tailscale funnel --https=8443 --set-path=/api/hook off
+if [ -n "$port" ]; then tailscale serve --https="$port" off; fi
+'''
+
+# Needs WOODPECKER_SERVER and WOODPECKER_TOKEN (Woodpecker UI > user > access
+# token) in mise.local.toml. Goes through the tailnet, not the public funnel.
+["ci:run"]
+description = "Start the release pipeline manually"
+usage = '''
+flag "--branch <branch>" help="Branch to run" default="main"
+flag "--no-deploy" help="Publish images and contract, skip the deploy step"
+flag "--var <key=value>" var=#true help="More pipeline variables"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+: "${WOODPECKER_SERVER:?set it in mise.local.toml}"
+: "${WOODPECKER_TOKEN:?set it in mise.local.toml}"
+args=(--branch "$usage_branch")
+if [ "${usage_no_deploy:-false}" = true ]; then args+=(--var DEPLOY=false); fi
+eval "vars=(${usage_var:-})"
+for v in "${vars[@]}"; do args+=(--var "$v"); done
+if ! out=$(woodpecker-cli pipeline create "${args[@]}" "$WOODPECKER_REPO" 2>&1); then
+    # The server answers 204 when no workflow of the branch *on GitHub* matches
+    # a manual run; the CLI then fails on the empty body.
+    if grep -q '"error":"EOF"' <<<"$out"; then
+        echo "no pipeline started: branch '$usage_branch' on GitHub has no .woodpecker/ workflow for manual runs (not pushed yet?)" >&2
+    else
+        echo "$out" >&2
+    fi
+    exit 1
+fi
+echo "$out"
+echo "$WOODPECKER_SERVER/repos"
+'''

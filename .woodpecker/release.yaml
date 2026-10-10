@@ -1,0 +1,110 @@
+# Release: pushes to main and manual runs (UI "Run pipeline", `mise run ci:run`)
+# publish this commit's images and API contract to the in-cluster registry and
+# deploy them. GitHub Actions does the checks (all OSes); this only needs what
+# GitHub cannot reach: the registry and the cluster.
+#
+# Manual-run variables:
+#   DEPLOY=false   publish only, do not touch the release
+#
+# Requires the repository to be "trusted" in Woodpecker (privileged builds).
+
+variables:
+  # Step image: mise + the tools of mise.lock. `mise run ci:image` updates it.
+  - &ci-image localhost:30500/echophase/ci:78ef71177f41
+  - &buildkit moby/buildkit:v0.33.0
+  # From pipeline pods the registry is its Service; image references in the
+  # chart keep localhost:30500, the address the node pulls from.
+  - &registry registry.registry.svc:5000
+
+when:
+  - event: push
+    branch: main
+  - event: manual
+
+clone:
+  - name: clone
+    image: woodpeckerci/plugin-git:2.10.1
+    settings:
+      # The image tag comes from `git describe`: full history and tags.
+      depth: 0
+      tags: true
+
+steps:
+  - name: image-tag
+    image: *ci-image
+    commands:
+      - mise run -q image-tag | tee .image-tag
+
+  - name: server-image
+    image: *buildkit
+    depends_on: [image-tag]
+    privileged: true
+    environment:
+      REGISTRY: *registry
+    commands:
+      - TAG=$(cat .image-tag)
+      - IMAGE=$${REGISTRY}/echophase/server
+      - >
+        buildctl-daemonless.sh build
+        --frontend dockerfile.v0 --local context=src --local dockerfile=src
+        --import-cache type=registry,ref=$${IMAGE}:buildcache,registry.insecure=true
+        --export-cache type=registry,ref=$${IMAGE}:buildcache,mode=max,registry.insecure=true
+        --output "type=image,\"name=$${IMAGE}:$${TAG},$${IMAGE}:latest\",push=true,registry.insecure=true"
+    backend_options:
+      kubernetes:
+        resources:
+          requests: { cpu: "1", memory: 2Gi }
+          limits: { cpu: "4", memory: 6Gi }
+
+  - name: webapp-image
+    image: *buildkit
+    depends_on: [image-tag]
+    privileged: true
+    environment:
+      REGISTRY: *registry
+    commands:
+      - TAG=$(cat .image-tag)
+      - IMAGE=$${REGISTRY}/echophase/webapp
+      - >
+        buildctl-daemonless.sh build
+        --frontend dockerfile.v0 --local context=webapp --local dockerfile=webapp
+        --import-cache type=registry,ref=$${IMAGE}:buildcache,registry.insecure=true
+        --export-cache type=registry,ref=$${IMAGE}:buildcache,mode=max,registry.insecure=true
+        --output "type=image,\"name=$${IMAGE}:$${TAG},$${IMAGE}:latest\",push=true,registry.insecure=true"
+    backend_options:
+      kubernetes:
+        resources:
+          requests: { cpu: "1", memory: 1Gi }
+          limits: { cpu: "4", memory: 4Gi }
+
+  # Fails on breaking changes against the last published contract.
+  - name: openapi
+    image: *ci-image
+    depends_on: [image-tag]
+    environment:
+      REGISTRY_API: *registry
+    commands:
+      - export IMAGE_TAG=$(cat .image-tag)
+      - mise run openapi:publish
+    backend_options:
+      kubernetes:
+        resources:
+          requests: { cpu: "1", memory: 1Gi }
+          limits: { cpu: "4", memory: 4Gi }
+
+  - name: deploy
+    image: *ci-image
+    depends_on: [server-image, webapp-image, openapi]
+    when:
+      - evaluate: 'DEPLOY != "false"'
+    environment:
+      REGISTRY_API: *registry
+      # Empty: helm uses the pod's ServiceAccount (in-cluster config).
+      KUBECONFIG: ""
+    commands:
+      - export IMAGE_TAG=$(cat .image-tag)
+      # No helm/secrets.yaml here: keep the release's values, change the tag.
+      - mise run helm:upgrade --reuse-values
+    backend_options:
+      kubernetes:
+        serviceAccountName: deployer
