@@ -5,6 +5,14 @@
 description = "Run the .NET tests"
 run = "dotnet test --solution EchoPhase.slnx"
 
+["test:coverage"]
+description = "Run the .NET tests with coverage: artifacts/coverage/*.cobertura.xml"
+run = """
+dotnet test --solution EchoPhase.slnx --results-directory artifacts/coverage \
+    --coverage --coverage-output-format cobertura \
+    --coverage-settings "$PWD/tests/coverage.runsettings"
+"""
+
 ["test:verbose"]
 description = "Run the .NET tests with detailed output"
 run = "dotnet test --solution EchoPhase.slnx --output Detailed"

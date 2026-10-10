@@ -29,6 +29,7 @@ mise tasks                     # everything below
 | Task | What |
 |---|---|
 | `test`, `test:verbose` | tests (`mise run test -- --filter-class '*Argon2*'`) |
+| `test:coverage` | tests with coverage, Cobertura reports in `artifacts/coverage` |
 | `lint` / `format` | check / apply code style |
 | `openapi` | export `artifacts/openapi.json` (skipped while sources are unchanged) |
 | `openapi:check [--base tag]` | fail on breaking API changes against a published contract |
@@ -46,7 +47,9 @@ changes.
 ## CI and releases
 
 - **GitHub Actions** (`.github/workflows/test.yml`): every push and PR, tests
-  on Linux, Windows and macOS, formatting, OpenAPI export, image build.
+  on Linux, Windows and macOS, formatting, OpenAPI export, image build;
+  coverage from the Linux run goes to
+  [Codecov](https://app.codecov.io/gh/EchoPhase-Project/server).
 - **Tags `vX.Y.Z`** (`publish.yml`): the `server` image and the API contract
   to `ghcr.io/echophase-project` (for self-hosting).
 - **Woodpecker** (`.woodpecker/release.yaml`, runs in the project's own

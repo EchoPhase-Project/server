@@ -1,9 +1,13 @@
 <Project>
+    <PropertyGroup>
+        <!-- xunit.v3 on Microsoft.Testing.Platform (not its own runner), so
+             that MTP extensions such as code coverage load. Unconditional:
+             IsTestProject is set later, in the project file. -->
+        <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    </PropertyGroup>
     <ItemGroup Condition="'$(IsTestProject)' == 'true'">
-        <PackageReference Include="coverlet.collector">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-            <PrivateAssets>all</PrivateAssets>
-        </PackageReference>
+        <!-- Coverage for mise run test:coverage (Microsoft.Testing.Platform; coverlet.collector is VSTest only) -->
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="xunit.runner.visualstudio">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

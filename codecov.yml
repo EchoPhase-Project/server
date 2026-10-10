@@ -1,0 +1,16 @@
+# https://docs.codecov.com/docs/codecov-yaml
+coverage:
+  status:
+    # Informational for now: report, do not fail PRs.
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+comment:
+  layout: "condensed_header, diff, flags, files"
+# The Linux job uploads one Cobertura report per test project.
+codecov:
+  notify:
+    after_n_builds: 1
