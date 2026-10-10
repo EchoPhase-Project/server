@@ -2,7 +2,7 @@
 # so steps run `mise run <task>` exactly as on a developer machine, without
 # downloading a .NET SDK per pipeline. Built and pushed by `mise run ci:image`
 # (its context is only this file plus mise.toml and mise.lock).
-FROM jdxcode/mise:2026.9.18-debian
+FROM jdxcode/mise:2026.10.4-debian
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
