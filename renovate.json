@@ -1,0 +1,36 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(build)",
+    "group:allNonMajor",
+    "schedule:weekly"
+  ],
+  "timezone": "Europe/Moscow",
+  "minimumReleaseAge": "3 days",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on monday"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "CI and pipeline images: ci(deps)",
+      "matchManagers": [
+        "github-actions",
+        "woodpecker"
+      ],
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": "Images of the in-cluster registry are built here, not released",
+      "matchPackageNames": [
+        "localhost:30500/**",
+        "registry.registry.svc:5000/**"
+      ],
+      "enabled": false
+    }
+  ]
+}
