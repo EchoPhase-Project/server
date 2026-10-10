@@ -8,7 +8,7 @@
 #
 # The dirty suffix is the newest modification time among the changed files,
 # not the current time: the same working tree gives the same tag in every
-# task run (docker:publish, then helm:upgrade), and any edit gives a new one.
+# task run (docker:publish, then the release), and any edit gives a new one.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 

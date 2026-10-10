@@ -68,8 +68,8 @@ done
 '''
 
 [clean]
-description = "Remove build outputs of the webapp and the solution"
+description = "Remove build outputs and artifacts"
 run = [
-  "rm -rf webapp/dist/ webapp/build/ webapp/node_modules/.cache/ artifacts/",
+  "rm -rf artifacts/",
   "dotnet clean EchoPhase.slnx -v q",
 ]

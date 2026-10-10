@@ -1,6 +1,7 @@
 # Release: pushes to main and manual runs (UI "Run pipeline", `mise run ci:run`)
-# publish this commit's images and API contract to the in-cluster registry and
-# release them by committing the tag to the deploy repository (Flux deploys).
+# publish this commit's server image and API contract to the in-cluster registry and
+# release the image by committing its tag to EchoPhase-Project/deploy (Flux
+# deploys from there).
 # GitHub Actions does the checks (all OSes); this only needs what GitHub
 # cannot reach: the registry.
 #
@@ -12,7 +13,7 @@
 
 variables:
   # Step image: mise + the tools of mise.lock. `mise run ci:image` updates it.
-  - &ci-image localhost:30500/echophase/ci:bc7a46ea9cdb
+  - &ci-image localhost:30500/echophase/ci-server:fc9cc3d8dc15
   - &buildkit moby/buildkit:v0.33.0
   # From pipeline pods the registry is its Service; image references in the
   # chart keep localhost:30500, the address the node pulls from.
@@ -62,27 +63,6 @@ steps:
           requests: { cpu: "1", memory: 2Gi }
           limits: { cpu: "4", memory: 6Gi }
 
-  - name: webapp-image
-    image: *buildkit
-    depends_on: [image-tag]
-    privileged: true
-    environment:
-      REGISTRY: *registry
-    commands:
-      - TAG=$(cat .image-tag)
-      - IMAGE=$${REGISTRY}/echophase/webapp
-      - >
-        buildctl-daemonless.sh build
-        --frontend dockerfile.v0 --local context=webapp --local dockerfile=webapp
-        --import-cache type=registry,ref=$${IMAGE}:buildcache,registry.insecure=true
-        --export-cache type=registry,ref=$${IMAGE}:buildcache,mode=max,registry.insecure=true
-        --output "type=image,\"name=$${IMAGE}:$${TAG},$${IMAGE}:latest\",push=true,registry.insecure=true"
-    backend_options:
-      kubernetes:
-        resources:
-          requests: { cpu: "1", memory: 1Gi }
-          limits: { cpu: "4", memory: 4Gi }
-
   # Fails on breaking changes against the last published contract.
   - name: openapi
     image: *ci-image
@@ -102,7 +82,7 @@ steps:
   # release from there. The step has no rights in the cluster at all.
   - name: release
     image: *ci-image
-    depends_on: [server-image, webapp-image, openapi]
+    depends_on: [server-image, openapi]
     when:
       - evaluate: 'DEPLOY != "false"'
     environment:
@@ -119,4 +99,5 @@ steps:
       # GitHub's published host key (api.github.com/meta), not ssh-keyscan.
       - echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > ~/.ssh/known_hosts
       - git clone -q --depth 1 git@github.com:EchoPhase-Project/deploy.git /tmp/deploy
-      - mise run release:bump --deploy-dir /tmp/deploy --tag "$(cat .image-tag)" --push
+      - TAG=$(cat .image-tag)
+      - cd /tmp/deploy && mise run release:bump --component server --tag "$${TAG}" --push

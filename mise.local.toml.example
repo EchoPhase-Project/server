@@ -1,11 +1,6 @@
-# Copy to mise.local.toml (gitignored) and fill in. mise loads it after
-# mise.toml, in this directory only.
+# Copy to mise.local.toml (gitignored) and fill in, for `mise run ci:run`.
 [env]
-# Woodpecker as served in the tailnet (`tailscale status` shows the node name).
-# Any port but 443, which k3s gives to Traefik on every node address.
+# Woodpecker as served in the tailnet (see EchoPhase-Project/deploy).
 WOODPECKER_SERVER = "https://<node>.<tailnet>.ts.net:9443"
-# GitHub > Settings > Developer settings > OAuth Apps, callback <WOODPECKER_SERVER>/authorize
-WOODPECKER_GITHUB_CLIENT = ""
-WOODPECKER_GITHUB_SECRET = ""
-# Woodpecker UI > user settings > access token (for `mise run ci:run`)
+# Woodpecker UI > user settings > access token
 WOODPECKER_TOKEN = ""

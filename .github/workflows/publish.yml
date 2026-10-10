@@ -1,0 +1,62 @@
+name: Publish
+
+# A tag vX.Y.Z publishes the server image and its API contract to GHCR for
+# self-hosting (the chart in EchoPhase-Project/charts pins them by version):
+#   ghcr.io/echophase-project/server:X.Y.Z   (and latest)
+#   ghcr.io/echophase-project/openapi:X.Y.Z  (and latest; webapp builds against it)
+on:
+  push:
+    tags: [ "v*" ]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  MISE_AUTO_INSTALL: "false"
+  REGISTRY: ghcr.io/echophase-project
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up tools
+        uses: jdx/mise-action@v5
+        with:
+          install_args: dotnet oras github:oasdiff/oasdiff
+
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          echo "$GH_TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      # Same rule as the in-cluster pipeline: no breaking change against the
+      # last published contract.
+      - name: API contract
+        run: |
+          mise run openapi
+          cd artifacts
+          if oras pull "$REGISTRY/openapi:latest" -o openapi-base >/dev/null 2>&1; then
+            oasdiff breaking openapi-base/openapi.json openapi.json --fail-on ERR
+          fi
+
+      - name: Server image
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          docker build -t "$REGISTRY/server:$version" -t "$REGISTRY/server:latest" ./src
+          docker push "$REGISTRY/server:$version"
+          docker push "$REGISTRY/server:latest"
+
+      - name: Publish API contract
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cd artifacts
+          oras push --artifact-type application/vnd.echophase.openapi \
+            --annotation "org.opencontainers.image.source=https://github.com/EchoPhase-Project/server" \
+            "$REGISTRY/openapi:$version" openapi.json:application/vnd.oai.openapi+json
+          oras tag "$REGISTRY/openapi:$version" latest

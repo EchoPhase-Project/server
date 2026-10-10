@@ -1,86 +1,48 @@
-# Docker images: build locally, push to $DOCKER_REGISTRY under the image tag
-# of this checkout (`mise run image-tag`) and "latest".
+# The server image: build locally, push to $DOCKER_REGISTRY under the image
+# tag of this checkout (`mise run image-tag`) and "latest".
 
 ["image-tag"]
 description = "Print the image tag of this checkout (<version>-g<sha>[-dirty.<time>])"
 run = "scripts/image-tag.sh"
 
 ["docker:build"]
-description = "Build the server and/or webapp image"
-usage = '''
-arg "[component]" help="What to build" default="all" {
-  choices "all" "server" "webapp"
-}
-'''
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-. scripts/lib.sh
-component_images "$usage_component" | while read -r image context; do
-    echo "building $image from ./$context"
-    docker build -t "$image" "./$context"
-done
-'''
+description = "Build the server image"
+run = 'docker build -t "$SERVER_IMAGE" ./src'
 
 ["docker:push"]
-description = "Tag the built images with the image tag and latest, and push them"
-usage = '''
-arg "[component]" help="What to push" default="all" {
-  choices "all" "server" "webapp"
-}
-flag "--tag <tag>" help="Tag instead of this checkout's image tag" env="IMAGE_TAG"
-'''
+description = "Tag the built image with the image tag and latest, and push it"
+usage = 'flag "--tag <tag>" help="Tag instead of the image tag of this checkout" env="IMAGE_TAG"'
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 . scripts/lib.sh
 tag=${usage_tag:-$(image_tag)}
-component_images "$usage_component" | while read -r image context; do
-    for t in "$tag" latest; do
-        docker tag "$image" "$DOCKER_REGISTRY/$image:$t"
-        docker push -q "$DOCKER_REGISTRY/$image:$t"
-    done
+for t in "$tag" latest; do
+    docker tag "$SERVER_IMAGE" "$DOCKER_REGISTRY/$SERVER_IMAGE:$t"
+    docker push -q "$DOCKER_REGISTRY/$SERVER_IMAGE:$t"
 done
 '''
 
 ["docker:publish"]
-description = "Build and push the server and/or webapp image"
-usage = '''
-arg "[component]" help="What to publish" default="all" {
-  choices "all" "server" "webapp"
-}
-flag "--tag <tag>" help="Tag instead of this checkout's image tag" env="IMAGE_TAG"
-'''
+description = "Build and push the server image"
+usage = 'flag "--tag <tag>" help="Tag instead of the image tag of this checkout" env="IMAGE_TAG"'
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-mise run docker:build "$usage_component"
-mise run docker:push "$usage_component" ${usage_tag:+--tag "$usage_tag"}
+mise run docker:build
+mise run docker:push ${usage_tag:+--tag "$usage_tag"}
 '''
 
 ["docker:info"]
-description = "Show the registry, image names and this checkout's image tag"
+description = "Show the registry, image name and this checkout's image tag"
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 . scripts/lib.sh
-tag=$(image_tag)
 echo "registry:  $DOCKER_REGISTRY"
-echo "image tag: $tag"
-for image in "$SERVER_IMAGE" "$WEBAPP_IMAGE"; do
-    echo "  $DOCKER_REGISTRY/$image:$tag"
-done
-'''
-
-["docker:clean"]
-description = "Remove local echophase Docker images"
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-ids=$(docker images --format '{{ "{{" }}.ID{{ "}}" }} {{ "{{" }}.Repository{{ "}}" }}' | awk '/echophase/ {print $1}' | sort -u)
-if [ -n "$ids" ]; then docker rmi -f $ids; else echo "no echophase images"; fi
+echo "image:     $DOCKER_REGISTRY/$SERVER_IMAGE:$(image_tag)"
 '''
 
 [check]
-description = "Build both images, as CI does"
-run = "mise run docker:build all"
+description = "Build the image, as CI does"
+run = "mise run docker:build"

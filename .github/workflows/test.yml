@@ -83,7 +83,7 @@ jobs:
       - name: Run tests
         run: mise run test
 
-  # The API contract the webapp generates its types from.
+  # The API contract (published with releases, see publish.yml) must export.
   openapi:
     name: OpenAPI document
     runs-on: ubuntu-latest
@@ -101,59 +101,11 @@ jobs:
       - name: Export OpenAPI document
         run: mise run openapi
 
-      - name: Upload OpenAPI document
-        uses: actions/upload-artifact@v4
-        with:
-          name: openapi
-          path: artifacts/openapi.json
 
-  webapp:
-    name: webapp
-    runs-on: ubuntu-latest
-    needs: openapi
-
-    defaults:
-      run:
-        working-directory: webapp
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download OpenAPI document
-        uses: actions/download-artifact@v4
-        with:
-          name: openapi
-          path: artifacts
-
-      - name: Set up tools
-        uses: jdx/mise-action@v5
-        with:
-          install_args: node
-
-      - name: Cache npm downloads
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('webapp/package-lock.json') }}
-
-      - name: Install dependencies
-        run: npm ci
-
-      # Fails when schema.d.ts was not regenerated after an API change.
-      - name: Check generated API types
-        run: npm run check:api
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-      - name: Build
-        run: npm run build
-
-  # The images build from a clean checkout (Dockerfiles, .dockerignore, the
+  # The image builds from a clean checkout (Dockerfile, .dockerignore, the
   # local NuGet source in src/packages).
   images:
-    name: docker images
+    name: docker image
     runs-on: ubuntu-latest
     needs: test
 
@@ -166,5 +118,5 @@ jobs:
         with:
           install: false
 
-      - name: Build server and webapp images
+      - name: Build the server image
         run: mise run check

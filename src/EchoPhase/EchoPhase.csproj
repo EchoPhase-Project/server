@@ -78,4 +78,9 @@
     <ProjectReference Include="..\EchoPhase.Cli\EchoPhase.Cli.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Development settings stay out of the published app, and so the image. -->
+    <Content Update="Configurations/appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
 </Project>
