@@ -38,7 +38,8 @@ namespace EchoPhase.Clients
             TQ? query,
             TB? body,
             AuthenticationHeaderValue? auth = null,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            ConnectionRef? connection = null)
             where TQ : class
             where TB : class
         {
@@ -54,6 +55,9 @@ namespace EchoPhase.Clients
 
             if (auth is not null)
                 request.Headers.Authorization = auth;
+
+            if (connection is not null)
+                request.Options.Set(ConnectionRef.OptionKey, connection);
 
             if (body is not null)
                 request.Content = new StringContent(

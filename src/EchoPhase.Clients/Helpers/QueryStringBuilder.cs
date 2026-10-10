@@ -44,7 +44,7 @@ namespace EchoPhase.Clients.Helpers
 
             Type type = obj.GetType();
 
-            if (_options.IncludeProperties)
+            if (Options.IncludeProperties)
             {
                 var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
                 foreach (var property in properties)
@@ -64,7 +64,7 @@ namespace EchoPhase.Clients.Helpers
                 }
             }
 
-            if (_options.IncludeFields)
+            if (Options.IncludeFields)
             {
                 var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
                 foreach (var field in fields)

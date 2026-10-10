@@ -10,6 +10,13 @@ namespace EchoPhase.DAL.Postgres.Interceptors
 {
     public class AuditInterceptor : SaveChangesInterceptor
     {
+        private readonly TimeProvider _time;
+
+        public AuditInterceptor(TimeProvider time)
+        {
+            _time = time;
+        }
+
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
             DbContextEventData eventData,
             InterceptionResult<int> result,
@@ -27,11 +34,11 @@ namespace EchoPhase.DAL.Postgres.Interceptors
             return base.SavingChanges(eventData, result);
         }
 
-        private static void Apply(DbContext? context)
+        private void Apply(DbContext? context)
         {
             if (context is null) return;
 
-            var now = DateTime.UtcNow;
+            var now = _time.GetUtcNow().UtcDateTime;
 
             foreach (var entry in context.ChangeTracker.Entries<ITrackingEntity>())
             {

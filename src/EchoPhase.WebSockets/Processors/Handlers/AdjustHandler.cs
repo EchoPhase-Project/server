@@ -1,67 +1,25 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Net.WebSockets;
-using EchoPhase.Security.BitMasks;
-using EchoPhase.Types.Result.Extensions;
 using EchoPhase.WebSockets.Constants;
-using EchoPhase.WebSockets.Exceptions;
 using EchoPhase.WebSockets.Processors.Payloads;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {
+    /// <summary>Replaces the connection's intents.</summary>
     public class AdjustHandler : OpCodeHandlerBase<AdjustPayload>
     {
-        private readonly WebSocketService _webSocketService;
-        private readonly WebSocketConnectionManager _connectionManager;
-        private readonly IntentsBitMask _intents;
+        private readonly IntentAuthorization _intents;
 
-        public AdjustHandler(IServiceProvider serviceProvider)
-        : base(serviceProvider)
+        public AdjustHandler(WebSocketService sockets, IntentAuthorization intents)
+            : base(sockets)
         {
-            _webSocketService = GetService<WebSocketService>();
-            _connectionManager = GetService<WebSocketConnectionManager>();
-            _intents = GetService<IntentsBitMask>();
+            _intents = intents;
         }
 
-        public override async Task HandleAsync(WebSocket webSocket, AdjustPayload payload)
-        {
-            try
-            {
-                var connection = await _connectionManager.GetConnectionAsync(webSocket);
-
-                var result = _intents.Deserialize(payload.Intents);
-
-                if (result.TryGetError(out var error))
-                {
-                    var responseError = EventMessage<ErrorPayload>.Create(OpCodes.Error, err =>
-                    {
-                        err.Code = ErrorCodes.DeserializationError;
-                        err.Message = error.Value;
-                    });
-
-                    await _webSocketService.SendMessageAsync(webSocket, responseError);
-                    return;
-                }
-
-                var response = EventMessage<AdjustAckPayload>.Create(OpCodes.AdjustAck);
-
-                await _webSocketService.SendMessageAsync(webSocket, response);
-            }
-            catch (WebSocketConnectionNotFoundException)
-            {
-                var response = EventMessage<ErrorPayload>.Create(OpCodes.Error, p =>
-                {
-                    p.Code = ErrorCodes.NotFound;
-                    p.Message = "Connection not found.";
-                });
-
-                await _webSocketService.SendMessageAsync(webSocket, response);
-
-                throw;
-            }
-
-            return;
-        }
+        protected override Task HandleAsync(WebSocketConnection connection, AdjustPayload payload, CancellationToken ct)
+            => _intents.TryApply(connection, payload.Intents) is { } error
+                ? Sockets.SendAsync(connection, error, ct)
+                : Sockets.SendAsync(connection, EventMessage<AdjustAckPayload>.Create(OpCodes.AdjustAck), ct);
     }
 }

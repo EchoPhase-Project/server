@@ -20,7 +20,7 @@ namespace EchoPhase.Cli.Commands.User.Roles.Remove
             _roleService = roleService;
         }
 
-        protected override async Task<int> ExecuteAsync(CommandContext context, RemoveSettings settings, CancellationToken cancellationToken)
+        public override async Task<int> ExecuteAsync(CommandContext context, RemoveSettings settings, CancellationToken cancellationToken)
         {
             var users = _userRepository.Query()
                 .WithUserNames(settings.Username)

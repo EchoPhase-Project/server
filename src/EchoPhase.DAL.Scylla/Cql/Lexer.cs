@@ -29,8 +29,15 @@ namespace EchoPhase.DAL.Scylla.Cql
                 if (inString)
                 {
                     current.Append(c);
-                    if (c == stringChar && (i == 0 || cql[i - 1] != '\\'))
+                    if (c == stringChar)
                     {
+                        // CQL escapes quotes by doubling them ('it''s', "my""column").
+                        if (i + 1 < cql.Length && cql[i + 1] == stringChar)
+                        {
+                            current.Append(cql[++i]);
+                            continue;
+                        }
+
                         tokens.Add(new Token(TokenType.String, current.ToString()));
                         current.Clear();
                         inString = false;

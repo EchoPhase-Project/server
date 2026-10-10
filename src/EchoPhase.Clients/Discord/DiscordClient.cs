@@ -12,11 +12,11 @@ namespace EchoPhase.Clients.Discord
 
         public async Task<Result<IEnumerable<DiscordUserGuildsResponseDto>>> GetUserGuildsAsync(
             DiscordUserGuildsQueryDto query,
-            string botToken,
+            ConnectionRef connection,
             CancellationToken ct = default)
         {
             var result = await SendAsync<DiscordUserGuildsQueryDto, object, List<DiscordUserGuildsResponseDto>>(
-                "users/@me/guilds", HttpMethod.Get, query, null, botToken, ct);
+                "users/@me/guilds", HttpMethod.Get, query, null, connection, ct);
 
             return result.Map(list => list.AsEnumerable());
         }

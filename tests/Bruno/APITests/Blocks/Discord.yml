@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/blocks/run"
+  url: "{{baseUrl}}/blocks/runs"
   headers:
     - name: ""
       value: ""
@@ -13,19 +13,20 @@ http:
     type: json
     data: |-
       {
-        "startIds": [1],
+        "startIds": [
+          1
+        ],
         "blocks": [
           {
             "id": 1,
             "type": "DiscordGetUserGuilds",
             "params": {
               "name": "guilds",
-              "token_name": "MyDiscordToken",
+              "connection": "MyDiscordToken",
               "query": {
                 "limit": 100,
                 "with_counts": true
-              },
-              "next": [2]
+              }
             }
           },
           {
@@ -33,8 +34,7 @@ http:
             "type": "Set",
             "params": {
               "name": "i",
-              "value": "0",
-              "next": [3]
+              "value": "0"
             }
           },
           {
@@ -44,34 +44,28 @@ http:
               "counterVar": "j",
               "start": 0,
               "end": 1,
-              "step": 1,
-              "bodyNext": [4],
-              "afterNext": [8]
+              "step": 1
             }
           },
           {
             "id": 4,
             "type": "Print",
             "params": {
-              "text": "Guild #@j: @guilds[j].name (ID: @guilds[j].id)",
-              "next": [5]
+              "text": "Guild #@j: @guilds[j].name (ID: @guilds[j].id)"
             }
           },
           {
             "id": 5,
             "type": "If",
             "params": {
-              "condition": "guilds[j].owner",
-              "trueNext": [6],
-              "falseNext": [7]
+              "condition": "guilds[j].owner"
             }
           },
           {
             "id": 6,
             "type": "Print",
             "params": {
-              "text": "  -> You are the owner of @guilds[j].name",
-              "next": []
+              "text": "  -> You are the owner of @guilds[j].name"
             }
           },
           {
@@ -79,17 +73,52 @@ http:
             "type": "Set",
             "params": {
               "name": "i",
-              "value": "@(i + guilds[j].approximate_member_count)",
-              "next": []
+              "value": "@(i + guilds[j].approximate_member_count)"
             }
           },
           {
             "id": 8,
             "type": "Print",
             "params": {
-              "text": "Total members across all guilds: @i",
-              "next": []
+              "text": "Total members across all guilds: @i"
             }
+          }
+        ],
+        "connections": [
+          {
+            "from": 1,
+            "output": "main",
+            "to": 2
+          },
+          {
+            "from": 2,
+            "output": "main",
+            "to": 3
+          },
+          {
+            "from": 3,
+            "output": "body",
+            "to": 4
+          },
+          {
+            "from": 3,
+            "output": "done",
+            "to": 8
+          },
+          {
+            "from": 4,
+            "output": "main",
+            "to": 5
+          },
+          {
+            "from": 5,
+            "output": "true",
+            "to": 6
+          },
+          {
+            "from": 5,
+            "output": "false",
+            "to": 7
           }
         ]
       }

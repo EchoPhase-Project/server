@@ -1,101 +1,61 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Net.WebSockets;
 using System.Text.Json;
 using EchoPhase.WebSockets.Constants;
 using EchoPhase.WebSockets.Processors.Payloads;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {
-    public abstract class OpCodeHandlerBase<TPayload> : IOpCodeHandler<TPayload>
+    /// <summary>
+    /// Binds "d" to <typeparamref name="TPayload"/> (camelCase or any case,
+    /// as the server's own messages are camelCase), validates it, then handles
+    /// it. A bad payload is answered with an Error message, not an exception.
+    /// </summary>
+    public abstract class OpCodeHandlerBase<TPayload> : IOpCodeHandler
+        where TPayload : class, IPayload, new()
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly WebSocketService _webSocketService;
-        private readonly JsonSerializerOptions _serializerOptions = new();
-
-        protected OpCodeHandlerBase(IServiceProvider serviceProvider)
+        protected OpCodeHandlerBase(WebSocketService sockets)
         {
-            _serviceProvider = serviceProvider;
-            _webSocketService = GetService<WebSocketService>();
+            Sockets = sockets;
         }
 
-        protected T GetService<T>() where T : notnull
+        protected WebSocketService Sockets { get; }
+
+        public async Task HandleAsync(WebSocketConnection connection, JsonElement payload, CancellationToken ct = default)
         {
-            return _serviceProvider.GetRequiredService<T>();
-        }
-
-        public async Task HandleAsync(WebSocket webSocket, string payloadJson)
-        {
-            var payload = JsonSerializer.Deserialize<TPayload>(payloadJson, _serializerOptions) ?? throw new JsonException($"Failed to deserialize payload for type {typeof(TPayload).Name}.");
-            await BeforeHandleAsync(webSocket, payload);
-        }
-
-        public async Task HandleAsync(WebSocket webSocket, object payload)
-        {
-            TPayload? typedPayload = default;
-
-            if (payload is null)
-                throw new ArgumentNullException("Missing payload exception.");
-
-            if (payload is JsonElement jsonElement)
-                typedPayload = jsonElement.Deserialize<TPayload>();
-            else if (payload is TPayload)
-                typedPayload = (TPayload)payload;
-
-            if (typedPayload is null)
-                throw new InvalidCastException($"Invalid payload type. Expected {typeof(TPayload)}, got {payload?.GetType()}.");
-
-            await BeforeHandleAsync(webSocket, typedPayload);
-        }
-
-        private async Task BeforeHandleAsync(WebSocket webSocket, TPayload payload)
-        {
-            if (await ValidatePayloadAsync(webSocket, payload))
-                await HandleAsync(webSocket, payload);
-        }
-
-        public abstract Task HandleAsync(WebSocket webSocket, TPayload payload);
-
-        private async Task<bool> ValidatePayloadAsync(WebSocket webSocket, TPayload payload)
-        {
-            if (payload is null)
+            TPayload? typed;
+            try
             {
-                await SendErrorAsync(webSocket, ErrorCodes.InvalidPayload, "Missing payload.");
-                return false;
+                typed = payload.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+                    ? new TPayload()
+                    : payload.Deserialize<TPayload>(WebSocketService.JsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                await SendErrorAsync(connection, ErrorCodes.DeserializationError, ex.Message, ct);
+                return;
             }
 
-            return await ValidatePayloadAsync(webSocket, (object)payload);
-        }
-
-        private async Task<bool> ValidatePayloadAsync(WebSocket webSocket, object payload)
-        {
-            if (payload is not IPayload validatablePayload)
+            if (typed is null)
             {
-                await SendErrorAsync(webSocket, ErrorCodes.InvalidPayload, "Payload is not validatable.");
-                return false;
+                await SendErrorAsync(connection, ErrorCodes.InvalidPayload, "Missing payload.", ct);
+                return;
             }
 
-            var validationResult = validatablePayload.Validate();
-            if (!validationResult.Successful)
+            var validation = typed.Validate();
+            if (!validation.Successful)
             {
-                await SendErrorAsync(webSocket, ErrorCodes.InvalidPayload, validationResult.Error.Value);
-                return false;
+                await SendErrorAsync(connection, ErrorCodes.InvalidPayload, validation.Error.Message, ct);
+                return;
             }
 
-            return true;
+            await HandleAsync(connection, typed, ct);
         }
 
-        private async Task SendErrorAsync(WebSocket socket, ErrorCodes code, string msg)
-        {
-            var error = EventMessage<ErrorPayload>.Create(OpCodes.Error, e =>
-            {
-                e.Code = code;
-                e.Message = msg;
-            });
+        protected abstract Task HandleAsync(WebSocketConnection connection, TPayload payload, CancellationToken ct);
 
-            await _webSocketService.SendMessageAsync(socket, error);
-        }
+        protected Task SendErrorAsync(WebSocketConnection connection, ErrorCodes code, string message, CancellationToken ct)
+            => Sockets.SendAsync(connection, ErrorMessages.Create(code, message), ct);
     }
 }

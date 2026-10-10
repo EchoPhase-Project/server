@@ -20,6 +20,12 @@ namespace EchoPhase.Security.Antiforgery.Filters
 
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
+            if (CsrfExemption.IsHeaderAuthenticated(context.HttpContext))
+            {
+                await next();
+                return;
+            }
+
             try
             {
                 await _antiforgeryService.ValidateAsync();

@@ -2,12 +2,18 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.Clients.Discord;
+using EchoPhase.Clients.Twitch;
 
 namespace EchoPhase.Runners.Roslyn.Contexts
 {
     public class ScriptContext : IScriptContext
     {
         public required IDiscordClient DiscordClient
+        {
+            set; get;
+        }
+
+        public required ITwitchClient TwitchClient
         {
             set; get;
         }

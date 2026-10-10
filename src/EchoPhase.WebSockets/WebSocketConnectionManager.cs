@@ -2,382 +2,115 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Net.WebSockets;
+using System.Security.Claims;
 using EchoPhase.Configuration.WebSocket;
-using EchoPhase.DAL.Redis.Interfaces;
-using EchoPhase.DAL.Redis.Models;
-using EchoPhase.WebSockets.Exceptions;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace EchoPhase.WebSockets
 {
+    /// <summary>
+    /// The open gateway sockets of this instance, by user. Lookups are lock-free:
+    /// each user's connections are an immutable array swapped on add and
+    /// remove, so senders iterate a snapshot while sockets come and go.
+    /// </summary>
     public class WebSocketConnectionManager
     {
         private readonly WebSocketOptions _settings;
-
-        private readonly ConcurrentDictionary<Guid, List<WebSocketConnection>> _connections = new();
-        private readonly ConcurrentDictionary<WebSocket, Guid> _socketToConnectionId = new();
-        private readonly SemaphoreSlim _connectionLock = new(1, 1);
-
-        private readonly ICacheContext _cacheContext;
+        private readonly TimeProvider _time;
         private readonly ILogger<WebSocketConnectionManager> _logger;
 
+        private readonly ConcurrentDictionary<Guid, ImmutableArray<WebSocketConnection>> _byUser = new();
+        private readonly ConcurrentDictionary<WebSocket, WebSocketConnection> _bySocket = new();
+
         public WebSocketConnectionManager(
-            ICacheContext cacheContext,
             ILogger<WebSocketConnectionManager> logger,
             IOptions<WebSocketOptions> settings,
-            IHostApplicationLifetime lifetime)
+            IHostApplicationLifetime lifetime,
+            TimeProvider time)
         {
-            _cacheContext = cacheContext;
             _logger = logger;
             _settings = settings.Value;
+            _time = time;
 
-            lifetime.ApplicationStopping.Register(OnApplicationStopping);
-            lifetime.ApplicationStopped.Register(OnApplicationStopped);
+            lifetime.ApplicationStopping.Register(() => CloseAllAsync(
+                WebSocketCloseStatus.EndpointUnavailable, "Server shutting down").GetAwaiter().GetResult());
         }
 
-        private void OnApplicationStopping()
+        public WebSocketConnection Add(Guid userId, WebSocket webSocket, ClaimsPrincipal user)
         {
-            CloseAllConnectionsAsync().GetAwaiter().GetResult();
-        }
-
-        private void OnApplicationStopped()
-        {
-            AbortAllConnections();
-        }
-
-        public async Task AddConnectionAsync(Guid userId, WebSocket webSocket, HttpContext context)
-        {
-            var connection = new WebSocketConnection
-            {
-                WebSocket = webSocket,
-                HttpContext = context
-            };
-
-            await _connectionLock.WaitAsync();
-            try
-            {
-                _connections.AddOrUpdate(userId,
-                    new List<WebSocketConnection> { connection },
-                    (key, existingConnections) =>
-                    {
-                        existingConnections.Add(connection);
-                        return existingConnections;
-                    });
-
-                _socketToConnectionId[webSocket] = connection.Id;
-
-                await _cacheContext
-                    .Entry<WebSocketCache>(connection.Id.ToString())
-                    .SetAsync(new WebSocketCache { UserId = userId }, TimeSpan.FromMinutes(10));
-            }
-            finally
-            {
-                _connectionLock.Release();
-            }
+            var connection = new WebSocketConnection(userId, webSocket, user, _time.GetTimestamp());
+            _bySocket[webSocket] = connection;
+            _byUser.AddOrUpdate(userId, [connection], (_, list) => list.Add(connection));
 
             _logger.LogInformation("WebSocket connection added. UserId: {UserId}, ConnectionId: {ConnectionId}",
                 userId, connection.Id);
-
-            StartHeartbeatTask(userId, connection);
+            return connection;
         }
 
-        public bool TryGetConnections(Guid userId, out List<WebSocketConnection>? connections)
+        /// <summary>Forgets a connection (the receive loop calls this when its socket ends).</summary>
+        public void Remove(WebSocketConnection connection)
         {
-            return _connections.TryGetValue(userId, out connections);
-        }
+            _bySocket.TryRemove(connection.WebSocket, out _);
 
-        public List<WebSocketConnection> GetConnections(Guid userId)
-        {
-            if (!_connections.TryGetValue(userId, out var connections))
-                throw new WebSocketConnectionNotFoundException(userId);
-
-            return connections;
-        }
-
-        public WebSocketConnection GetConnection(Guid userId, WebSocket webSocket)
-        {
-            if (!_connections.TryGetValue(userId, out var connections))
-                throw new WebSocketConnectionNotFoundException(userId);
-
-            var connection = connections.FirstOrDefault(conn => conn.WebSocket == webSocket);
-            return connection ?? throw new WebSocketConnectionNotFoundException(userId, webSocket);
-        }
-
-        public async Task<WebSocketConnection> GetConnectionAsync(WebSocket webSocket)
-        {
-            var userId = await GetUserIdAsync(webSocket);
-
-            if (userId == Guid.Empty)
-                throw new WebSocketConnectionNotFoundException(userId);
-
-            if (!_connections.TryGetValue(userId, out var connections))
-                throw new WebSocketConnectionNotFoundException(userId);
-
-            var connection = connections.FirstOrDefault(conn => conn.WebSocket == webSocket);
-            return connection ?? throw new WebSocketConnectionNotFoundException(userId, webSocket);
-        }
-
-        public IEnumerable<(Guid UserId, WebSocketConnection Connection)> GetAllConnections()
-        {
-            return _connections.SelectMany(
-                pair => pair.Value,
-                (pair, connection) => (pair.Key, connection));
-        }
-
-        public IEnumerable<Guid> GetConnectedUserIds()
-        {
-            return _connections.Keys;
-        }
-
-        public int GetConnectionCount(Guid userId)
-        {
-            return _connections.TryGetValue(userId, out var connections)
-                ? connections.Count
-                : 0;
-        }
-
-        public int GetTotalConnectionCount()
-        {
-            return _connections.Values.Sum(c => c.Count);
-        }
-
-        public async Task CloseConnectionAsync(WebSocketConnection connection)
-        {
-            using var cts = new CancellationTokenSource(_settings.CloseTimeout);
-
-            try
+            while (_byUser.TryGetValue(connection.UserId, out var list))
             {
-                if (connection.WebSocket.State is WebSocketState.Open or WebSocketState.CloseReceived)
-                {
-                    try
-                    {
-                        await connection.WebSocket.CloseAsync(
-                            WebSocketCloseStatus.NormalClosure,
-                            "Connection closed by server",
-                            cts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        _logger.LogWarning("Close timeout exceeded for connection {ConnectionId}, aborting",
-                            connection.Id);
-                        connection.WebSocket.Abort();
-                    }
-                }
-                else
-                {
-                    connection.WebSocket.Abort();
-                }
+                var updated = list.Remove(connection);
+                if (updated.IsEmpty
+                        ? _byUser.TryRemove(new KeyValuePair<Guid, ImmutableArray<WebSocketConnection>>(connection.UserId, list))
+                        : _byUser.TryUpdate(connection.UserId, updated, list))
+                    break;
+            }
 
-                await _cacheContext
-                    .Entry<WebSocketCache>(connection.Id.ToString())
-                    .RemoveAsync();
-            }
-            catch (WebSocketException ex)
-            {
-                _logger.LogWarning(ex, "WebSocket error while closing connection {ConnectionId}",
-                    connection.Id);
-            }
-            finally
-            {
-                await RemoveConnectionAsync(connection);
-            }
+            connection.Dispose();
         }
 
-        private async Task RemoveConnectionAsync(WebSocketConnection connection)
+        public IReadOnlyList<WebSocketConnection> GetConnections(Guid userId)
+            => _byUser.TryGetValue(userId, out var list) ? list : [];
+
+        public bool TryGetConnection(WebSocket webSocket, out WebSocketConnection connection)
+            => _bySocket.TryGetValue(webSocket, out connection!);
+
+        public IEnumerable<WebSocketConnection> GetAllConnections() => _bySocket.Values;
+
+        public IEnumerable<Guid> GetConnectedUserIds() => _byUser.Keys;
+
+        public int GetConnectionCount(Guid userId) => GetConnections(userId).Count;
+
+        public int GetTotalConnectionCount() => _bySocket.Count;
+
+        public void Touch(WebSocketConnection connection) => connection.Touch(_time.GetTimestamp());
+
+        public Task CloseConnectionAsync(WebSocketConnection connection, WebSocketCloseStatus status, string description)
+            => connection.CloseAsync(status, description, _settings.CloseTimeout);
+
+        public Task CloseConnectionsAsync(Guid userId, WebSocketCloseStatus status, string description)
+            => Task.WhenAll(GetConnections(userId).Select(c => CloseConnectionAsync(c, status, description)));
+
+        public Task CloseAllAsync(WebSocketCloseStatus status, string description)
+            => Task.WhenAll(_bySocket.Values.Select(c => CloseConnectionAsync(c, status, description)));
+
+        /// <summary>
+        /// Closes connections that sent nothing for a heartbeat interval (the
+        /// client stopped pinging); returns how many.
+        /// </summary>
+        public async Task<int> CloseSilentAsync()
         {
-            await _connectionLock.WaitAsync();
-            try
-            {
-                var userId = await GetUserIdAsync(connection);
-
-                if (_connections.TryGetValue(userId, out var connections))
-                {
-                    connections.Remove(connection);
-
-                    if (connections.Count == 0)
-                    {
-                        _connections.TryRemove(userId, out _);
-                        _logger.LogInformation("All connections closed for UserId: {UserId}", userId);
-                    }
-                }
-
-                _socketToConnectionId.TryRemove(connection.WebSocket, out _);
-
-                connection.Dispose();
-            }
-            finally
-            {
-                _connectionLock.Release();
-            }
-        }
-
-        public async Task CloseConnectionAsync(Guid userId, WebSocket webSocket)
-        {
-            if (!_connections.TryGetValue(userId, out var connections))
-                return;
-
-            var connection = connections.FirstOrDefault(conn => conn.WebSocket == webSocket);
-            if (connection is not null)
-                await CloseConnectionAsync(connection);
-        }
-
-        public async Task CloseConnectionsAsync(Guid userId)
-        {
-            if (!_connections.TryGetValue(userId, out var connections))
-                return;
-
-            var connectionsToClose = connections.ToList();
-            await CloseConnectionsInternalAsync(connectionsToClose);
-        }
-
-        public async Task CloseAllConnectionsAsync()
-        {
-            var allConnections = _connections.Values
-                .SelectMany(c => c)
+            var now = _time.GetTimestamp();
+            var silent = _bySocket.Values
+                .Where(c => _time.GetElapsedTime(c.LastSeen, now) > _settings.HeartbeatInterval)
                 .ToList();
 
-            await CloseConnectionsInternalAsync(allConnections);
-        }
-
-        private async Task CloseConnectionsInternalAsync(IEnumerable<WebSocketConnection> connections)
-        {
-            var tasks = connections.Select(CloseConnectionAsync);
-            await Task.WhenAll(tasks);
-        }
-
-        public void AbortAllConnections()
-        {
-            _logger.LogWarning("Aborting all WebSocket connections");
-
-            foreach (var connections in _connections.Values)
+            foreach (var connection in silent)
             {
-                foreach (var connection in connections)
-                {
-                    try
-                    {
-                        connection.WebSocket.Abort();
-                        connection.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error aborting connection {ConnectionId}", connection.Id);
-                    }
-                }
+                _logger.LogInformation("Heartbeat timeout for connection {ConnectionId}, closing", connection.Id);
+                await CloseConnectionAsync(connection, WebSocketCloseStatus.PolicyViolation, "Heartbeat timeout");
             }
 
-            _connections.Clear();
-        }
-
-        private void StartHeartbeatTask(Guid userId, WebSocketConnection connection)
-        {
-            connection.HeartbeatCancellationTokenSource?.Cancel();
-            connection.HeartbeatCancellationTokenSource?.Dispose();
-            connection.HeartbeatCancellationTokenSource = new CancellationTokenSource();
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(_settings.HeartbeatInterval, connection.HeartbeatCancellationTokenSource.Token);
-
-                    _logger.LogInformation(
-                        "Heartbeat timeout for connection {ConnectionId}, closing",
-                        connection.Id);
-
-                    await CloseConnectionAsync(connection);
-                }
-                catch (TaskCanceledException)
-                {
-                    // Normal cancellation, heartbeat was refreshed
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error in heartbeat task for connection {ConnectionId}",
-                        connection.Id);
-                }
-            }, connection.HeartbeatCancellationTokenSource.Token);
-        }
-
-        public void RefreshHeartbeat(Guid userId, WebSocketConnection connection)
-        {
-            StartHeartbeatTask(userId, connection);
-        }
-
-        public async Task RefreshHeartbeatAsync(WebSocket webSocket)
-        {
-            var userId = await GetUserIdAsync(webSocket);
-            if (userId == Guid.Empty)
-            {
-                _logger.LogWarning("Cannot refresh heartbeat: UserId not found for WebSocket");
-                return;
-            }
-
-            if (!_connections.TryGetValue(userId, out var connections))
-            {
-                _logger.LogWarning("Cannot refresh heartbeat: No connections for UserId {UserId}", userId);
-                return;
-            }
-
-            var connection = connections.FirstOrDefault(c => c.WebSocket == webSocket);
-            if (connection is null)
-            {
-                _logger.LogWarning("Cannot refresh heartbeat: Connection not found");
-                return;
-            }
-
-            RefreshHeartbeat(userId, connection);
-        }
-
-        public async Task<Guid> GetUserIdAsync(WebSocket webSocket)
-        {
-            if (!_socketToConnectionId.TryGetValue(webSocket, out var connectionId))
-                return Guid.Empty;
-
-            var cacheKey = connectionId.ToString();
-            var webSocketCache = await _cacheContext
-                .Entry<WebSocketCache>(cacheKey)
-                .GetOrSetAsync(
-                    () => Task.FromResult(FindUserIdByConnectionId(connectionId)),
-                    TimeSpan.FromMinutes(10));
-
-            return webSocketCache.UserId;
-        }
-
-        public async Task<Guid> GetUserIdAsync(WebSocketConnection connection)
-        {
-            var cacheKey = connection.Id.ToString();
-
-            var webSocketCache = await _cacheContext
-                .Entry<WebSocketCache>(cacheKey)
-                .GetOrSetAsync(
-                    () => Task.FromResult(FindUserIdByConnection(connection)),
-                    TimeSpan.FromMinutes(10));
-
-            return webSocketCache.UserId;
-        }
-
-        private WebSocketCache FindUserIdByConnectionId(Guid connectionId)
-        {
-            foreach (var (userId, connections) in _connections)
-                if (connections.Any(c => c.Id == connectionId))
-                    return new WebSocketCache { UserId = userId };
-
-            return new WebSocketCache { UserId = Guid.Empty };
-        }
-
-        private WebSocketCache FindUserIdByConnection(WebSocketConnection connection)
-        {
-            foreach (var (userId, connections) in _connections)
-            {
-                if (connections.Contains(connection))
-                    return new WebSocketCache { UserId = userId };
-            }
-
-            return new WebSocketCache { UserId = Guid.Empty };
+            return silent.Count;
         }
     }
 }

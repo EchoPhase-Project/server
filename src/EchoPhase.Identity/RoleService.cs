@@ -4,6 +4,8 @@
 using System.Security.Claims;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
+using EchoPhase.Security.BitMasks;
+using EchoPhase.Security.BitMasks.Constants;
 using Microsoft.AspNetCore.Identity;
 
 namespace EchoPhase.Identity
@@ -44,6 +46,8 @@ namespace EchoPhase.Identity
         /// <exception cref="Exception">Thrown when role creation fails.</exception>
         public async Task CreateRoleAsync(string roleName)
         {
+            EnsureKnown([roleName]);
+
             if (await _roleManager.RoleExistsAsync(roleName))
                 return;
 
@@ -59,10 +63,18 @@ namespace EchoPhase.Identity
         /// <param name="user">The user to add to roles.</param>
         /// <param name="roleNames">One or more collections of role names.</param>
         /// <returns>A task that represents the asynchronous operation.</returns>
+        /// <exception cref="ArgumentException">Thrown when a role is not one of <see cref="Roles"/>.</exception>
         public async Task AddToRolesAsync(User user, params IEnumerable<string> roleNames)
         {
-            foreach (var roleName in roleNames)
-                await AddToRoleAsync(user, roleName);
+            var roles = roleNames.ToArray();
+            EnsureKnown(roles);
+
+            var changed = false;
+            foreach (var roleName in roles)
+                changed |= await AddToRoleCoreAsync(user, roleName);
+
+            if (changed)
+                await InvalidateTokensAsync(user);
         }
 
         /// <summary>
@@ -72,8 +84,12 @@ namespace EchoPhase.Identity
         /// <param name="user">The user to add to the role.</param>
         /// <param name="roleName">The name of the role.</param>
         /// <returns>A task that represents the asynchronous operation.</returns>
+        /// <exception cref="ArgumentException">Thrown when the role is not one of <see cref="Roles"/>.</exception>
         /// <exception cref="Exception">Thrown if adding the user to the role fails.</exception>
-        public async Task AddToRoleAsync(User user, string roleName)
+        public Task AddToRoleAsync(User user, string roleName)
+            => AddToRolesAsync(user, roleName);
+
+        private async Task<bool> AddToRoleCoreAsync(User user, string roleName)
         {
             if (!await _roleManager.RoleExistsAsync(roleName))
             {
@@ -81,11 +97,13 @@ namespace EchoPhase.Identity
             }
 
             if (await IsInRoleAsync(user, roleName))
-                return;
+                return false;
 
             var result = await _userManager.AddToRoleAsync(user, roleName);
             if (!result.Succeeded)
                 throw new InvalidOperationException($"Failed to add to role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+
+            return true;
         }
 
         /// <summary>
@@ -96,13 +114,17 @@ namespace EchoPhase.Identity
         /// <returns>A task that represents the asynchronous operation.</returns>
         public async Task RemoveFromRolesAsync(User user, params IEnumerable<string>[] roleNames)
         {
+            var changed = false;
             foreach (var roles in roleNames)
             {
                 foreach (var roleName in roles)
                 {
-                    await RemoveFromRoleAsync(user, roleName);
+                    changed |= await RemoveFromRoleCoreAsync(user, roleName);
                 }
             }
+
+            if (changed)
+                await InvalidateTokensAsync(user);
         }
 
         /// <summary>
@@ -112,14 +134,36 @@ namespace EchoPhase.Identity
         /// <param name="roleName">The name of the role.</param>
         /// <returns>A task that represents the asynchronous operation.</returns>
         /// <exception cref="Exception">Thrown if removing the user from the role fails.</exception>
-        public async Task RemoveFromRoleAsync(User user, string roleName)
+        public Task RemoveFromRoleAsync(User user, string roleName)
+            => RemoveFromRolesAsync(user, new[] { roleName });
+
+        private async Task<bool> RemoveFromRoleCoreAsync(User user, string roleName)
         {
             if (!await IsInRoleAsync(user, roleName))
-                return;
+                return false;
 
             var result = await _userManager.RemoveFromRoleAsync(user, roleName);
             if (!result.Succeeded)
                 throw new InvalidOperationException($"Failed to remove from role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+
+            return true;
+        }
+
+        /// <summary>
+        /// Access tokens carry permissions derived from roles, so every issued
+        /// token must die when roles change; refresh then re-derives them.
+        /// </summary>
+        private Task InvalidateTokensAsync(User user)
+            => _userManager.UpdateSecurityStampAsync(user);
+
+        // Roles are bundles defined in code (RolePermissions); an unknown name
+        // would grant nothing and only confuse whoever assigned it.
+        private static void EnsureKnown(IEnumerable<string> roleNames)
+        {
+            var unknown = roleNames.Where(r => !RolePermissions.IsKnownRole(r)).ToArray();
+            if (unknown.Length > 0)
+                throw new ArgumentException(
+                    $"Unknown role(s): {string.Join(", ", unknown)}. Known roles: {string.Join(", ", Roles.AsEnumerable())}.");
         }
 
         /// <summary>

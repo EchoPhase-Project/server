@@ -12,7 +12,7 @@ namespace EchoPhase.DAL.Redis.Database
     {
         private readonly ConcurrentDictionary<Type, object> _sets = new();
         private readonly IDistributedCache _cache;
-        protected readonly IRedisOptions _settings;
+        protected readonly IRedisOptions Settings;
 
         public DbContext(
             IDistributedCache cache,
@@ -20,13 +20,13 @@ namespace EchoPhase.DAL.Redis.Database
         )
         {
             _cache = cache;
-            _settings = settings;
+            Settings = settings;
         }
 
 
         protected void RegisterSet<T>(string template)
         {
-            var set = new CacheSet<T>(_cache, template, _settings.TenantId);
+            var set = new CacheSet<T>(_cache, template, Settings.TenantId);
             _sets[typeof(T)] = set;
         }
 

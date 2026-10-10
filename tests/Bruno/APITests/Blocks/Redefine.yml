@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/blocks/run"
+  url: "{{baseUrl}}/blocks/runs"
   headers:
     - name: ""
       value: ""
@@ -13,15 +13,16 @@ http:
     type: json
     data: |-
       {
-        "startIds": [1],
+        "startIds": [
+          1
+        ],
         "blocks": [
           {
             "id": 1,
             "type": "Set",
             "params": {
               "name": "user.name",
-              "value": "John",
-              "next": [2]
+              "value": "John"
             }
           },
           {
@@ -29,17 +30,15 @@ http:
             "type": "Set",
             "params": {
               "name": "user.age",
-              "value": "30",
-              "next": [3]
+              "value": "30"
             }
           },
           {
             "id": 3,
-            "type": "Set",  
+            "type": "Set",
             "params": {
-              "name": "user.items[0]",                                                          
-              "value": "apple",
-              "next": [4]
+              "name": "user.items[0]",
+              "value": "apple"
             }
           },
           {
@@ -47,17 +46,37 @@ http:
             "type": "Set",
             "params": {
               "name": "user.items[1]",
-              "value": "banana",
-              "next": [5]
+              "value": "banana"
             }
           },
           {
             "id": 5,
             "type": "Print",
             "params": {
-              "text": "User: @user.name, Age: @user.age, Items: @user.items[0], @user.items[1]",
-              "next": []
+              "text": "User: @user.name, Age: @user.age, Items: @user.items[0], @user.items[1]"
             }
+          }
+        ],
+        "connections": [
+          {
+            "from": 1,
+            "output": "main",
+            "to": 2
+          },
+          {
+            "from": 2,
+            "output": "main",
+            "to": 3
+          },
+          {
+            "from": 3,
+            "output": "main",
+            "to": 4
+          },
+          {
+            "from": 4,
+            "output": "main",
+            "to": 5
           }
         ]
       }

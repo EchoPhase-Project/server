@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using EchoPhase.DAL.Scylla.Cql;
+
 namespace EchoPhase.DAL.Scylla.Builders
 {
     public class KeyspaceBuilder
@@ -22,6 +24,19 @@ namespace EchoPhase.DAL.Scylla.Builders
         public KeyspaceBuilder WithSimpleStrategy(int replicationFactor)
         {
             _replicationClass = "SimpleStrategy";
+            _replicationFactor = replicationFactor;
+            _datacenterReplication = null;
+            return this;
+        }
+
+        /// <summary>
+        /// NetworkTopologyStrategy with the same factor in every datacenter
+        /// (<c>'replication_factor': n</c>). Works with tablets, which reject
+        /// SimpleStrategy, and needs no datacenter names.
+        /// </summary>
+        public KeyspaceBuilder WithNetworkTopologyStrategy(int replicationFactor)
+        {
+            _replicationClass = "NetworkTopologyStrategy";
             _replicationFactor = replicationFactor;
             _datacenterReplication = null;
             return this;
@@ -82,7 +97,7 @@ namespace EchoPhase.DAL.Scylla.Builders
             string replication;
             if (_datacenterReplication != null)
             {
-                var dcReplicas = string.Join(", ", _datacenterReplication.Select(kvp => $"'{kvp.Key}': {kvp.Value}"));
+                var dcReplicas = string.Join(", ", _datacenterReplication.Select(kvp => $"{CqlLiteral.Quote(kvp.Key)}: {kvp.Value}"));
                 replication = $"{{'class': 'NetworkTopologyStrategy', {dcReplicas}}}";
             }
             else
@@ -102,7 +117,7 @@ namespace EchoPhase.DAL.Scylla.Builders
             string replication;
             if (_datacenterReplication != null)
             {
-                var dcReplicas = string.Join(", ", _datacenterReplication.Select(kvp => $"'{kvp.Key}': {kvp.Value}"));
+                var dcReplicas = string.Join(", ", _datacenterReplication.Select(kvp => $"{CqlLiteral.Quote(kvp.Key)}: {kvp.Value}"));
                 replication = $"{{'class': 'NetworkTopologyStrategy', {dcReplicas}}}";
             }
             else

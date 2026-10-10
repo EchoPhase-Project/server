@@ -21,21 +21,21 @@ namespace EchoPhase.Cli.Commands.Database.Migrate
             _scyllaContext = scyllaContext;
         }
 
-        protected override async Task<int> ExecuteAsync(CommandContext context, MigrateSettings settings, CancellationToken cancellationToken)
+        public override async Task<int> ExecuteAsync(CommandContext context, MigrateSettings settings, CancellationToken cancellationToken)
         {
-            var pgPendingMigrations = await _pgContext.Database.GetPendingMigrationsAsync();
-            var scyllaPendingMigrations = await _scyllaContext.Database.GetPendingMigrationsAsync();
+            var pgPendingMigrations = await _pgContext.Database.GetPendingMigrationsAsync(cancellationToken);
+            var scyllaPendingMigrations = await _scyllaContext.Database.GetPendingMigrationsAsync(cancellationToken);
 
             if (pgPendingMigrations.Any())
             {
-                await _pgContext.Database.MigrateAsync();
+                await _pgContext.Database.MigrateAsync(cancellationToken);
                 if (settings.Verbose)
                     AnsiConsole.MarkupLine("[green]Postgres migrations were applied[/]");
             }
 
             if (scyllaPendingMigrations.Any())
             {
-                await _scyllaContext.Database.MigrateAsync();
+                await _scyllaContext.Database.MigrateAsync(cancellationToken);
                 if (settings.Verbose)
                     AnsiConsole.MarkupLine("[green]Scylla migrations were applied[/]");
             }

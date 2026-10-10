@@ -1,34 +1,21 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Net.WebSockets;
 using EchoPhase.WebSockets.Constants;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {
+    /// <summary>Handlers by op code, from the connection's scope (they may use scoped services).</summary>
     public class OpCodeHandlerResolver
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IServiceProvider _services;
 
-        public OpCodeHandlerResolver(IServiceProvider serviceProvider)
+        public OpCodeHandlerResolver(IServiceProvider services)
         {
-            _serviceProvider = serviceProvider;
+            _services = services;
         }
 
-        public IOpCodeHandler GetHandler(OpCodes opCode)
-        {
-            if (!Enum.IsDefined(typeof(OpCodes), opCode))
-                throw new NotSupportedException($"Unsupported OpCode {opCode} value.");
-
-            return _serviceProvider.GetKeyedService<IOpCodeHandler>(opCode)
-                ?? throw new NotSupportedException($"No handler registered for OpCode {opCode}.");
-        }
-
-        public async Task HandleAsync(OpCodes opCode, WebSocket webSocket, object payload)
-        {
-            var handler = GetHandler(opCode);
-            await handler.HandleAsync(webSocket, payload);
-        }
+        public IOpCodeHandler? Find(OpCodes opCode) => _services.GetKeyedService<IOpCodeHandler>(opCode);
     }
 }

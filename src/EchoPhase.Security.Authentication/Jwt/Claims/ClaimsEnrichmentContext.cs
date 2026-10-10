@@ -9,10 +9,27 @@ namespace EchoPhase.Security.Authentication.Jwt.Claims
     {
         public required User User { get; init; }
 
-        public IReadOnlyList<string> RequestedScopes { get; init; } = [];
-        public IReadOnlyList<string> RequestedIntents { get; init; } = [];
+        /// <summary>
+        /// Set when issuing a token to an API client; becomes the <c>client_id</c> claim.
+        /// </summary>
+        public Guid? ClientId { get; init; }
 
-        public IReadOnlyDictionary<string, string[]> RequestedPermissions { get; init; }  // string[] → string
-            = new Dictionary<string, string[]>();
+        /// <summary>
+        /// Set when issuing an impersonation token: <see cref="User"/> is the
+        /// target, this is who actually acts. Becomes the <c>act</c> claim.
+        /// </summary>
+        public Guid? ActorId { get; init; }
+
+        /// <summary>
+        /// The impersonation record the token belongs to; becomes the <c>imp</c> claim.
+        /// </summary>
+        public Guid? ImpersonationId { get; init; }
+
+        /// <summary>
+        /// Permissions to narrow the token to. <c>null</c> (interactive sessions)
+        /// grants the full ceiling of the user's roles; otherwise the token gets
+        /// the intersection of this with that ceiling.
+        /// </summary>
+        public IReadOnlyDictionary<string, string[]>? RequestedPermissions { get; init; }
     }
 }

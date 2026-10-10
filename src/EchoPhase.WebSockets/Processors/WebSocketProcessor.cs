@@ -1,70 +1,79 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Net.WebSockets;
 using System.Text.Json;
-using EchoPhase.Identity;
 using EchoPhase.WebSockets.Constants;
 using EchoPhase.WebSockets.Processors.Handlers;
 using EchoPhase.WebSockets.Processors.Payloads;
 
 namespace EchoPhase.WebSockets.Processors
 {
+    /// <summary>
+    /// Dispatches one client message, { "op": n, "d": { ... } }, to the
+    /// handler for its op. Malformed messages and unknown ops are answered
+    /// with an Error message; the connection stays open.
+    /// </summary>
     public class WebSocketProcessor
     {
-        private readonly WebSocketService _webSocketService;
-        private readonly WebSocketConnectionManager _connectionManager;
-        private readonly IUserService _userService;
-        private readonly OpCodeHandlerResolver _handlerResolver;
+        private readonly WebSocketService _sockets;
+        private readonly OpCodeHandlerResolver _handlers;
 
-        public WebSocketProcessor(
-            WebSocketService webSocketService,
-            WebSocketConnectionManager connectionManager,
-            IUserService userService,
-            OpCodeHandlerResolver handlerResolver
-        )
+        public WebSocketProcessor(WebSocketService sockets, OpCodeHandlerResolver handlers)
         {
-            _webSocketService = webSocketService;
-            _connectionManager = connectionManager;
-            _userService = userService;
-            _handlerResolver = handlerResolver;
+            _sockets = sockets;
+            _handlers = handlers;
         }
 
-        public async Task HandleMessageAsync(WebSocket webSocket, string message)
+        public async Task HandleMessageAsync(WebSocketConnection connection, ReadOnlyMemory<byte> utf8Json, CancellationToken ct = default)
         {
-            var rawMessage = JsonSerializer.Deserialize<RawEventMessage>(message);
-            if (rawMessage == null)
-            {
-                await SendErrorAsync(webSocket, ErrorCodes.DeserializationError, "Unable to deserialize JSON.");
-                return;
-            }
-
-            if (rawMessage.D == null)
-            {
-                await SendErrorAsync(webSocket, ErrorCodes.InvalidPayload, "Payload data is missing.");
-                return;
-            }
-
+            JsonDocument document;
             try
             {
-                var handler = _handlerResolver.GetHandler(rawMessage.Op);
-                await handler.HandleAsync(webSocket, rawMessage.D);
+                document = JsonDocument.Parse(utf8Json);
             }
-            catch (NotSupportedException e)
+            catch (JsonException ex)
             {
-                await SendErrorAsync(webSocket, ErrorCodes.Unsupported, e.Message);
+                await SendErrorAsync(connection, ErrorCodes.DeserializationError, $"Invalid JSON: {ex.Message}", ct);
+                return;
+            }
+
+            using (document)
+            {
+                var root = document.RootElement;
+                if (root.ValueKind != JsonValueKind.Object
+                    || !TryGetProperty(root, "op", out var opElement)
+                    || !opElement.TryGetInt32(out var op))
+                {
+                    await SendErrorAsync(connection, ErrorCodes.InvalidMessage, "Expected { \"op\": number, \"d\": object }.", ct);
+                    return;
+                }
+
+                if (!Enum.IsDefined((OpCodes)op) || _handlers.Find((OpCodes)op) is not { } handler)
+                {
+                    await SendErrorAsync(connection, ErrorCodes.Unsupported, $"Unsupported op {op}.", ct);
+                    return;
+                }
+
+                TryGetProperty(root, "d", out var payload);
+                await handler.HandleAsync(connection, payload, ct);
             }
         }
 
-        private async Task SendErrorAsync(WebSocket socket, ErrorCodes code, string msg)
+        // Clients may send "op" or "Op": the server writes camelCase, older clients wrote PascalCase.
+        private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
         {
-            var error = EventMessage<ErrorPayload>.Create(OpCodes.Error, e =>
-            {
-                e.Code = code;
-                e.Message = msg;
-            });
+            foreach (var property in element.EnumerateObject())
+                if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
 
-            await _webSocketService.SendMessageAsync(socket, error);
+            value = default;
+            return false;
         }
+
+        private Task SendErrorAsync(WebSocketConnection connection, ErrorCodes code, string message, CancellationToken ct)
+            => _sockets.SendAsync(connection, ErrorMessages.Create(code, message), ct);
     }
 }

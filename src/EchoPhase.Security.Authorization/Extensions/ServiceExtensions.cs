@@ -13,9 +13,8 @@ namespace EchoPhase.Security.Authorization.Extensions
     {
         public static IServiceCollection AddAuthorizations(this IServiceCollection services)
         {
-            services.AddSingleton<IAuthorizationHandler, RoleAuthorizationHandler>();
-            services.AddSingleton<IAuthorizationHandler, ScopeAuthorizationHandler>();
             services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, PrincipalAuthorizationHandler>();
 
             services.AddAuthorization(options =>
             {
@@ -35,9 +34,8 @@ namespace EchoPhase.Security.Authorization.Extensions
                     .Build();
             });
 
-            services.AddSingleton<IPolicyBuilder, RolePolicyBuilder>();
-            services.AddSingleton<IPolicyBuilder, ScopePolicyBuilder>();
             services.AddSingleton<IPolicyBuilder, PermissionPolicyBuilder>();
+            services.AddSingleton<IPolicyBuilder, PrincipalPolicyBuilder>();
 
             services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 

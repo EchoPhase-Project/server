@@ -27,7 +27,7 @@ namespace EchoPhase.Clients.Helpers
             if (IsSimple(type))
                 return result;
 
-            if (_options.IncludeProperties)
+            if (Options.IncludeProperties)
             {
                 var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                                 .Where(p => p.CanRead);
@@ -39,7 +39,7 @@ namespace EchoPhase.Clients.Helpers
                 }
             }
 
-            if (_options.IncludeFields)
+            if (Options.IncludeFields)
             {
                 var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
                 foreach (var field in fields)

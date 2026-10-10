@@ -10,7 +10,8 @@ namespace EchoPhase.WebSockets.Processors.Payloads
     [OpCodePayload(OpCodes.Handshake)]
     public class HandshakePayload : IPayload
     {
-        public string? Intents
+        /// <summary>Intent names to receive, e.g. ["blocks", "connections"]; omitted: keep the current ones.</summary>
+        public string[]? Intents
         {
             get; set;
         }
@@ -21,9 +22,13 @@ namespace EchoPhase.WebSockets.Processors.Payloads
 
         public IValidationResult Validate()
         {
-            if (Intents != null && string.IsNullOrWhiteSpace(Intents))
+            if (Intents is { } list && (list.Length > IntentLimits.MaxIntents || list.Any(n => n?.Length > IntentLimits.MaxNameLength)))
                 return ValidationResult.Failure(error =>
-                    error.Set(nameof(Intents), "Intents cannot be empty if set."));
+                    error.Set(nameof(Intents), $"At most {IntentLimits.MaxIntents} intents of up to {IntentLimits.MaxNameLength} characters."));
+
+            if (Intents is not null && Intents.Any(string.IsNullOrWhiteSpace))
+                return ValidationResult.Failure(error =>
+                    error.Set(nameof(Intents), "Intent names cannot be empty."));
 
             return ValidationResult.Success();
         }

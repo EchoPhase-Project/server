@@ -1,91 +1,39 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Net.WebSockets;
 using EchoPhase.Configuration.WebSocket;
-using EchoPhase.Security.BitMasks;
-using EchoPhase.Types.Result.Extensions;
 using EchoPhase.WebSockets.Constants;
-using EchoPhase.WebSockets.Exceptions;
 using EchoPhase.WebSockets.Processors.Payloads;
 using Microsoft.Extensions.Options;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {
+    /// <summary>Optionally sets intents; answers with them and the heartbeat interval.</summary>
     public class HandshakeHandler : OpCodeHandlerBase<HandshakePayload>
     {
-        private readonly WebSocketService _webSocketService;
-        private readonly WebSocketConnectionManager _connectionManager;
-        private readonly IntentsBitMask _intents;
+        private readonly IntentAuthorization _intents;
         private readonly WebSocketOptions _settings;
 
-        public HandshakeHandler(IServiceProvider serviceProvider)
-        : base(serviceProvider)
+        public HandshakeHandler(WebSocketService sockets, IntentAuthorization intents, IOptions<WebSocketOptions> settings)
+            : base(sockets)
         {
-            _webSocketService = GetService<WebSocketService>();
-            _connectionManager = GetService<WebSocketConnectionManager>();
-            _intents = GetService<IntentsBitMask>();
-            _settings = GetService<IOptions<WebSocketOptions>>().Value;
-
+            _intents = intents;
+            _settings = settings.Value;
         }
 
-        public override async Task HandleAsync(WebSocket webSocket, HandshakePayload payload)
+        protected override async Task HandleAsync(WebSocketConnection connection, HandshakePayload payload, CancellationToken ct)
         {
-            try
+            if (payload.Intents is not null && _intents.TryApply(connection, payload.Intents) is { } error)
             {
-                var connection = await _connectionManager.GetConnectionAsync(webSocket);
-
-                if (payload.Intents is not null)
-                {
-                    var result = _intents.Deserialize(payload.Intents);
-
-                    if (result.TryGetError(out var error))
-                    {
-                        var responseError = EventMessage<ErrorPayload>.Create(OpCodes.Error, err =>
-                        {
-                            err.Code = ErrorCodes.DeserializationError;
-                            err.Message = error.Value;
-                        });
-
-                        await _webSocketService.SendMessageAsync(webSocket, responseError);
-                        return;
-                    }
-
-                    if (result.TryGetValue(out var value))
-                    {
-                        connection.Intents = value;
-                    }
-                }
-
-                var intents = Array.Empty<string>();
-
-                var decodingResult = _intents.Decode(connection.Intents);
-
-                if (decodingResult.TryGetValue(out var decoded))
-                    intents = decoded;
-
-                var response = EventMessage<HandshakeAckPayload>.Create(OpCodes.HandshakeAck, p =>
-                {
-                    p.HeartbeatInterval = _settings.HeartbeatInterval.TotalMilliseconds;
-                    p.Intents = intents;
-                });
-
-                await _webSocketService.SendMessageAsync(webSocket, response);
-            }
-            catch (WebSocketConnectionNotFoundException)
-            {
-                var response = EventMessage<ErrorPayload>.Create(OpCodes.Error, p =>
-                {
-                    p.Code = ErrorCodes.NotFound;
-                    p.Message = "Connection not found.";
-                });
-
-                await _webSocketService.SendMessageAsync(webSocket, response);
-
-                throw;
+                await Sockets.SendAsync(connection, error, ct);
+                return;
             }
 
-            return;
+            await Sockets.SendAsync(connection, EventMessage<HandshakeAckPayload>.Create(OpCodes.HandshakeAck, p =>
+            {
+                p.HeartbeatInterval = _settings.HeartbeatInterval.TotalMilliseconds;
+                p.Intents = _intents.Names(connection.Intents);
+            }), ct);
         }
     }
 }

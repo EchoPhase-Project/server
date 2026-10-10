@@ -3,16 +3,22 @@
 
 using System.Globalization;
 using System.Net.Http.Headers;
-using EchoPhase.Clients;
 using EchoPhase.Clients.Discord;
+using EchoPhase.Clients.Discord.WebSocket;
+using EchoPhase.Clients.Twitch;
+using EchoPhase.Clients.Twitch.Auth;
+using EchoPhase.Connections;
+using EchoPhase.Connections.Extensions;
+using EchoPhase.Controllers.Api.v1.Common;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
 using EchoPhase.Interfaces.Services;
+using EchoPhase.Json;
 using EchoPhase.Services.Events;
 using EchoPhase.WebHooks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
-using Microsoft.AspNetCore.Mvc.Razor;
+using Microsoft.AspNetCore.Mvc;
 using Polly;
 using Polly.Extensions.Http;
 
@@ -20,16 +26,24 @@ namespace EchoPhase.Extensions
 {
     public static class ServiceExtensions
     {
-        /*
-        public static IServiceCollection AddTwitchClient(this IServiceCollection services, IConfigurationSection configurationSection)
+        public static IServiceCollection AddTwitchClient(this IServiceCollection services)
         {
-            services.AddHttpClient<TwitchClient>("Twitch", (serviceProvider, client) =>
-            {
-                client.BaseAddress = new Uri("https://api.twitch.tv/helix/");
+            services.AddHttpClient<ITwitchAuthClient, TwitchAuthClient>("TwitchAuth", (serviceProvider, client) =>
+                    {
+                        client.BaseAddress = new Uri("https://id.twitch.tv/oauth2/");
 
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            })
+                        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    })
+                .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+
+            services.AddHttpClient<ITwitchClient, TwitchClient>("Twitch", (serviceProvider, client) =>
+                    {
+                        client.BaseAddress = new Uri("https://api.twitch.tv/helix/");
+
+                        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    })
                 .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                .AddConnectionAuth(ConnectionProviders.Twitch)
                 .AddPolicyHandler(request =>
                     request.Method == HttpMethod.Get ?
                         GetRetryPolicy() :
@@ -38,14 +52,11 @@ namespace EchoPhase.Extensions
 
             return services;
         }
-        */
 
         public static IServiceCollection AddDiscordClient(this IServiceCollection services)
         {
-            services.AddSingleton<IClientSecretVault, ClientSecretVault>();
-            services.AddScoped<IExternalTokenService, ExternalTokenService>();
-            services.AddScoped<IClientTokenProviderRegistry>(
-                sp => new ClientTokenProviderRegistry(sp));
+            services.AddSingleton<DiscordWebSocketManager>();
+
             services.AddHttpClient<IDiscordClient, DiscordClient>("Discord", (serviceProvider, client) =>
                     {
                         client.BaseAddress = new Uri("https://discord.com/api/v10/");
@@ -53,6 +64,7 @@ namespace EchoPhase.Extensions
                         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                     })
                 .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                .AddConnectionAuth(ConnectionProviders.Discord)
                 .AddPolicyHandler(request =>
                     request.Method == HttpMethod.Get ?
                         GetRetryPolicy() :
@@ -74,23 +86,21 @@ namespace EchoPhase.Extensions
                 .AsAsyncPolicy<HttpResponseMessage>();
 
 
-        public static IServiceCollection AddPreparedMvc(this IServiceCollection services)
+        public static IServiceCollection AddApiControllers(this IServiceCollection services)
         {
-            services.Configure<RazorViewEngineOptions>(o =>
-            {
-                // {2} is area, {1} is controller,{0} is the action
-                o.ViewLocationFormats.Clear();
-                o.ViewLocationFormats.Add("/Controllers/{1}/Views/{0}" + RazorViewEngine.ViewExtension);
-                o.ViewLocationFormats.Add("/Controllers/Shared/{0}" + RazorViewEngine.ViewExtension);
-                o.ViewLocationFormats.Add("/Controllers/Shared/Views/{0}" + RazorViewEngine.ViewExtension);
-
-                o.AreaViewLocationFormats.Clear();
-                o.AreaViewLocationFormats.Add("/Areas/{2}/Controllers/{1}/Views/{0}" + RazorViewEngine.ViewExtension);
-                o.AreaViewLocationFormats.Add("/Areas/{2}/Controllers/Shared/Views/{0}" + RazorViewEngine.ViewExtension);
-                o.AreaViewLocationFormats.Add("/Areas/Shared/Views/{0}" + RazorViewEngine.ViewExtension);
-            });
-
-            services.AddMvc();
+            // JSON API controllers only: no views, Razor or Razor Pages.
+            services.AddControllers()
+                // Request times must carry Z or an offset (see StrictTime).
+                .AddJsonOptions(o =>
+                {
+                    o.JsonSerializerOptions.Converters.Add(new StrictDateTimeOffsetConverter());
+                    o.JsonSerializerOptions.Converters.Add(new StrictUtcDateTimeConverter());
+                })
+                // Validation failures use the API's error body, with the field each
+                // message is about, instead of ProblemDetails.
+                .ConfigureApiBehaviorOptions(o => o.InvalidModelStateResponseFactory =
+                    context => new BadRequestObjectResult(ErrorBody.From(
+                        context.ModelState, context.ActionDescriptor.Parameters.Select(p => p.Name))));
 
             return services;
         }
@@ -117,13 +127,6 @@ namespace EchoPhase.Extensions
                         .WithOrigins("https://localhost")
                         .AllowAnyHeader()
                         .AllowAnyMethod());
-
-                options.AddPolicy("AllowAllGrpc",
-                    builder => builder
-                        .AllowAnyOrigin()
-                        .AllowAnyMethod()
-                        .AllowAnyHeader()
-                        .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding"));
             });
 
             return services;
@@ -154,6 +157,7 @@ namespace EchoPhase.Extensions
         {
             services.AddScoped<RoleManager<UserRole>>();
             services.AddScoped<IRoleService, RoleService>();
+            services.AddScoped<IUserPermissionService, UserPermissionService>();
 
             return services;
         }

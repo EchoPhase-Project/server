@@ -1,196 +1,270 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Reflection;
+using System.Linq.Expressions;
 using Cassandra;
 using EchoPhase.Configuration.Database.Scylla;
 using EchoPhase.DAL.Scylla.Builders;
 using EchoPhase.DAL.Scylla.Cql;
 using EchoPhase.DAL.Scylla.Enums;
 using EchoPhase.DAL.Scylla.Interfaces;
-using EchoPhase.DAL.Scylla.Loggers;
 using EchoPhase.DAL.Scylla.Models;
+using EchoPhase.DAL.Scylla.Schema;
 using ISession = Cassandra.ISession;
 
 namespace EchoPhase.DAL.Scylla.Database
 {
+    /// <summary>
+    /// Unit of work for one context: change tracking, batches and the model.
+    /// The connection underneath is shared (<see cref="ScyllaConnection"/>).
+    /// </summary>
+    /// <remarks>
+    /// Meant for one logical operation at a time, like an EF DbContext. Tracking
+    /// and batch state are guarded, so concurrent calls do not corrupt it, but
+    /// use one context per unit of work rather than sharing one.
+    /// </remarks>
     public class Database : IDisposable
     {
-        private readonly Dictionary<Guid, TrackedEntity> _changeTracker = new();
-        private readonly Stack<List<TrackedEntity>> _transactionStack = new();
-        private readonly IScyllaOptions _settings;
-        private readonly Dictionary<Type, IEntityBuilder> _builderCache = new();
-        private readonly List<IMigration> _migrations = new();
-        private readonly Stack<Transaction> _activeTransactions = new();
-        private readonly QueryExecutor _queryExecutor;
-        private readonly IQueryLogger _queryLogger;
-        private readonly ICqlGenerator _cqlGenerator;
-        private ISaveStrategy _saveStrategy;
+        private const string MigrationLockId = "migrations";
+        private static readonly TimeSpan MigrationLockTtl = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan MigrationLockWait = TimeSpan.FromMinutes(2);
+        private static readonly TimeSpan MigrationLockPoll = TimeSpan.FromSeconds(2);
 
-        public ISession Session
-        {
-            get;
-        }
+        private readonly object _sync = new();
+        private readonly Dictionary<object, TrackedEntity> _changeTracker = new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<Type, IEntityBuilder> _builderCache = new();
+        private readonly Stack<Batch> _activeBatches = new();
+
+        private readonly ScyllaConnection _connection;
+        private readonly bool _ownsConnection;
+        private readonly ISaveStrategy _directStrategy;
+        private readonly ISaveStrategy _batchStrategy;
+        private bool _disposed;
+
+        public ISession Session => _connection.Session;
+
+        public string Keyspace => _connection.Keyspace;
+
         public ModelBuilder ModelBuilder
         {
             get;
         }
 
-        public Database(IScyllaOptions settings, IQueryLogger? logger = null)
+        internal QueryExecutor Executor => _connection.Executor;
+
+        /// <summary>
+        /// Clock for migration bookkeeping (applied time, lock deadline);
+        /// tests may replace it.
+        /// </summary>
+        public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
+
+        /// <summary>
+        /// Works on a shared connection; disposing this does not close it.
+        /// </summary>
+        /// <param name="model">A model built once and shared by contexts of one type.</param>
+        public Database(ScyllaConnection connection, ModelBuilder? model = null)
+            : this(connection, model, ownsConnection: false)
         {
-            _settings = settings;
-            ModelBuilder = new ModelBuilder();
+        }
 
-            var clusterBuilder = Cluster.Builder()
-                .AddContactPoint(_settings.ContactPoint);
+        /// <summary>
+        /// Standalone use (tools, tests): opens a connection of its own and
+        /// closes it on dispose. Applications should share one connection.
+        /// </summary>
+        public Database(IScyllaOptions settings, IQueryLogger? logger = null)
+            : this(new ScyllaConnection(settings, logger), model: null, ownsConnection: true)
+        {
+        }
 
-            if (!string.IsNullOrWhiteSpace(_settings.Username))
-                clusterBuilder = clusterBuilder.WithCredentials(_settings.Username, _settings.Password);
+        internal Database(ScyllaConnection connection, ModelBuilder? model, bool ownsConnection)
+        {
+            _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            _ownsConnection = ownsConnection;
+            ModelBuilder = model ?? new ModelBuilder();
 
-            var cluster = clusterBuilder.Build();
-
-            try
-            {
-                Session = cluster.Connect(_settings.Keyspace);
-            }
-            catch (InvalidQueryException ex) when (ex.Message.Contains($"Keyspace '{_settings.Keyspace}' does not exist"))
-            {
-                Session = cluster.Connect();
-
-                var migration = new MigrationBuilder();
-                migration.CreateKeyspace(_settings.Keyspace, replicationFactor: 1);
-
-                Session.Execute(migration.GetCommands().First());
-                Session = cluster.Connect(_settings.Keyspace);
-            }
-
-            _queryLogger = logger ?? new ConsoleQueryLogger();
-            _cqlGenerator = new CqlGenerator();
-            _queryExecutor = new QueryExecutor(Session, _queryLogger);
-            _saveStrategy = new DirectSaveStrategy(_cqlGenerator, _queryExecutor, GetBuilder);
-
-            EnsureMigrationsTable();
-            LoadMigrationsFromAssembly(Assembly.GetExecutingAssembly());
+            var cqlGenerator = new CqlGenerator();
+            _directStrategy = new DirectSaveStrategy(cqlGenerator, Executor, GetBuilder);
+            _batchStrategy = new BatchSaveStrategy(cqlGenerator, GetBuilder);
         }
 
         #region Entity Operations
 
-        public void Insert<T>(T entity) => TrackEntity(entity, EntityState.Added);
-        public void Update<T>(T entity) => TrackEntity(entity, EntityState.Modified);
-        public void Delete<T>(T entity) => TrackEntity(entity, EntityState.Deleted);
+        public void Insert<T>(T entity, WriteOptions? options = null)
+            => TrackEntity(entity, EntityState.Added, typeof(T), options);
 
-        private void TrackEntity<T>(T entity, EntityState state)
+        public void Update<T>(T entity, WriteOptions? options = null)
+            => TrackEntity(entity, EntityState.Modified, typeof(T), options);
+
+        public void Delete<T>(T entity, WriteOptions? options = null)
+            => TrackEntity(entity, EntityState.Deleted, typeof(T), options);
+
+        /// <summary>
+        /// Deletes the stored values of the given columns on save. A null
+        /// property alone never clears a value: it means "leave unchanged".
+        /// </summary>
+        public void ClearColumns<T>(T entity, params Expression<Func<T, object?>>[] columns)
         {
             if (entity is null)
                 throw new ArgumentNullException(nameof(entity));
 
-            TrackEntityInternal(entity, state, typeof(T));
+            if (columns.Length == 0)
+                throw new ArgumentException("At least one column is required.", nameof(columns));
+
+            var names = columns.Select(PropertyName).ToList();
+
+            lock (_sync)
+            {
+                if (!_changeTracker.TryGetValue(entity, out var tracked))
+                {
+                    tracked = new TrackedEntity(typeof(T), entity, EntityState.Modified);
+                    _changeTracker[entity] = tracked;
+                }
+                else if (tracked.State == EntityState.Unchanged)
+                {
+                    tracked.State = EntityState.Modified;
+                }
+
+                tracked.ClearedColumns.UnionWith(names);
+            }
         }
 
-        private void TrackEntity(object entity, EntityState state)
+        private void TrackEntity(object? entity, EntityState state, Type type, WriteOptions? options)
         {
             if (entity is null)
                 throw new ArgumentNullException(nameof(entity));
 
-            TrackEntityInternal(entity, state, entity.GetType());
+            options?.Validate();
+
+            lock (_sync)
+            {
+                if (_changeTracker.TryGetValue(entity, out var tracked))
+                {
+                    tracked.State = state;
+                    tracked.Options = options ?? tracked.Options;
+                }
+                else
+                {
+                    _changeTracker[entity] = new TrackedEntity(type, entity, state) { Options = options };
+                }
+            }
         }
 
-        private void TrackEntityInternal(object entity, EntityState state, Type type)
-        {
-            var tracked = _changeTracker.Values.FirstOrDefault(t => ReferenceEquals(t.Entity, entity));
-            if (tracked == null)
+        private static string PropertyName<T>(Expression<Func<T, object?>> expression)
+            => expression.Body switch
             {
-                tracked = new TrackedEntity(type, entity, state);
-                _changeTracker[tracked.TrackingId] = tracked;
-            }
-            else
-            {
-                tracked.State = state;
-            }
-        }
+                MemberExpression member => member.Member.Name,
+                UnaryExpression { Operand: MemberExpression member } => member.Member.Name,
+                _ => throw new ArgumentException("Expected a property access, e.g. x => x.Name.", nameof(expression))
+            };
 
-        private IEntityBuilder GetBuilder(Type entityType)
+        internal IEntityBuilder GetBuilder(Type entityType)
         {
-            if (!_builderCache.TryGetValue(entityType, out var builder))
+            lock (_sync)
             {
-                var method = typeof(ModelBuilder)
-                    .GetMethod(nameof(ModelBuilder.GetBuilder)) ?? throw new InvalidOperationException($"Method {nameof(ModelBuilder.GetBuilder)} not found.");
-                var generic = method.MakeGenericMethod(entityType);
-                var obj = generic?.Invoke(ModelBuilder, null);
-                if (obj is not IEntityBuilder entityBuilder)
-                    throw new InvalidOperationException($"Method {generic?.Name} returned null or not IEntityBuilder");
+                if (!_builderCache.TryGetValue(entityType, out var builder))
+                {
+                    builder = ModelBuilder.GetBuilder(entityType)
+                        ?? throw new InvalidOperationException(
+                            $"Entity {entityType.Name} is not configured. Call builder.Entity<{entityType.Name}>() in OnModelBuilding.");
+                    _builderCache[entityType] = builder;
+                }
 
-                builder = entityBuilder;
-                _builderCache[entityType] = builder;
+                return builder;
             }
-            return builder;
         }
 
         #endregion
 
-        #region Transactions & SaveChanges
+        #region Batches & SaveChanges
 
-        internal Transaction? CurrentTransaction =>
-            _activeTransactions.Count > 0 ? _activeTransactions.Peek() : null;
-
-        public void PushActiveTransaction(Transaction tx)
+        internal Batch? CurrentBatch
         {
-            _activeTransactions.Push(tx);
-            UpdateSaveStrategy();
+            get
+            {
+                lock (_sync)
+                    return _activeBatches.Count > 0 ? _activeBatches.Peek() : null;
+            }
         }
 
-        public void PopActiveTransaction()
+        internal void PushActiveBatch(Batch batch)
         {
-            if (_activeTransactions.Count > 0)
-                _activeTransactions.Pop();
-            UpdateSaveStrategy();
+            lock (_sync)
+                _activeBatches.Push(batch);
         }
 
-        private void UpdateSaveStrategy()
+        internal void PopActiveBatch()
         {
-            _saveStrategy = CurrentTransaction != null
-                ? new TransactionSaveStrategy(_cqlGenerator, GetBuilder)
-                : new DirectSaveStrategy(_cqlGenerator, _queryExecutor, GetBuilder);
+            lock (_sync)
+            {
+                if (_activeBatches.Count > 0)
+                    _activeBatches.Pop();
+            }
         }
 
-        public Transaction BeginTransaction(BatchType batchType = BatchType.Logged)
-            => new Transaction(this, batchType);
+        /// <summary>
+        /// Collects the next saves into one batch until it is committed.
+        /// Unlogged by default: use it for several writes to the same partition;
+        /// pass <see cref="BatchType.Logged"/> when writes to different
+        /// partitions must all eventually apply together.
+        /// </summary>
+        public Batch BeginBatch(BatchType batchType = BatchType.Unlogged)
+            => new Batch(this, batchType);
+
+        [Obsolete("A CQL batch is not a transaction. Use BeginBatch; pass BatchType.Logged for atomic multi-partition writes.")]
+        public Batch BeginTransaction(BatchType batchType = BatchType.Logged)
+            => BeginBatch(batchType);
 
         public int SaveChanges()
         {
-            var changedEntities = GetChangedEntities();
-            if (!changedEntities.Any()) return 0;
+            var batch = CurrentBatch;
+            var snapshot = TakeSnapshot();
+            if (snapshot.Count == 0) return 0;
 
-            var count = _saveStrategy.Execute(changedEntities, CurrentTransaction);
-
-            MarkEntitiesAsUnchanged(changedEntities);
-            _changeTracker.Clear();
-
+            var count = StrategyFor(batch).Execute(snapshot.Select(s => s.Entity), batch);
+            Complete(snapshot);
             return count;
         }
 
-        public async Task<int> SaveChangesAsync()
+        public async Task<int> SaveChangesAsync(CancellationToken ct = default)
         {
-            var changedEntities = GetChangedEntities();
-            if (!changedEntities.Any()) return 0;
+            var batch = CurrentBatch;
+            var snapshot = TakeSnapshot();
+            if (snapshot.Count == 0) return 0;
 
-            var count = await _saveStrategy.ExecuteAsync(changedEntities, CurrentTransaction);
-
-            MarkEntitiesAsUnchanged(changedEntities);
-            _changeTracker.Clear();
-
+            var count = await StrategyFor(batch).ExecuteAsync(snapshot.Select(s => s.Entity), batch, ct);
+            Complete(snapshot);
             return count;
         }
 
-        private List<TrackedEntity> GetChangedEntities() =>
-            _changeTracker.Values
-                .Where(t => t.State != EntityState.Unchanged)
-                .ToList();
+        // Chosen per call instead of swapped on push/pop, so a save cannot pick
+        // up a strategy that belongs to another caller's batch.
+        private ISaveStrategy StrategyFor(Batch? batch)
+            => batch != null ? _batchStrategy : _directStrategy;
 
-        private static void MarkEntitiesAsUnchanged(IEnumerable<TrackedEntity> entities)
+        private List<(TrackedEntity Entity, int Version)> TakeSnapshot()
         {
-            foreach (var entity in entities)
-                entity.State = EntityState.Unchanged;
+            lock (_sync)
+                return _changeTracker.Values
+                    .Where(t => t.State != EntityState.Unchanged)
+                    .Select(t => (t, t.Version))
+                    .ToList();
+        }
+
+        /// <summary>
+        /// Stops tracking what was saved. Entities changed again during the save
+        /// (or added meanwhile) stay tracked for the next one; on failure nothing
+        /// is removed, so the save can be retried.
+        /// </summary>
+        private void Complete(List<(TrackedEntity Entity, int Version)> snapshot)
+        {
+            lock (_sync)
+            {
+                foreach (var (tracked, version) in snapshot)
+                {
+                    if (tracked.Version == version)
+                        _changeTracker.Remove(tracked.Entity);
+                }
+            }
         }
 
         #endregion
@@ -201,113 +275,174 @@ namespace EchoPhase.DAL.Scylla.Database
             string cql,
             Func<Row, TResult>? projector = null,
             params object[] parameters)
-        {
-            return _queryExecutor.Execute(cql, projector, parameters);
-        }
+            => Executor.Execute(cql, projector, parameters);
 
         public Task<IEnumerable<TResult>> ExecuteQueryAsync<TResult>(
             string cql,
             Func<Row, TResult>? projector = null,
             params object[] parameters)
-        {
-            return _queryExecutor.ExecuteAsync(cql, projector, parameters);
-        }
+            => Executor.ExecuteAsync(cql, projector, parameters);
+
+        public Task<IEnumerable<TResult>> ExecuteQueryAsync<TResult>(
+            string cql,
+            Func<Row, TResult>? projector,
+            object[] parameters,
+            CancellationToken ct)
+            => Executor.ExecuteAsync(cql, projector, parameters, ct);
 
         public IEnumerable<Row> ExecuteQuery(string cql, params object[] parameters)
-            => _queryExecutor.Execute(cql, parameters);
+            => Executor.Execute(cql, parameters);
 
         public Task<IEnumerable<Row>> ExecuteQueryAsync(string cql, params object[] parameters)
-            => _queryExecutor.ExecuteAsync(cql, parameters);
+            => Executor.ExecuteAsync(cql, parameters);
+
+        public Task<IEnumerable<Row>> ExecuteQueryAsync(string cql, object[] parameters, CancellationToken ct)
+            => Executor.ExecuteAsync(cql, parameters, ct);
 
         public TResult? ExecuteScalar<TResult>(string cql, params object[] parameters)
-            => _queryExecutor.ExecuteScalar<TResult>(cql, parameters);
+            => Executor.ExecuteScalar<TResult>(cql, parameters);
 
         public Task<TResult?> ExecuteScalarAsync<TResult>(string cql, params object[] parameters)
-            => _queryExecutor.ExecuteScalarAsync<TResult>(cql, parameters);
+            => Executor.ExecuteScalarAsync<TResult>(cql, parameters);
+
+        public Task<TResult?> ExecuteScalarAsync<TResult>(string cql, object[] parameters, CancellationToken ct)
+            => Executor.ExecuteScalarAsync<TResult>(cql, parameters, ct);
 
         public void ExecuteNonQuery(string cql, params object[] parameters)
-            => _queryExecutor.ExecuteNonQuery(cql, parameters);
+            => Executor.ExecuteNonQuery(cql, parameters);
 
         public Task ExecuteNonQueryAsync(string cql, params object[] parameters)
-            => _queryExecutor.ExecuteNonQueryAsync(cql, parameters);
+            => Executor.ExecuteNonQueryAsync(cql, parameters);
+
+        public Task ExecuteNonQueryAsync(string cql, object[] parameters, CancellationToken ct)
+            => Executor.ExecuteNonQueryAsync(cql, parameters, ct);
+
+        #endregion
+
+        #region Schema
+
+        /// <summary>
+        /// Compares the configured model with the live tables (system_schema):
+        /// missing tables or columns, wrong key layout, incompatible types.
+        /// Run at startup to fail fast instead of on the first mapped row.
+        /// </summary>
+        public Task<IReadOnlyList<SchemaProblem>> ValidateSchemaAsync(CancellationToken ct = default)
+            => new SchemaValidator(Executor, _connection.Keyspace).ValidateAsync(ModelBuilder.GetAllBuilders(), ct);
 
         #endregion
 
         #region Migrations
 
-        private void EnsureMigrationsTable()
-        {
-            var migration = new MigrationBuilder();
-            migration.CreateTable(
-                keyspace: _settings.Keyspace,
-                name: "schema_migrations",
-                buildAction: table => table
-                    .Text("migration_id")
-                    .Timestamp("applied_at")
-                    .PrimaryKey("migration_id"),
-                ifNotExists: true
-            );
-
-            var cql = migration.GetCommands().First();
-            ExecuteQuery(cql);
-        }
-
-        private void LoadMigrationsFromAssembly(Assembly assembly)
-        {
-            var migrationTypes = assembly.GetTypes()
-                .Where(t => typeof(IMigration).IsAssignableFrom(t) && !t.IsAbstract);
-
-            foreach (var type in migrationTypes)
-            {
-                var migration = (IMigration)Activator.CreateInstance(type)!;
-                _migrations.Add(migration);
-            }
-
-            _migrations.Sort((a, b) => string.Compare(a.Id, b.Id, StringComparison.Ordinal));
-        }
-
-        public async Task<IEnumerable<IMigration>> GetPendingMigrationsAsync()
+        public async Task<IEnumerable<IMigration>> GetPendingMigrationsAsync(CancellationToken ct = default)
         {
             var applied = await ExecuteQueryAsync(
-                "SELECT migration_id FROM schema_migrations",
-                row => row.GetValue<string>("migration_id")
-            );
+                $"SELECT migration_id FROM {ScyllaConnection.MigrationsTable}",
+                row => row.GetValue<string>("migration_id"),
+                [],
+                ct);
 
             var appliedSet = applied.ToHashSet();
-            return _migrations.Where(m => !appliedSet.Contains(m.Id));
+            return _connection.Migrations.Where(m => !appliedSet.Contains(m.Id));
         }
 
-        public async Task MigrateAsync()
+        /// <summary>
+        /// Applies pending migrations under a cluster-wide lock, so instances
+        /// starting together do not run the same migration twice.
+        /// </summary>
+        public async Task MigrateAsync(CancellationToken ct = default)
         {
-            var pendingMigrations = (await GetPendingMigrationsAsync()).ToList();
+            var owner = Guid.NewGuid();
+            await AcquireMigrationLockAsync(owner, ct);
 
-            foreach (var migration in pendingMigrations)
+            try
             {
+                // Re-read under the lock: another instance may have just migrated.
+                var pendingMigrations = (await GetPendingMigrationsAsync(ct)).ToList();
+
+                foreach (var migration in pendingMigrations)
+                    await ApplyAsync(migration, ct);
+            }
+            finally
+            {
+                await ReleaseMigrationLockAsync(owner);
+            }
+        }
+
+        private async Task ApplyAsync(IMigration migration, CancellationToken ct)
+        {
+            try
+            {
+                await migration.Up(this, ct);
+
+                if (!await migration.Validate(this, ct))
+                    throw new InvalidOperationException($"Validation failed for migration {migration.Id}");
+
+                await Executor.ExecuteNonQueryAsync(
+                    $"INSERT INTO {ScyllaConnection.MigrationsTable} (migration_id, applied_at) VALUES (?, ?)",
+                    [migration.Id, TimeProvider.GetUtcNow().UtcDateTime],
+                    idempotent: true,
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                // DDL is not transactional: Down must undo a partial Up. If it
+                // fails too, report both rather than hiding the original error.
                 try
                 {
-                    await migration.Up(this);
-
-                    var valid = await migration.Validate(this);
-                    if (!valid)
-                        throw new InvalidOperationException($"Validation failed for migration {migration.Id}");
-
-                    await ExecuteNonQueryAsync(
-                        "INSERT INTO schema_migrations (migration_id, applied_at) VALUES (?, ?)",
-                        migration.Id,
-                        DateTime.UtcNow
-                    );
+                    await migration.Down(this, CancellationToken.None);
                 }
-                catch (Exception)
+                catch (Exception downEx)
                 {
-                    await migration.Down(this);
-                    throw;
+                    throw new AggregateException(
+                        $"Migration {migration.Id} failed and rolling it back failed too; the schema may be partially migrated.",
+                        ex, downEx);
                 }
+
+                throw;
             }
+        }
+
+        private async Task AcquireMigrationLockAsync(Guid owner, CancellationToken ct)
+        {
+            var deadline = TimeProvider.GetUtcNow().UtcDateTime + MigrationLockWait;
+
+            while (true)
+            {
+                // LWT: exactly one instance gets [applied] = true. The TTL frees
+                // the lock if its holder crashes mid-migration.
+                var rows = await Executor.ExecuteAsync<Row>(
+                    $"INSERT INTO {ScyllaConnection.MigrationLockTable} (lock_id, owner, acquired_at) " +
+                    $"VALUES (?, ?, ?) IF NOT EXISTS USING TTL {(int)MigrationLockTtl.TotalSeconds}",
+                    null,
+                    [MigrationLockId, owner, TimeProvider.GetUtcNow().UtcDateTime],
+                    idempotent: false,
+                    ct);
+
+                if (rows.FirstOrDefault()?.GetValue<bool>("[applied]") == true)
+                    return;
+
+                if (TimeProvider.GetUtcNow().UtcDateTime >= deadline)
+                    throw new TimeoutException("Timed out waiting for the Scylla migration lock held by another instance.");
+
+                await Task.Delay(MigrationLockPoll, ct);
+            }
+        }
+
+        private async Task ReleaseMigrationLockAsync(Guid owner)
+        {
+            // Always runs, even after cancellation: a held lock would block every
+            // other instance until its TTL expires.
+            await Executor.ExecuteNonQueryAsync(
+                $"DELETE FROM {ScyllaConnection.MigrationLockTable} WHERE lock_id = ? IF owner = ?",
+                [MigrationLockId, owner],
+                idempotent: false,
+                CancellationToken.None);
         }
 
         public void ApplyMigration(Action<MigrationBuilder> buildAction)
         {
-            var migration = new MigrationBuilder();
+            // The connection's keyspace, so migrations need not hard-code one.
+            var migration = new MigrationBuilder(_connection.Keyspace);
             buildAction(migration);
 
             foreach (var command in migration.GetCommands())
@@ -316,14 +451,15 @@ namespace EchoPhase.DAL.Scylla.Database
             }
         }
 
-        public async Task ApplyMigrationAsync(Action<MigrationBuilder> buildAction)
+        public async Task ApplyMigrationAsync(Action<MigrationBuilder> buildAction, CancellationToken ct = default)
         {
-            var migration = new MigrationBuilder();
+            // The connection's keyspace, so migrations need not hard-code one.
+            var migration = new MigrationBuilder(_connection.Keyspace);
             buildAction(migration);
 
             foreach (var command in migration.GetCommands())
             {
-                await ExecuteNonQueryAsync(command);
+                await ExecuteNonQueryAsync(command, [], ct);
             }
         }
 
@@ -331,10 +467,17 @@ namespace EchoPhase.DAL.Scylla.Database
 
         public void Dispose()
         {
-            _changeTracker.Clear();
-            _transactionStack.Clear();
-            _queryExecutor.ClearPreparedStatements();
-            Session?.Dispose();
+            if (_disposed) return;
+            _disposed = true;
+
+            lock (_sync)
+            {
+                _changeTracker.Clear();
+                _activeBatches.Clear();
+            }
+
+            if (_ownsConnection)
+                _connection.Dispose();
         }
     }
 }

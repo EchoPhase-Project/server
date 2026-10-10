@@ -3,8 +3,10 @@
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text.Json;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Security.Authentication.Jwt.Claims.Providers;
+using EchoPhase.Types.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace EchoPhase.Security.Authentication.Jwt.Claims
@@ -32,6 +34,16 @@ namespace EchoPhase.Security.Authentication.Jwt.Claims
                 identity.AddClaim(new Claim(JwtRegisteredClaimNames.Name, user.UserName));
             if (user.SecurityStamp != null)
                 identity.AddClaim(new Claim(JwtRegisteredClaimNames.Jti, user.SecurityStamp));
+            if (context.ClientId is { } clientId)
+                identity.AddClaim(new Claim(EchoPhaseClaimTypes.ClientId, clientId.ToString()));
+            if (context.ActorId is { } actorId && context.ImpersonationId is { } impersonationId)
+            {
+                identity.AddClaim(new Claim(
+                    EchoPhaseClaimTypes.Act,
+                    JsonSerializer.Serialize(new { sub = actorId.ToString() }),
+                    JsonClaimValueTypes.Json));
+                identity.AddClaim(new Claim(EchoPhaseClaimTypes.ImpersonationId, impersonationId.ToString()));
+            }
 
             foreach (var provider in _providers)
                 await provider.EnrichAsync(identity, context);

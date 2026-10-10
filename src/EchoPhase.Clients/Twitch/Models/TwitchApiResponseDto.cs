@@ -11,6 +11,8 @@ namespace EchoPhase.Clients.Twitch.Models
         public IEnumerable<TR> Data { get; set; } = Enumerable.Empty<TR>();
 
         [JsonPropertyName("pagination")]
-        public ITwitchApiPagination? Pagination { get; set; } = default;
+        public TwitchApiPagination? Pagination { get; set; } = default;
+
+        ITwitchApiPagination? ITwitchApiResponseDto<IEnumerable<TR>>.Pagination => Pagination;
     }
 }

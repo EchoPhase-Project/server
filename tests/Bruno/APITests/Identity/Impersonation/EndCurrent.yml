@@ -1,0 +1,18 @@
+info:
+  name: EndCurrent
+  type: http
+  seq: 3
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/auth/impersonation/current"
+  headers:
+    - name: Authorization
+      value: "Bearer {{ImpersonationToken}}"
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

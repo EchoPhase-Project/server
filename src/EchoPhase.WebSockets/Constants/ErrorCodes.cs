@@ -11,6 +11,9 @@ namespace EchoPhase.WebSockets.Constants
         TypeError,
         Unsupported,
         NotFound,
-        InvalidPayload
+        InvalidPayload,
+
+        /// <summary>The token's permissions do not allow subscribing to some intents.</summary>
+        DisallowedIntents
     }
 }

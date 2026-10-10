@@ -20,7 +20,7 @@ namespace EchoPhase.Cli.Commands.User.Roles.Add
             _userRepository = userRepository;
         }
 
-        protected override async Task<int> ExecuteAsync(CommandContext context, AddSettings settings, CancellationToken cancellationToken)
+        public override async Task<int> ExecuteAsync(CommandContext context, AddSettings settings, CancellationToken cancellationToken)
         {
             var users = _userRepository.Query()
                 .WithUserNames(settings.Username)

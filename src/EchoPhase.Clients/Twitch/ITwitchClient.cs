@@ -10,7 +10,7 @@ namespace EchoPhase.Clients.Twitch
     {
         Task<PagedResult<IEnumerable<TwitchVipResponseDto>>> GetVipsAsync(
             TwitchVipRequestQueryDto query,
-            string bearerToken,
+            ConnectionRef connection,
             CancellationToken ct = default);
     }
 }

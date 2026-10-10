@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/blocks/run"
+  url: "{{baseUrl}}/blocks/runs"
   headers:
     - name: ""
       value: ""
@@ -13,15 +13,16 @@ http:
     type: json
     data: |-
       {
-        "startIds": [1],
+        "startIds": [
+          1
+        ],
         "blocks": [
           {
             "id": 1,
             "type": "Set",
             "params": {
               "name": "user.name",
-              "value": "John",
-              "next": [2]
+              "value": "John"
             }
           },
           {
@@ -29,17 +30,27 @@ http:
             "type": "Set",
             "params": {
               "name": "user.age",
-              "value": "30",
-              "next": [5]
+              "value": "30"
             }
           },
           {
             "id": 5,
             "type": "Print",
             "params": {
-              "text": "User: @user.name, Age: @user.age",                                       
-              "next": []
+              "text": "User: @user.name, Age: @user.age"
             }
+          }
+        ],
+        "connections": [
+          {
+            "from": 1,
+            "output": "main",
+            "to": 2
+          },
+          {
+            "from": 2,
+            "output": "main",
+            "to": 5
           }
         ]
       }

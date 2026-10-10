@@ -15,6 +15,9 @@ namespace EchoPhase.DAL.Postgres.Configurations
             builder.HasKey(e => e.Id);
             builder.HasIndex(e => new { e.Url, e.UserId }).IsUnique();
 
+            // Event delivery filters by "has all of these intents" (<@ / @>).
+            builder.HasIndex(e => e.Intents).HasMethod("gin");
+
             builder.HasOne(e => e.User)
                 .WithMany(u => u.WebHooks)
                 .HasForeignKey(e => e.UserId)

@@ -22,7 +22,7 @@ namespace EchoPhase.Security.Cryptography.Vaults
         private readonly IDatabase _db;
         private readonly RedisOptions _settings;
         private const string KeyPrefix = "key_";
-        private static readonly ConcurrentDictionary<string, string> _keyCache = new();
+        private static readonly ConcurrentDictionary<string, string> KeyCache = new();
 
         /// <summary>
         /// Initializes the Redis keys service using the default Redis database (0).
@@ -208,6 +208,10 @@ namespace EchoPhase.Security.Cryptography.Vaults
             if (Set(key, value, when: When.NotExists))
                 return ServiceResult<byte[]>.Success(value);
 
+            // Another instance created it between our check and our write: use theirs.
+            if (Exists(key))
+                return Get(key);
+
             return ServiceResult<byte[]>.Failure(err =>
                 err.Set("InvalidOperation", $"Failed to save '{key}' key to storage."));
         }
@@ -242,7 +246,7 @@ namespace EchoPhase.Security.Cryptography.Vaults
         /// <param name="key">Logical key</param>
         /// <returns>Prefixed Redis key</returns>
         private string Prefixed(string key) =>
-            _keyCache.GetOrAdd(key, k =>
+            KeyCache.GetOrAdd(key, k =>
             {
                 var raw = $"{KeyPrefix}tenant:{_settings.TenantId}:{k}";
                 var uuid = Uuid.NewNameBased(_settings.TenantId, raw);

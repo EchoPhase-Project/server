@@ -2,12 +2,16 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.DAL.Scylla.Database;
-using EchoPhase.DAL.Scylla.Enums;
 using EchoPhase.DAL.Scylla.Interfaces;
 using EchoPhase.DAL.Scylla.Models;
 
 namespace EchoPhase.DAL.Scylla.Cql
 {
+    /// <summary>
+    /// Writes each change as its own statement. Generated writes are plain
+    /// INSERT/UPDATE/DELETE (no LWT, no counters), so they are idempotent and
+    /// the driver may retry them on timeouts.
+    /// </summary>
     public class DirectSaveStrategy : ISaveStrategy
     {
         private readonly ICqlGenerator _cqlGenerator;
@@ -24,45 +28,40 @@ namespace EchoPhase.DAL.Scylla.Cql
             _getBuilder = getBuilder;
         }
 
-        public int Execute(IEnumerable<TrackedEntity> entities, Transaction? transaction)
+        public int Execute(IEnumerable<TrackedEntity> entities, Batch? batch)
         {
             var count = 0;
+
             foreach (var tracked in entities)
             {
-                var (cql, parameters) = GenerateCql(tracked);
-                if (cql == null) continue;
+                var statements = _cqlGenerator.Generate(tracked, _getBuilder(tracked.EntityType));
+                if (statements.Count == 0) continue;
 
-                _queryExecutor.ExecuteNonQuery(cql, parameters);
+                foreach (var (cql, parameters) in statements)
+                    _queryExecutor.ExecuteNonQuery(cql, parameters, idempotent: true);
+
                 count++;
             }
+
             return count;
         }
 
-        public async Task<int> ExecuteAsync(IEnumerable<TrackedEntity> entities, Transaction? transaction)
+        public async Task<int> ExecuteAsync(IEnumerable<TrackedEntity> entities, Batch? batch, CancellationToken ct = default)
         {
             var count = 0;
+
             foreach (var tracked in entities)
             {
-                var (cql, parameters) = GenerateCql(tracked);
-                if (cql == null) continue;
+                var statements = _cqlGenerator.Generate(tracked, _getBuilder(tracked.EntityType));
+                if (statements.Count == 0) continue;
 
-                await _queryExecutor.ExecuteNonQueryAsync(cql, parameters);
+                foreach (var (cql, parameters) in statements)
+                    await _queryExecutor.ExecuteNonQueryAsync(cql, parameters, idempotent: true, ct);
+
                 count++;
             }
+
             return count;
-        }
-
-        private (string? cql, object[] parameters) GenerateCql(TrackedEntity tracked)
-        {
-            var builder = _getBuilder(tracked.EntityType);
-
-            return tracked.State switch
-            {
-                EntityState.Added => _cqlGenerator.GenerateInsert(tracked.Entity, builder),
-                EntityState.Modified => _cqlGenerator.GenerateUpdate(tracked.Entity, builder),
-                EntityState.Deleted => _cqlGenerator.GenerateDelete(tracked.Entity, builder),
-                _ => (null, Array.Empty<object>())
-            };
         }
     }
 }

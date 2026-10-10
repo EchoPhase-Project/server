@@ -5,8 +5,15 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace EchoPhase.Security.Authorization.Attributes
 {
+    /// <summary>
+    /// Requires the token's effective permissions (role ceiling, narrowed for
+    /// API clients) to include the given actions on a resource.
+    /// </summary>
     public class RequirePermissionAttribute : AuthorizeAttribute
     {
+        public RequirePermissionAttribute(string resource, params string[] permissions)
+            : base(BuildPolicyName([resource], permissions)) { }
+
         public RequirePermissionAttribute(string[] resources, string[] permissions)
             : base(BuildPolicyName(resources, permissions)) { }
 

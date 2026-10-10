@@ -3,7 +3,6 @@
 
 namespace EchoPhase.Clients.Twitch
 {
-    using System.Net.Http.Headers;
     using System.Text.Json;
     using EchoPhase.Clients.Abstractions;
     using EchoPhase.Clients.Twitch.Models;
@@ -17,9 +16,13 @@ namespace EchoPhase.Clients.Twitch
         {
         }
 
+        private static ApiError ToApiError(TwitchApiError? err) =>
+            new(err?.Status ?? 0, err?.Message);
+
         /// <summary>
-        /// Sends a Twitch API request authenticated with a Bearer token and
-        /// returns a paged result.  The Twitch response envelope wraps data
+        /// Sends a Twitch API request on behalf of <paramref name="connection"/>
+        /// and returns a paged result. The Bearer token and <c>Client-Id</c> are
+        /// applied by the connection authentication handler.  The Twitch response envelope wraps data
         /// inside a <c>data</c> array plus a <c>pagination</c> cursor object.
         /// </summary>
         protected Task<PagedResult<IEnumerable<TR>>> SendAsync<TQ, TB, TR>(
@@ -27,16 +30,14 @@ namespace EchoPhase.Clients.Twitch
             HttpMethod method,
             TQ? query,
             TB? body,
-            string bearerToken,
+            ConnectionRef connection,
             CancellationToken ct = default)
             where TQ : class
             where TB : class
             where TR : class
         {
-            var auth = new AuthenticationHeaderValue("Bearer", bearerToken);
-
             return SendPagedAsync<TQ, TB, TwitchApiResponseDto<TR>, IEnumerable<TR>>(
-                uri, method, query, body, auth,
+                uri, method, query, body, null,
                 selectData: wrapper => wrapper.Data ?? Enumerable.Empty<TR>(),
                 selectPage: wrapper => wrapper.Pagination is null
                     ? null
@@ -48,9 +49,10 @@ namespace EchoPhase.Clients.Twitch
 
                     return err is null
                         ? null
-                        : new ApiError(0, err.Message);
+                        : ToApiError(err);
                 },
-                ct);
+                ct,
+                connection);
         }
 
         /// <summary>
@@ -62,22 +64,20 @@ namespace EchoPhase.Clients.Twitch
             HttpMethod method,
             TQ? query,
             TB? body,
-            string bearerToken,
+            ConnectionRef connection,
             CancellationToken ct = default)
             where TQ : class
             where TB : class
             where TR : class
         {
-            var auth = new AuthenticationHeaderValue("Bearer", bearerToken);
-
             return SendRawAsync<TQ, TB, TR, TwitchApiError>(
-                uri, method, query, body, auth,
+                uri, method, query, body, null,
                 readError: (stream, token) =>
                     JsonSerializer.DeserializeAsync<TwitchApiError>(
                         stream, JsonOptions, token).AsTask(),
-                toApiError: err =>
-                    new ApiError(0, err?.Message),
-                ct);
+                toApiError: ToApiError,
+                ct,
+                connection);
         }
     }
 }

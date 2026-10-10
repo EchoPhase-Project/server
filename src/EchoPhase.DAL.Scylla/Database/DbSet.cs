@@ -3,10 +3,10 @@
 
 using System.Collections;
 using System.Linq.Expressions;
-using System.Reflection;
 using Cassandra;
 using EchoPhase.DAL.Scylla.Interfaces;
 using EchoPhase.DAL.Scylla.Linq;
+using EchoPhase.DAL.Scylla.Models;
 
 namespace EchoPhase.DAL.Scylla.Database
 {
@@ -49,12 +49,12 @@ namespace EchoPhase.DAL.Scylla.Database
 
         #region CRUD Operations
 
-        public void Add(TEntity entity)
+        public void Add(TEntity entity, WriteOptions? options = null)
         {
             if (entity == null)
                 throw new ArgumentNullException(nameof(entity));
 
-            _database.Insert(entity);
+            _database.Insert(entity, options);
         }
 
         public void AddRange(IEnumerable<TEntity> entities)
@@ -73,12 +73,16 @@ namespace EchoPhase.DAL.Scylla.Database
             AddRange((IEnumerable<TEntity>)entities);
         }
 
-        public void Update(TEntity entity)
+        /// <summary>
+        /// Writes every non-null property. Null properties are left unchanged in
+        /// the database; use <see cref="ClearColumns"/> to delete stored values.
+        /// </summary>
+        public void Update(TEntity entity, WriteOptions? options = null)
         {
             if (entity == null)
                 throw new ArgumentNullException(nameof(entity));
 
-            _database.Update(entity);
+            _database.Update(entity, options);
         }
 
         public void UpdateRange(IEnumerable<TEntity> entities)
@@ -97,12 +101,13 @@ namespace EchoPhase.DAL.Scylla.Database
             UpdateRange((IEnumerable<TEntity>)entities);
         }
 
-        public void Remove(TEntity entity)
+        /// <param name="options">Only <see cref="WriteOptions.Timestamp"/> applies to deletes.</param>
+        public void Remove(TEntity entity, WriteOptions? options = null)
         {
             if (entity == null)
                 throw new ArgumentNullException(nameof(entity));
 
-            _database.Delete(entity);
+            _database.Delete(entity, options);
         }
 
         public void RemoveRange(IEnumerable<TEntity> entities)
@@ -121,16 +126,40 @@ namespace EchoPhase.DAL.Scylla.Database
             RemoveRange((IEnumerable<TEntity>)entities);
         }
 
+        /// <summary>
+        /// Deletes the stored values of the given columns on the next save
+        /// (<c>DELETE col, ... FROM ... WHERE key</c>).
+        /// </summary>
+        public void ClearColumns(TEntity entity, params Expression<Func<TEntity, object?>>[] columns)
+            => _database.ClearColumns(entity, columns);
+
         #endregion
 
         #region Query Methods
 
         public TEntity? Find(params object[] keyValues)
         {
+            var (cql, parameters) = BuildFind(keyValues);
+            return _database.Executor.Execute(cql, MapRowToEntity, parameters, idempotent: true).FirstOrDefault();
+        }
+
+        public Task<TEntity?> FindAsync(params object[] keyValues)
+            => FindAsync(keyValues, CancellationToken.None);
+
+        public async Task<TEntity?> FindAsync(object[] keyValues, CancellationToken ct)
+        {
+            var (cql, parameters) = BuildFind(keyValues);
+            var results = await _database.Executor.ExecuteAsync(cql, MapRowToEntity, parameters, idempotent: true, ct);
+            return results.FirstOrDefault();
+        }
+
+        private (string cql, object[] parameters) BuildFind(object[] keyValues)
+        {
             if (keyValues == null || keyValues.Length == 0)
                 throw new ArgumentException("Key values must be provided", nameof(keyValues));
 
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
+            var builder = Builder;
+
             var pkNames = builder.GetPrimaryKey();
             if (pkNames == null || pkNames.Count == 0)
                 throw new InvalidOperationException($"No primary key defined for type {typeof(TEntity).Name}");
@@ -142,139 +171,44 @@ namespace EchoPhase.DAL.Scylla.Database
             var whereClause = string.Join(" AND ",
                 pkNames.Select(pk => $"{builder.GetColumn(pk)} = ?"));
 
-            var cql = $"SELECT * FROM {builder.GetTableName()} WHERE {whereClause} LIMIT 1";
-
-            var results = _database.ExecuteQuery<TEntity>(cql,
-                row => MapRowToEntity(row),
-                keyValues);
-
-            return results.FirstOrDefault();
+            return ($"SELECT * FROM {builder.GetFullTableName()} WHERE {whereClause} LIMIT 1", keyValues);
         }
 
-        public async Task<TEntity?> FindAsync(params object[] keyValues)
-        {
-            if (keyValues == null || keyValues.Length == 0)
-                throw new ArgumentException("Key values must be provided", nameof(keyValues));
+        // The methods below go through the same LINQ provider as any query, so a
+        // DbSet and a filtered query behave the same; they exist for discoverability.
 
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-            var pkNames = builder.GetPrimaryKey();
-            if (pkNames == null || pkNames.Count == 0)
-                throw new InvalidOperationException($"No primary key defined for type {typeof(TEntity).Name}");
+        public List<TEntity> ToList() => Enumerable.ToList(this);
 
-            if (pkNames.Count != keyValues.Length)
-                throw new InvalidOperationException(
-                    $"Expected {pkNames.Count} key values, but got {keyValues.Length}");
+        public Task<List<TEntity>> ToListAsync(CancellationToken ct = default)
+            => ScyllaQueryableExtensions.ToListAsync(this, ct);
 
-            var whereClause = string.Join(" AND ",
-                pkNames.Select(pk => $"{builder.GetColumn(pk)} = ?"));
+        public TEntity? FirstOrDefault() => Queryable.FirstOrDefault(this);
 
-            var cql = $"SELECT * FROM {builder.GetTableName()} WHERE {whereClause} LIMIT 1";
+        public Task<TEntity?> FirstOrDefaultAsync(CancellationToken ct = default)
+            => ScyllaQueryableExtensions.FirstOrDefaultAsync(this, ct);
 
-            var results = await _database.ExecuteQueryAsync<TEntity>(cql,
-                row => MapRowToEntity(row),
-                keyValues);
+        public long Count() => Queryable.LongCount(this);
 
-            return results.FirstOrDefault();
-        }
+        public Task<long> CountAsync(CancellationToken ct = default)
+            => ScyllaQueryableExtensions.LongCountAsync(this, ct);
 
-        public List<TEntity> ToList()
-        {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-            var cql = $"SELECT * FROM {builder.GetTableName()}";
-            return _database.ExecuteQuery<TEntity>(cql, row => MapRowToEntity(row)).ToList();
-        }
+        public bool Any() => Queryable.Any(this);
 
-        public async Task<List<TEntity>> ToListAsync()
-        {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-            var cql = $"SELECT * FROM {builder.GetTableName()}";
-            var results = await _database.ExecuteQueryAsync<TEntity>(cql, row => MapRowToEntity(row));
-            return results.ToList();
-        }
-
-        public TEntity? FirstOrDefault()
-        {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-            var cql = $"SELECT * FROM {builder.GetTableName()} LIMIT 1";
-            return _database.ExecuteQuery<TEntity>(cql, row => MapRowToEntity(row)).FirstOrDefault();
-        }
-
-        public async Task<TEntity?> FirstOrDefaultAsync()
-        {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-            var cql = $"SELECT * FROM {builder.GetTableName()} LIMIT 1";
-            var results = await _database.ExecuteQueryAsync<TEntity>(cql, row => MapRowToEntity(row));
-            return results.FirstOrDefault();
-        }
-
-        public long Count()
-        {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-            var cql = $"SELECT COUNT(*) FROM {builder.GetTableName()}";
-            return _database.ExecuteScalar<long>(cql);
-        }
-
-        public async Task<long> CountAsync()
-        {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-            var cql = $"SELECT COUNT(*) FROM {builder.GetTableName()}";
-            return await _database.ExecuteScalarAsync<long>(cql);
-        }
-
-        public bool Any()
-        {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-            var cql = $"SELECT * FROM {builder.GetTableName()} LIMIT 1";
-            return _database.ExecuteQuery(cql).Any();
-        }
-
-        public async Task<bool> AnyAsync()
-        {
-            var builder = _database.ModelBuilder.GetBuilder<TEntity>() ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
-            var cql = $"SELECT * FROM {builder.GetTableName()} LIMIT 1";
-            var results = await _database.ExecuteQueryAsync(cql);
-            return results.Any();
-        }
+        public Task<bool> AnyAsync(CancellationToken ct = default)
+            => ScyllaQueryableExtensions.AnyAsync(this, ct);
 
         #endregion
 
         #region Helper Methods
 
+        private IEntityBuilder Builder =>
+            _database.ModelBuilder.GetBuilder<TEntity>()
+            ?? throw new InvalidOperationException($"No model builder found for type {typeof(TEntity).Name}");
+
         private TEntity MapRowToEntity(Row row)
         {
-            var entity = new TEntity();
-            var type = typeof(TEntity);
-            var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                                .Where(p => p.CanWrite);
-
             var builder = _database.ModelBuilder.GetBuilder<TEntity>();
-            if (builder == null)
-                return entity;
-
-            foreach (var prop in properties)
-            {
-                try
-                {
-                    var columnName = builder.GetColumn(prop.Name);
-                    if (string.IsNullOrEmpty(columnName))
-                        continue;
-
-                    var columnInfo = row.GetColumn(columnName);
-                    if (columnInfo != null)
-                    {
-                        var value = row.GetValue(prop.PropertyType, columnName);
-                        if (value != null && value != DBNull.Value)
-                        {
-                            prop.SetValue(entity, value);
-                        }
-                    }
-                }
-                catch
-                {
-                }
-            }
-
-            return entity;
+            return builder == null ? new TEntity() : EntityMapper.Map<TEntity>(row, builder);
         }
 
         #endregion
@@ -283,13 +217,14 @@ namespace EchoPhase.DAL.Scylla.Database
 
         public IEnumerable<TEntity> FromSql(string cql, params object[] parameters)
         {
-            return _database.ExecuteQuery<TEntity>(cql, row => MapRowToEntity(row), parameters);
+            return _database.ExecuteQuery<TEntity>(cql, MapRowToEntity, parameters);
         }
 
-        public async Task<IEnumerable<TEntity>> FromSqlAsync(string cql, params object[] parameters)
-        {
-            return await _database.ExecuteQueryAsync<TEntity>(cql, row => MapRowToEntity(row), parameters);
-        }
+        public Task<IEnumerable<TEntity>> FromSqlAsync(string cql, params object[] parameters)
+            => FromSqlAsync(cql, parameters, CancellationToken.None);
+
+        public Task<IEnumerable<TEntity>> FromSqlAsync(string cql, object[] parameters, CancellationToken ct)
+            => _database.ExecuteQueryAsync<TEntity>(cql, MapRowToEntity, parameters, ct);
 
         #endregion
     }

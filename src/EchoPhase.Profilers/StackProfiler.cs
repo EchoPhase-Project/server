@@ -1,177 +1,79 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Runtime.CompilerServices;
 using System.Text;
 using EchoPhase.Profilers.Models;
+using Microsoft.Extensions.Logging;
 
 namespace EchoPhase.Profilers
 {
-    public class StackProfiler : IProfiler
+    /// <summary>
+    /// A tree of steps by caller. The current step is tracked per async flow
+    /// (AsyncLocal), so steps of concurrent tasks in one scope nest under
+    /// their own callers instead of corrupting a shared stack.
+    /// </summary>
+    public class StackProfiler : ProfilerBase
     {
-        private readonly object _lock = new();
-        private readonly List<ProfileNode> _stackRoots = new();
-        private readonly Stack<ProfileNode> _stack = new();
+        private readonly ProfileNode _root = new("", parent: null);
+        private readonly AsyncLocal<ProfileNode?> _current = new();
 
-        public bool IsEnabled { get; private set; } = true;
-
-        public void Enable()
+        public StackProfiler(bool enabled = true, ILogger<StackProfiler>? logger = null)
+            : base(enabled, logger)
         {
-            Clear();
-            IsEnabled = true;
         }
 
-        public void Disable() => IsEnabled = false;
-
-        public void Clear()
+        public override void Clear()
         {
-            lock (_lock)
-            {
-                _stack.Clear();
-                _stackRoots.Clear();
-            }
+            _root.ClearChildren();
+            _current.Value = null;
         }
 
-        private ProfileNode FindOrCreateNode(string baseName, List<ProfileNode> siblings, Stack<ProfileNode> currentStack)
+        protected override IDisposable Begin(string name)
         {
-            var uniqueName = baseName;
-            int suffix = 1;
+            var parent = _current.Value ?? _root;
+            var node = parent.GetOrAddChild(UniqueInChain(name, parent));
+            _current.Value = node;
 
-            while (currentStack.Any(n => n.Name == uniqueName))
-            {
-                uniqueName = $"{baseName}#{suffix++}";
-            }
-
-            var existing = siblings.FirstOrDefault(n => n.Name == uniqueName);
-            if (existing != null)
-                return existing;
-
-            var newNode = new ProfileNode(uniqueName);
-            siblings.Add(newNode);
-            return newNode;
+            // Restoring the parent (not popping) keeps each async flow's
+            // position its own: ExecutionContext gives every flow a copy.
+            return new StepTimer(node, () => _current.Value = node.Parent == _root ? null : node.Parent);
         }
 
-        public IDisposable Step([CallerMemberName] string memberName = "")
+        // A recursive step gets its own level: name, name#1, name#2...
+        private static string UniqueInChain(string name, ProfileNode parent)
         {
-            if (!IsEnabled)
-                return DisposableEmpty.Instance;
-
-            ProfileNode node;
-
-            lock (_lock)
-            {
-                if (_stack.Count == 0)
-                {
-                    node = FindOrCreateNode(memberName, _stackRoots, _stack);
-                }
-                else
-                {
-                    var parent = _stack.Peek();
-                    node = FindOrCreateNode(memberName, parent.Children, _stack);
-                }
-
-                _stack.Push(node);
-            }
-
-            return new StepTimer(node, () =>
-            {
-                lock (_lock)
-                {
-                    if (_stack.Count == 0 || _stack.Peek() != node)
-                        throw new InvalidOperationException("Profiler stack corrupted");
-                    _stack.Pop();
-                }
-            });
+            var unique = name;
+            for (int suffix = 1; InChain(unique, parent); suffix++)
+                unique = $"{name}#{suffix}";
+            return unique;
         }
 
-        public void Step(Action action, [CallerMemberName] string memberName = "")
+        private static bool InChain(string name, ProfileNode? node)
         {
-            using (Step(memberName))
-            {
-                action();
-            }
+            for (; node is not null; node = node.Parent)
+                if (node.Name == name)
+                    return true;
+            return false;
         }
 
-        public T Step<T>(Func<T> action, [CallerMemberName] string memberName = "")
+        protected override void DumpTo(StringBuilder sb)
         {
-            using (Step(memberName))
-            {
-                return action();
-            }
+            var roots = _root.SnapshotChildren();
+            for (int i = 0; i < roots.Count; i++)
+                DumpTree(sb, roots[i], prefix: "", isRoot: true, isLast: i == roots.Count - 1);
         }
 
-        public async Task StepAsync(Func<Task> func, [CallerMemberName] string memberName = "")
+        private static void DumpTree(StringBuilder sb, ProfileNode node, string prefix, bool isRoot, bool isLast)
         {
-            if (!IsEnabled)
-            {
-                await func();
-                return;
-            }
+            sb.Append(prefix);
+            if (!isRoot)
+                sb.Append(isLast ? "└─" : "├─");
+            AppendStats(sb, node);
 
-            using (Step(memberName))
-            {
-                await func();
-            }
-        }
-
-        public async Task<T> StepAsync<T>(Func<Task<T>> func, [CallerMemberName] string memberName = "")
-        {
-            if (!IsEnabled)
-                return await func();
-
-            using (Step(memberName))
-            {
-                return await func();
-            }
-        }
-
-        public string Dump()
-        {
-            var sb = new StringBuilder();
-            lock (_lock)
-            {
-                foreach (var root in _stackRoots)
-                    DumpTree(sb, root, level: 0, isLasts: new List<bool>());
-            }
-            return sb.ToString();
-        }
-
-        private void DumpTree(StringBuilder sb, ProfileNode node, int level, List<bool> isLasts)
-        {
-            for (int i = 0; i < level; i++)
-            {
-                if (i == level - 1)
-                {
-                    sb.Append(isLasts[i] ? "└─" : "├─");
-                }
-                else
-                {
-                    sb.Append(isLasts[i] ? "  " : "│ ");
-                }
-            }
-
-            sb.AppendLine($"{node.Name}: count={node.Count}, avg={node.AverageMs:F3} ms, min={node.MinMs:F3} ms, max={node.MaxMs:F3} ms, total={node.TotalMs:F3} ms, memoryChange={FormatBytes(node.TotalMemoryChangeBytes)}");
-
-            for (int i = 0; i < node.Children.Count; i++)
-            {
-                bool isLast = (i == node.Children.Count - 1);
-                var newIsLasts = new List<bool>(isLasts) { isLast };
-                DumpTree(sb, node.Children[i], level + 1, newIsLasts);
-            }
-        }
-
-        private static string FormatBytes(long bytes)
-        {
-            if (bytes == 0) return "0 B";
-            string[] sizes = { "B", "KB", "MB", "GB" };
-            int order = 0;
-            double len = bytes;
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len /= 1024;
-            }
-            return $"{len:F2} {sizes[order]}";
+            var childPrefix = isRoot ? "" : prefix + (isLast ? "  " : "│ ");
+            var children = node.SnapshotChildren();
+            for (int i = 0; i < children.Count; i++)
+                DumpTree(sb, children[i], childPrefix, isRoot: false, isLast: i == children.Count - 1);
         }
     }
 }

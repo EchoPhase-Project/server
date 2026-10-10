@@ -47,7 +47,11 @@ namespace EchoPhase.DAL.Postgres.Models
 
         public string Name { get; set; } = string.Empty;
 
-        public string Intents { get; set; } = string.Empty;
+        /// <summary>
+        /// Intent names (not a bitmask): stable when intents are added, and
+        /// filterable in SQL. Stored as <c>text[]</c> with a GIN index.
+        /// </summary>
+        public List<string> Intents { get; set; } = [];
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

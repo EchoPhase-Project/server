@@ -10,6 +10,7 @@ namespace EchoPhase.Security.Cryptography.Extensions
     {
         public static IServiceCollection AddCryptography(this IServiceCollection services)
         {
+            services.AddSingleton<KeyRing>();
             services.AddSingleton<AesGcm>();
             services.AddSingleton<ICrypto25519, Crypto25519>();
             services.AddTransient<IKeyVault, KeyVault>();

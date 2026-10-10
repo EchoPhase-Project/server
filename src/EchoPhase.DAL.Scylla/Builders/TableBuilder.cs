@@ -1,11 +1,14 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Globalization;
+using EchoPhase.DAL.Scylla.Cql;
+
 namespace EchoPhase.DAL.Scylla.Builders
 {
     public class TableBuilder
     {
-        private readonly string _name;
+        private string _name;
         private string? _keyspace;
         private readonly bool _ifNotExists;
         private readonly List<string> _columns = new();
@@ -27,69 +30,102 @@ namespace EchoPhase.DAL.Scylla.Builders
             return this;
         }
 
-        public TableBuilder Column(string name, string type, bool nullable = true)
+        /// <summary>
+        /// Sets the table name, for <c>MigrationBuilder.CreateTable(Action)</c>
+        /// where it is not passed up front.
+        /// </summary>
+        public TableBuilder Named(string name)
         {
-            var nullStr = nullable ? "" : " NOT NULL";
-            _columns.Add($"{name} {type}{nullStr}");
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Table name cannot be empty.", nameof(name));
+
+            _name = name;
             return this;
         }
 
-        public TableBuilder Column<T>(string name, string type, bool nullable = true)
+        // CQL has no NOT NULL constraint: only primary key columns are implicitly non-null.
+        public TableBuilder Column(string name, string type)
         {
-            return Column(name, type, nullable);
+            _columns.Add($"{name} {type}");
+            return this;
         }
+
+        /// <summary>Column whose CQL type is derived from <typeparamref name="T"/>.</summary>
+        public TableBuilder Column<T>(string name)
+            => Column(name, Schema.CqlTypeMap.For(typeof(T)));
 
         // Типизированные методы для распространенных типов
-        public TableBuilder Int(string name, bool nullable = true)
-            => Column(name, "int", nullable);
+        public TableBuilder Int(string name)
+            => Column(name, "int");
 
-        public TableBuilder BigInt(string name, bool nullable = true)
-            => Column(name, "bigint", nullable);
+        public TableBuilder BigInt(string name)
+            => Column(name, "bigint");
 
-        public TableBuilder Text(string name, bool nullable = true)
-            => Column(name, "text", nullable);
+        public TableBuilder Text(string name)
+            => Column(name, "text");
 
-        public TableBuilder Varchar(string name, int? maxLength = null, bool nullable = true)
-        {
-            var type = maxLength.HasValue ? $"varchar({maxLength})" : "varchar";
-            return Column(name, type, nullable);
-        }
+        public TableBuilder Varchar(string name)
+            => Column(name, "varchar");
 
-        public TableBuilder Uuid(string name, bool nullable = true)
-            => Column(name, "uuid", nullable);
+        public TableBuilder Uuid(string name)
+            => Column(name, "uuid");
 
-        public TableBuilder TimeUuid(string name, bool nullable = true)
-            => Column(name, "timeuuid", nullable);
+        public TableBuilder TimeUuid(string name)
+            => Column(name, "timeuuid");
 
-        public TableBuilder Timestamp(string name, bool nullable = true)
-            => Column(name, "timestamp", nullable);
+        public TableBuilder Timestamp(string name)
+            => Column(name, "timestamp");
 
-        public TableBuilder Boolean(string name, bool nullable = true)
-            => Column(name, "boolean", nullable);
+        public TableBuilder Boolean(string name)
+            => Column(name, "boolean");
 
-        public TableBuilder Decimal(string name, bool nullable = true)
-            => Column(name, "decimal", nullable);
+        public TableBuilder Decimal(string name)
+            => Column(name, "decimal");
 
-        public TableBuilder Double(string name, bool nullable = true)
-            => Column(name, "double", nullable);
+        public TableBuilder Double(string name)
+            => Column(name, "double");
 
-        public TableBuilder Float(string name, bool nullable = true)
-            => Column(name, "float", nullable);
+        public TableBuilder Float(string name)
+            => Column(name, "float");
 
-        public TableBuilder Blob(string name, bool nullable = true)
-            => Column(name, "blob", nullable);
+        public TableBuilder Blob(string name)
+            => Column(name, "blob");
 
-        public TableBuilder List(string name, string elementType, bool nullable = true)
-            => Column(name, $"list<{elementType}>", nullable);
+        public TableBuilder SmallInt(string name)
+            => Column(name, "smallint");
 
-        public TableBuilder Set(string name, string elementType, bool nullable = true)
-            => Column(name, $"set<{elementType}>", nullable);
+        public TableBuilder TinyInt(string name)
+            => Column(name, "tinyint");
 
-        public TableBuilder Map(string name, string keyType, string valueType, bool nullable = true)
-            => Column(name, $"map<{keyType}, {valueType}>", nullable);
+        public TableBuilder VarInt(string name)
+            => Column(name, "varint");
 
-        public TableBuilder Frozen(string name, string type, bool nullable = true)
-            => Column(name, $"frozen<{type}>", nullable);
+        public TableBuilder Counter(string name)
+            => Column(name, "counter");
+
+        public TableBuilder Inet(string name)
+            => Column(name, "inet");
+
+        public TableBuilder Date(string name)
+            => Column(name, "date");
+
+        public TableBuilder Time(string name)
+            => Column(name, "time");
+
+        public TableBuilder Duration(string name)
+            => Column(name, "duration");
+
+        public TableBuilder List(string name, string elementType)
+            => Column(name, $"list<{elementType}>");
+
+        public TableBuilder Set(string name, string elementType)
+            => Column(name, $"set<{elementType}>");
+
+        public TableBuilder Map(string name, string keyType, string valueType)
+            => Column(name, $"map<{keyType}, {valueType}>");
+
+        public TableBuilder Frozen(string name, string type)
+            => Column(name, $"frozen<{type}>");
 
         // Primary Key методы
         public TableBuilder PrimaryKey(params string[] columns)
@@ -143,19 +179,13 @@ namespace EchoPhase.DAL.Scylla.Builders
         // Table Options
         public TableBuilder WithCompression(string compressionClass, params (string key, string value)[] options)
         {
-            var opts = options.Length > 0
-                ? ", " + string.Join(", ", options.Select(o => $"'{o.key}': '{o.value}'"))
-                : "";
-            _options["compression"] = $"{{'class': '{compressionClass}'{opts}}}";
+            _options["compression"] = CqlLiteral.Options("sstable_compression", compressionClass, options);
             return this;
         }
 
         public TableBuilder WithCompaction(string compactionClass, params (string key, string value)[] options)
         {
-            var opts = options.Length > 0
-                ? ", " + string.Join(", ", options.Select(o => $"'{o.key}': '{o.value}'"))
-                : "";
-            _options["compaction"] = $"{{'class': '{compactionClass}'{opts}}}";
+            _options["compaction"] = CqlLiteral.Options("class", compactionClass, options);
             return this;
         }
 
@@ -167,7 +197,7 @@ namespace EchoPhase.DAL.Scylla.Builders
 
         public TableBuilder WithBloomFilterFpChance(double chance)
         {
-            _options["bloom_filter_fp_chance"] = chance.ToString("F2");
+            _options["bloom_filter_fp_chance"] = chance.ToString(CultureInfo.InvariantCulture);
             return this;
         }
 
@@ -179,13 +209,13 @@ namespace EchoPhase.DAL.Scylla.Builders
 
         public TableBuilder WithCaching(string keys, string rowsPerPartition)
         {
-            _options["caching"] = $"{{'keys': '{keys}', 'rows_per_partition': '{rowsPerPartition}'}}";
+            _options["caching"] = $"{{'keys': {CqlLiteral.Quote(keys)}, 'rows_per_partition': {CqlLiteral.Quote(rowsPerPartition)}}}";
             return this;
         }
 
         public TableBuilder WithComment(string comment)
         {
-            _options["comment"] = $"'{comment}'";
+            _options["comment"] = CqlLiteral.Quote(comment);
             return this;
         }
 
@@ -193,6 +223,9 @@ namespace EchoPhase.DAL.Scylla.Builders
         {
             if (string.IsNullOrEmpty(_keyspace))
                 throw new InvalidOperationException("Keyspace must be specified for the table");
+
+            if (string.IsNullOrWhiteSpace(_name))
+                throw new InvalidOperationException("Table name must be specified (pass it to CreateTable or call Named)");
 
             var ifNotExistsClause = _ifNotExists ? "IF NOT EXISTS " : "";
             var cols = string.Join(",\n    ", _columns);

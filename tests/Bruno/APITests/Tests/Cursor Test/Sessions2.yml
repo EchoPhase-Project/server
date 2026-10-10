@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/auth/refresh/sessions?limit=1&after={{after}}"
+  url: "{{baseUrl}}/sessions?limit=1&after={{after}}"
   params:
     - name: limit
       value: "1"
@@ -13,9 +13,6 @@ http:
     - name: after
       value: "{{after}}"
       type: query
-  body:
-    type: json
-    data: ""
   auth: inherit
 
 runtime:
@@ -27,6 +24,14 @@ runtime:
         method: jsonq
       variable:
         name: after
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body["Data"][0]["Id"]
+        method: jsonq
+      variable:
+        name: SessionId2
         scope: runtime
 
 settings:

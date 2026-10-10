@@ -17,11 +17,18 @@ namespace EchoPhase.DAL.Postgres
         public PostgresContext(DbContextOptions<PostgresContext> options) : base(options) { }
 
         public override DbSet<User> Users { get; set; } = default!;
-        public DbSet<ExternalToken> ExternalTokens { get; set; } = default!;
-        public DbSet<RefreshToken> RefreshTokens { get; set; } = default!;
+        public DbSet<Connection> Connections { get; set; } = default!;
+        public DbSet<OAuthApp> OAuthApps { get; set; } = default!;
+        public DbSet<Session> Sessions { get; set; } = default!;
+        public DbSet<ApiClient> ApiClients { get; set; } = default!;
+        public DbSet<Impersonation> Impersonations { get; set; } = default!;
+        public DbSet<ApiClientPermissionEntry> ApiClientPermissionEntries { get; set; } = default!;
         public DbSet<WebHook> WebHooks { get; set; } = default!;
-        public DbSet<RefreshTokenAudit> RefreshTokenAudits { get; set; } = default!;
-        public DbSet<RefreshTokenPermissionEntry> RefreshTokenPermissionEntries { get; set; } = default!;
+        public DbSet<SessionAudit> SessionAudits { get; set; } = default!;
+        public DbSet<UserPermissionGrant> UserPermissionGrants { get; set; } = default!;
+        public DbSet<Workflow> Workflows { get; set; } = default!;
+        public DbSet<WorkflowSchedule> WorkflowSchedules { get; set; } = default!;
+        public DbSet<WorkflowVersion> WorkflowVersions { get; set; } = default!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

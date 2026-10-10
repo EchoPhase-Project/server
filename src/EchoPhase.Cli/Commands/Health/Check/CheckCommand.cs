@@ -9,7 +9,7 @@ namespace EchoPhase.Cli.Commands.Health.Check
         {
         }
 
-        protected override async Task<int> ExecuteAsync(CommandContext context, CheckSettings settings, CancellationToken cancellationToken)
+        public override async Task<int> ExecuteAsync(CommandContext context, CheckSettings settings, CancellationToken cancellationToken)
         {
             var url = "http://localhost:8080/health/live";
 
@@ -20,7 +20,7 @@ namespace EchoPhase.Cli.Commands.Health.Check
                     Timeout = TimeSpan.FromSeconds(2)
                 };
 
-                using var response = await client.GetAsync(url);
+                using var response = await client.GetAsync(url, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {

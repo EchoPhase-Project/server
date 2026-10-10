@@ -28,11 +28,11 @@ namespace EchoPhase.Security.Authentication
             _logger = logger;
         }
 
-        public async Task<IServiceResult> LoginAsync(string username, string password)
+        public async Task<IServiceResult> LoginAsync(string username, string password, CancellationToken ct = default)
         {
             try
             {
-                await _signInManager.LoginAsync(username, password, ResolveDeviceId());
+                await _signInManager.LoginAsync(username, password, ResolveDeviceId(), ct);
                 _antiforgery.Set();
                 return ServiceResult.Success();
             }
@@ -42,16 +42,16 @@ namespace EchoPhase.Security.Authentication
             }
         }
 
-        public async Task<IServiceResult> LogoutAsync(Guid userId)
+        public async Task<IServiceResult> LogoutAsync(Guid userId, CancellationToken ct = default)
         {
             try
             {
                 var context = _httpContext.HttpContext!;
 
-                if (context.Request.Cookies.TryGetValue(CookieNames.RefreshId, out var raw)
-                    && Guid.TryParse(raw, out var tokenId))
+                if (context.Request.Cookies.TryGetValue(CookieNames.RefreshToken, out var refreshToken)
+                    && !string.IsNullOrEmpty(refreshToken))
                 {
-                    await _signInManager.LogoutAsync(userId, tokenId);
+                    await _signInManager.LogoutAsync(userId, refreshToken, ct);
                 }
 
                 _antiforgery.Remove();
@@ -63,11 +63,11 @@ namespace EchoPhase.Security.Authentication
             }
         }
 
-        public async Task<IServiceResult> LogoutAllAsync(Guid userId)
+        public async Task<IServiceResult> LogoutAllAsync(Guid userId, CancellationToken ct = default)
         {
             try
             {
-                await _signInManager.LogoutAllAsync(userId);
+                await _signInManager.LogoutAllAsync(userId, ct);
                 _antiforgery.Remove();
                 return ServiceResult.Success();
             }
@@ -77,11 +77,11 @@ namespace EchoPhase.Security.Authentication
             }
         }
 
-        public async Task<IServiceResult> RevokeSessionAsync(Guid userId, Guid tokenId)
+        public async Task<IServiceResult> RevokeSessionAsync(Guid userId, Guid sessionId, CancellationToken ct = default)
         {
             try
             {
-                await _signInManager.RevokeSessionAsync(userId, tokenId);
+                await _signInManager.RevokeSessionAsync(userId, sessionId, ct);
                 return ServiceResult.Success();
             }
             catch (Exception ex)

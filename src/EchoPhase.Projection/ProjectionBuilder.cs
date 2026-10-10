@@ -22,7 +22,7 @@ namespace EchoPhase.Projection
         /// Values implement <see cref="ICollectionConfig"/> so Projector can work
         /// with them without knowing the element type at compile time.
         /// </summary>
-        internal readonly Dictionary<string, ICollectionConfig> CollectionConfigs = new();
+        internal readonly Dictionary<string, ICollectionConfig> _collectionConfigs = new();
 
         internal ProjectionBuilder(T source, ProjectionOptions options)
         {
@@ -55,7 +55,7 @@ namespace EchoPhase.Projection
             _fields.Add(wrapped);
 
             // Store a typed CollectionConfig<TItem> — no object cast in Apply.
-            CollectionConfigs[name] = new CollectionConfig<TItem>(
+            _collectionConfigs[name] = new CollectionConfig<TItem>(
                 (projector, item) =>
                 {
                     var builder = new ProjectionBuilder<TItem>(item, projector._defaultOptions.Clone());
@@ -97,7 +97,7 @@ namespace EchoPhase.Projection
         public object? Build()
         {
             var projector = new Projector(_options);
-            return projector.Execute(_source, _options, _fields, CollectionConfigs);
+            return projector.Execute(_source, _options, _fields, _collectionConfigs);
         }
 
         /// <summary>Executes and returns <see cref="Dictionary{String, Object}"/>.</summary>

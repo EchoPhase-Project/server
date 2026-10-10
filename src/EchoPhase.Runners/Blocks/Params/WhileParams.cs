@@ -12,12 +12,6 @@ namespace EchoPhase.Runners.Blocks.Params
         [JsonPropertyName("condition")]
         public string Condition { get; set; } = string.Empty;
 
-        [JsonPropertyName("bodyNext")]
-        public IEnumerable<int> BodyNext { get; set; } = new HashSet<int>();
-
-        [JsonPropertyName("afterNext")]
-        public IEnumerable<int> AfterNext { get; set; } = new HashSet<int>();
-
         public IValidationResult Validate()
         {
             if (string.IsNullOrWhiteSpace(Condition))

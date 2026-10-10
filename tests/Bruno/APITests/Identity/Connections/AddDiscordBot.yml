@@ -1,0 +1,36 @@
+info:
+  name: AddDiscordBot
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/connections/discord/manual"
+  headers:
+    - name: X-CSRF-TOKEN
+      value: "{{X-CSRF-TOKEN}}"
+  body:
+    type: json
+    data: |-
+      {
+        "Name": "{{DiscordKeyName}}",
+        "AccessToken": "{{DiscordToken}}"
+      }
+  auth: inherit
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body["id"]
+        method: jsonq
+      variable:
+        name: ConnectionId
+        scope: runtime
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

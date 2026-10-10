@@ -3,59 +3,99 @@
 
 using System.Collections;
 using System.Net.WebSockets;
+using System.Security.Claims;
 using EchoPhase.Types.Attributes;
 using EchoPhase.Types.BitMask;
-using Microsoft.AspNetCore.Http;
 using UUIDNext;
 
 namespace EchoPhase.WebSockets
 {
-    public class WebSocketConnection : IDisposable
+    /// <summary>
+    /// One client socket. Sends go through <see cref="SendAsync"/>: replies,
+    /// events and broadcasts can come from different threads at once, and a
+    /// WebSocket allows one outstanding send.
+    /// </summary>
+    public sealed class WebSocketConnection : IDisposable
     {
+        private readonly SemaphoreSlim _sendLock = new(1, 1);
+        private long _lastSeen;
+        private int _closing;
+
+        public WebSocketConnection(Guid userId, WebSocket webSocket, ClaimsPrincipal user, long now)
+        {
+            UserId = userId;
+            WebSocket = webSocket;
+            User = user;
+            _lastSeen = now;
+        }
+
         public Guid Id { get; } = Uuid.NewSequential();
 
-        public WebSocket WebSocket { get; set; } = default!;
-        public HttpContext HttpContext { get; set; } = default!;
+        public Guid UserId { get; }
 
+        public WebSocket WebSocket { get; }
+
+        /// <summary>The principal of the token the socket was opened with; re-checked by the credential monitor.</summary>
+        public ClaimsPrincipal User { get; }
+
+        /// <summary>Which events it receives; replaced as a whole on handshake/adjust.</summary>
         [AlwaysMerge]
-        public BitArray Intents { get; set; } = BitMaskBase.Empty;
-
-        public CancellationTokenSource HeartbeatCancellationTokenSource { get; set; } = new();
-
-        private bool _disposed = false;
-
-        /// <summary>
-        /// Releases all resources used by the WebSocketConnection.
-        /// </summary>
-        public void Dispose()
+        public BitArray Intents
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
+            get => Volatile.Read(ref field);
+            set => Volatile.Write(ref field, value);
+        } = BitMaskBase.Empty;
 
-        /// <summary>
-        /// Releases the unmanaged and optionally managed resources.
-        /// </summary>
-        /// <param name="disposing">True to release managed resources.</param>
-        protected virtual void Dispose(bool disposing)
+        /// <summary>Timestamp (TimeProvider) of the last message from the client.</summary>
+        public long LastSeen => Interlocked.Read(ref _lastSeen);
+
+        public bool IsOpen => WebSocket.State == WebSocketState.Open && Volatile.Read(ref _closing) == 0;
+
+        public void Touch(long now) => Interlocked.Exchange(ref _lastSeen, now);
+
+        public async Task SendAsync(ReadOnlyMemory<byte> utf8Json, CancellationToken ct)
         {
-            if (_disposed) return;
-
-            if (disposing)
+            await _sendLock.WaitAsync(ct);
+            try
             {
-                // Dispose managed resources
-                HeartbeatCancellationTokenSource?.Cancel();
-                HeartbeatCancellationTokenSource?.Dispose();
-
-                if (WebSocket is not null && WebSocket.State != WebSocketState.Closed && WebSocket.State != WebSocketState.Aborted)
-                {
-                    try { WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disposed", CancellationToken.None).GetAwaiter().GetResult(); } catch { }
-                }
-
-                WebSocket?.Dispose();
+                if (IsOpen)
+                    await WebSocket.SendAsync(utf8Json, WebSocketMessageType.Text, endOfMessage: true, ct);
             }
-
-            _disposed = true;
+            finally
+            {
+                _sendLock.Release();
+            }
         }
+
+        /// <summary>
+        /// Starts the closing handshake once (later calls do nothing). Uses
+        /// CloseOutput: the receive loop owns reading and sees the client's reply.
+        /// </summary>
+        public async Task CloseAsync(WebSocketCloseStatus status, string description, TimeSpan timeout)
+        {
+            if (Interlocked.Exchange(ref _closing, 1) == 1)
+                return;
+
+            using var cts = new CancellationTokenSource(timeout);
+            try
+            {
+                await _sendLock.WaitAsync(cts.Token);
+                try
+                {
+                    if (WebSocket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                        await WebSocket.CloseOutputAsync(status, description, cts.Token);
+                }
+                finally
+                {
+                    _sendLock.Release();
+                }
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or WebSocketException or ObjectDisposedException)
+            {
+                WebSocket.Abort();
+            }
+        }
+
+        public void Dispose() => _sendLock.Dispose();
     }
 }

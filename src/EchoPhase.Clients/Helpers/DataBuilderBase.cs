@@ -6,7 +6,7 @@ namespace EchoPhase.Clients.Helpers
     public abstract class DataBuilderBase<TBuilder> : IDataBuilder<TBuilder>
         where TBuilder : DataBuilderBase<TBuilder>, new()
     {
-        protected IBuildOptions _options = new BuildOptions();
+        protected IBuildOptions Options = new BuildOptions();
 
         public DataBuilderBase()
         {
@@ -14,20 +14,20 @@ namespace EchoPhase.Clients.Helpers
 
         public TBuilder WithOptions(IBuildOptions options)
         {
-            _options = options;
+            Options = options;
             return (TBuilder)this;
         }
 
         public TBuilder WithOptions(Action<IBuildOptions> configure)
         {
-            configure(_options);
+            configure(Options);
             return (TBuilder)this;
         }
 
         public virtual TBuilder Clone()
         {
             return new TBuilder()
-                .WithOptions(_options);
+                .WithOptions(Options);
         }
 
         public abstract object Build(object? obj);

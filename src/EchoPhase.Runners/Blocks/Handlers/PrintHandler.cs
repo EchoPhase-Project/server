@@ -1,44 +1,19 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using EchoPhase.Profilers;
-using EchoPhase.Runners.Blocks.Contexts;
-using EchoPhase.Runners.Blocks.Models;
 using EchoPhase.Runners.Blocks.Params;
 using EchoPhase.Scripting;
-using EchoPhase.Scripting.Lexers;
-using EchoPhase.Scripting.Parsers;
-using EchoPhase.Scripting.Tokens;
-using EchoPhase.Types.Result.Extensions;
 
 namespace EchoPhase.Runners.Blocks.Handlers
 {
-    [BlockTypeHandler(BlockTypes.Print)]
+    [BlockType(BlockTypes.Print, Description = "Adds a line to the run's output; its output is the text.")]
     public class PrintHandler : BlockHandlerBase<PrintParams>
     {
-        private readonly IProfiler _profiler;
-        private readonly ILexer<TemplateToken> _lexer;
-        private readonly IParser<TemplateToken> _parser;
-
-        public PrintHandler(IProfiler profiler, ILexer<TemplateToken> lexer, IParser<TemplateToken> parser)
+        public override Task<BlockResult> ExecuteAsync(BlockCall call, PrintParams param)
         {
-            _profiler = profiler;
-            _lexer = lexer;
-            _parser = parser;
-        }
-
-        public override Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, PrintParams param)
-        {
-            var result = Eval.Process<string>(_lexer, _parser, param.Text, context.Variables);
-
-            if (!result.TryGetValue(out var output))
-                if (result.TryGetError(out var err))
-                    throw new InvalidOperationException(err.Message);
-                else
-                    throw new InvalidOperationException("Unknown error");
-
-            context.Output.Add(output);
-            return Task.FromResult(param.Next);
+            var output = Eval.TypedProcess<string>(param.Text, call.Scope);
+            call.Context.Output.Add(output);
+            return Task.FromResult(BlockResult.Main(output));
         }
     }
 }

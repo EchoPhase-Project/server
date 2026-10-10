@@ -5,41 +5,78 @@ using System.Diagnostics;
 
 namespace EchoPhase.Profilers.Models
 {
-    internal class ProfileNode
+    /// <summary>Timings of one step; safe to update from several threads.</summary>
+    public sealed class ProfileNode
     {
-        public string Name
-        {
-            get;
-        }
-        public List<ProfileNode> Children
-        {
-            get;
-        }
-
+        private readonly object _sync = new();
+        private readonly List<ProfileNode> _children = [];
         private long _totalTicks;
         private long _minTicks = long.MaxValue;
-        private long _maxTicks = long.MinValue;
+        private long _maxTicks;
+        private int _count;
+        private long _allocated;
 
-        public ProfileNode(string name)
+        public ProfileNode(string name, ProfileNode? parent)
         {
             Name = name;
-            Children = new List<ProfileNode>();
+            Parent = parent;
         }
 
-        public void AddMeasurement(long ticks, long memoryChange)
+        public string Name { get; }
+
+        public ProfileNode? Parent { get; }
+
+        public int Count { get { lock (_sync) return _count; } }
+
+        public double AverageMs { get { lock (_sync) return _count > 0 ? ToMs(_totalTicks) / _count : 0; } }
+
+        public double MinMs { get { lock (_sync) return _count > 0 ? ToMs(_minTicks) : 0; } }
+
+        public double MaxMs { get { lock (_sync) return ToMs(_maxTicks); } }
+
+        public double TotalMs { get { lock (_sync) return ToMs(_totalTicks); } }
+
+        /// <summary>Bytes allocated by the step on the thread it ran on.</summary>
+        public long AllocatedBytes { get { lock (_sync) return _allocated; } }
+
+        public void AddMeasurement(long ticks, long allocated)
         {
-            Count++;
-            _totalTicks += ticks;
-            _minTicks = Math.Min(_minTicks, ticks);
-            _maxTicks = Math.Max(_maxTicks, ticks);
-            TotalMemoryChangeBytes += memoryChange;
+            lock (_sync)
+            {
+                _count++;
+                _totalTicks += ticks;
+                _minTicks = Math.Min(_minTicks, ticks);
+                _maxTicks = Math.Max(_maxTicks, ticks);
+                _allocated += allocated;
+            }
         }
 
-        public int Count { get; private set; }
-        public double AverageMs => Count > 0 ? (_totalTicks / (double)Count) * 1000.0 / Stopwatch.Frequency : 0;
-        public double MinMs => _minTicks == long.MaxValue ? 0 : _minTicks * 1000.0 / Stopwatch.Frequency;
-        public double MaxMs => _maxTicks == long.MinValue ? 0 : _maxTicks * 1000.0 / Stopwatch.Frequency;
-        public double TotalMs => _totalTicks * 1000.0 / Stopwatch.Frequency;
-        public long TotalMemoryChangeBytes { get; private set; }
+        public ProfileNode GetOrAddChild(string name)
+        {
+            lock (_sync)
+            {
+                foreach (var child in _children)
+                    if (child.Name == name)
+                        return child;
+
+                var created = new ProfileNode(name, this);
+                _children.Add(created);
+                return created;
+            }
+        }
+
+        public List<ProfileNode> SnapshotChildren()
+        {
+            lock (_sync)
+                return [.. _children];
+        }
+
+        public void ClearChildren()
+        {
+            lock (_sync)
+                _children.Clear();
+        }
+
+        private static double ToMs(long ticks) => ticks * 1000.0 / Stopwatch.Frequency;
     }
 }

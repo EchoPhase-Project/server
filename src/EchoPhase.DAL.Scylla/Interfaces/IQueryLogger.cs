@@ -8,5 +8,11 @@ namespace EchoPhase.DAL.Scylla.Interfaces
         void LogQuery(string cql, Type resultType, object[] parameters);
         void LogQueryTiming(long elapsedMs);
         void LogError(string cql, Exception ex);
+
+        /// <summary>
+        /// Something that works but is likely slow or surprising (client-side
+        /// evaluation, multi-partition batches).
+        /// </summary>
+        void LogWarning(string message) { }
     }
 }

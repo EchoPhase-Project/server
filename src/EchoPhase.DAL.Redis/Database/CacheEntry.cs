@@ -28,21 +28,21 @@ namespace EchoPhase.DAL.Redis.Database
         public string Key { get; }
         public string CacheKey { get; }
 
-        public virtual async Task<T> GetOrSetAsync(Func<Task<T>> getData, TimeSpan cacheDuration)
+        public virtual async Task<T> GetOrSetAsync(Func<Task<T>> getData, TimeSpan cacheDuration, CancellationToken ct = default)
         {
             try
             {
-                return await GetAsync();
+                return await GetAsync(ct);
             }
             catch (InvalidOperationException)
             {
-                return await SetAsync(getData, cacheDuration);
+                return await SetAsync(getData, cacheDuration, ct);
             }
         }
 
-        public virtual async Task<T> GetAsync()
+        public virtual async Task<T> GetAsync(CancellationToken ct = default)
         {
-            string? cachedData = await _cache.GetStringAsync(CacheKey) ??
+            string? cachedData = await _cache.GetStringAsync(CacheKey, ct) ??
                 throw new InvalidOperationException($"Data not found in cache for tenant {TenantId}, key {Key} (cache key: {CacheKey}).");
 
             try
@@ -60,29 +60,29 @@ namespace EchoPhase.DAL.Redis.Database
             }
         }
 
-        public virtual async Task<T> SetAsync(Func<Task<T>> getData, TimeSpan cacheDuration)
+        public virtual async Task<T> SetAsync(Func<Task<T>> getData, TimeSpan cacheDuration, CancellationToken ct = default)
         {
             T data = await getData();
-            await SetAsync(data, cacheDuration);
+            await SetAsync(data, cacheDuration, ct);
             return data;
         }
 
-        public virtual async Task SetAsync(T data, TimeSpan cacheDuration)
+        public virtual async Task SetAsync(T data, TimeSpan cacheDuration, CancellationToken ct = default)
         {
             string serializedData = JsonSerializer.Serialize(data);
             await _cache.SetStringAsync(CacheKey, serializedData, new DistributedCacheEntryOptions
             {
                 AbsoluteExpirationRelativeToNow = cacheDuration
-            });
+            }, ct);
         }
 
-        public virtual async Task<T> SetAsync(Func<T> getData, TimeSpan cacheDuration) =>
-            await SetAsync(getData.ToAsync(), cacheDuration);
+        public virtual async Task<T> SetAsync(Func<T> getData, TimeSpan cacheDuration, CancellationToken ct = default) =>
+            await SetAsync(getData.ToAsync(), cacheDuration, ct);
 
-        public virtual async Task<T> GetOrSetAsync(Func<T> getData, TimeSpan cacheDuration) =>
-            await GetOrSetAsync(getData.ToAsync(), cacheDuration);
+        public virtual async Task<T> GetOrSetAsync(Func<T> getData, TimeSpan cacheDuration, CancellationToken ct = default) =>
+            await GetOrSetAsync(getData.ToAsync(), cacheDuration, ct);
 
-        public virtual async Task RemoveAsync() =>
-            await _cache.RemoveAsync(CacheKey);
+        public virtual async Task RemoveAsync(CancellationToken ct = default) =>
+            await _cache.RemoveAsync(CacheKey, ct);
     }
 }

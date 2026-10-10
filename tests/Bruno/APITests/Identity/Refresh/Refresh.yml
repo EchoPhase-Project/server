@@ -10,7 +10,6 @@ http:
     type: json
     data: |-
       {
-        "RefreshId": "{{RefreshId}}",
         "RefreshToken": "{{RefreshToken}}"
       }
   auth: inherit

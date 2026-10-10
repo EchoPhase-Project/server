@@ -8,8 +8,10 @@ using EchoPhase.Configuration.Authentication.Bearer;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Security.Authentication.Jwt.Claims;
+using EchoPhase.Security.Authentication.Jwt.Verdicts;
+using EchoPhase.Security.BitMasks;
 using EchoPhase.Security.Cryptography.Vaults;
-using EchoPhase.Types.Result.Extensions;
+using EchoPhase.Types.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -22,30 +24,42 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
         private readonly ILogger<JwtTokenProvider> _logger;
         private readonly BearerOptions _settings;
         private readonly UserRepository _userRepository;
+        private readonly ApiClientRepository _apiClients;
+        private readonly ImpersonationRepository _impersonations;
         private readonly IUserPrincipalFactory _principalFactory;
-        private readonly byte[] _key;
+        private readonly IPrincipalVerdictCache _verdicts;
+        private readonly ResourcePermissionsBitMask _permissions;
+        private readonly KeyRing _keys;
+        private readonly TimeProvider _time;
 
         public JwtTokenProvider(
             ILogger<JwtTokenProvider> logger,
             IOptions<AuthenticationOptions> settings,
-            IKeyVault keyVault,
+            KeyRing keys,
             UserRepository userRepository,
-            IUserPrincipalFactory principalFactory
+            ApiClientRepository apiClients,
+            ImpersonationRepository impersonations,
+            IUserPrincipalFactory principalFactory,
+            IPrincipalVerdictCache verdicts,
+            ResourcePermissionsBitMask permissions,
+            TimeProvider time
         )
         {
             _logger = logger;
             _settings = settings.Value.Bearer;
             _userRepository = userRepository;
+            _apiClients = apiClients;
+            _impersonations = impersonations;
             _principalFactory = principalFactory;
-
-            var result = keyVault.GetOrSet(_settings.Key);
-            result.OnFailure(err => throw new InvalidOperationException(err.Value));
-
-            if (!result.TryGetValue(out var key))
-                throw new InvalidOperationException($"Missing '{_settings.Key}' key.");
-
-            _key = key;
+            _verdicts = verdicts;
+            _permissions = permissions;
+            // Scoped: the signing key is read from the ring when used, so building
+            // a provider per request costs no Redis round trip.
+            _keys = keys;
+            _time = time;
         }
+
+        private byte[] SigningKey => _keys.Get(_settings.Key);
 
         public virtual async Task<string> GenerateTokenAsync(
             User user,
@@ -61,18 +75,18 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = identity,
-                Expires = DateTime.UtcNow + (lifetime ?? _settings.Lifetime),
+                Expires = _time.GetUtcNow().UtcDateTime + (lifetime ?? _settings.Lifetime),
                 Issuer = _settings.Issuer,
                 Audience = _settings.Audience,
                 SigningCredentials = new SigningCredentials(
-                    new SymmetricSecurityKey(_key),
+                    new SymmetricSecurityKey(SigningKey),
                     SecurityAlgorithms.HmacSha256Signature)
             };
 
             return tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescriptor));
         }
 
-        public virtual async Task<ClaimsPrincipal?> ValidateTokenAsync(string token)
+        public virtual async Task<ClaimsPrincipal?> ValidateTokenAsync(string token, CancellationToken ct = default)
         {
             if (token is null)
                 throw new ArgumentNullException(nameof(token));
@@ -83,7 +97,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             {
                 AuthenticationType = JwtBearerDefaults.AuthenticationScheme,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(_key),
+                IssuerSigningKey = new SymmetricSecurityKey(SigningKey),
                 ValidateIssuer = true,
                 ValidIssuer = _settings.ValidIssuer,
                 ValidateAudience = true,
@@ -103,21 +117,77 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
                 return null;
             }
 
+            return await CheckPrincipalAsync(claims, ct) switch
+            {
+                PrincipalState.Valid => claims,
+                // Lets the handler fall back to a silent refresh.
+                PrincipalState.StampMismatch => throw new SecurityTokenExpiredException("Security stamp mismatch."),
+                _ => null
+            };
+        }
+
+        public async Task<bool> IsPrincipalValidAsync(ClaimsPrincipal principal, CancellationToken ct = default)
+        {
+            var exp = principal.FindFirstValue(JwtRegisteredClaimNames.Exp);
+            if (exp is null
+                || !long.TryParse(exp, out var seconds)
+                || DateTimeOffset.FromUnixTimeSeconds(seconds) <= _time.GetUtcNow())
+                return false;
+
+            return await CheckPrincipalAsync(principal, ct) == PrincipalState.Valid;
+        }
+
+        private enum PrincipalState
+        {
+            Valid,
+            Invalid,
+            StampMismatch
+        }
+
+        /// <summary>
+        /// Checks that still matter after the signature: the user, their security
+        /// stamp, and the API client or impersonation the token belongs to.
+        /// A cached positive verdict skips the database.
+        /// </summary>
+        private async Task<PrincipalState> CheckPrincipalAsync(ClaimsPrincipal claims, CancellationToken ct)
+        {
+            // Permissions are encoded against the current set of resources and
+            // actions; a token from before that set changed cannot be read.
+            // Treat it like a stamp change so sessions refresh silently.
+            if (claims.FindFirstValue(_permissions.ClaimName) is { } permissions
+                && !_permissions.Deserialize(permissions).Successful)
+            {
+                _logger.LogInformation("JWT permissions use an outdated encoding; token must be reissued");
+                return PrincipalState.StampMismatch;
+            }
+
+            if (await _verdicts.IsKnownValidAsync(claims))
+                return PrincipalState.Valid;
+
+            var state = await CheckPrincipalInDatabaseAsync(claims, ct);
+            if (state == PrincipalState.Valid)
+                await _verdicts.RememberValidAsync(claims);
+
+            return state;
+        }
+
+        private async Task<PrincipalState> CheckPrincipalInDatabaseAsync(ClaimsPrincipal claims, CancellationToken ct)
+        {
             var sub = claims.FindFirstValue(JwtRegisteredClaimNames.Sub);
             if (sub is null || !Guid.TryParse(sub, out var userId))
             {
                 _logger.LogWarning("JWT missing or invalid 'sub' claim");
-                return null;
+                return PrincipalState.Invalid;
             }
 
-            var user = _userRepository.Query()
+            var user = await _userRepository.Query()
                 .WithIds(userId)
-                .FirstOrDefault();
+                .FirstOrDefaultAsync(ct);
 
             if (user is null)
             {
                 _logger.LogWarning("User {UserId} not found in DB", userId);
-                return null;
+                return PrincipalState.Invalid;
             }
 
             var stamp = claims.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
@@ -125,10 +195,67 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             if (stamp != user.SecurityStamp)
             {
                 _logger.LogWarning("SecurityStamp mismatch for user {UserId}", userId);
-                throw new SecurityTokenExpiredException("Security stamp mismatch.");
+                return PrincipalState.StampMismatch;
             }
 
-            return claims;
+            // Tokens issued to an API client die with the client, not just at expiry.
+            var clientIdRaw = claims.FindFirstValue(EchoPhaseClaimTypes.ClientId);
+            if (clientIdRaw is not null)
+            {
+                var now = _time.GetUtcNow().UtcDateTime;
+                if (!Guid.TryParse(clientIdRaw, out var clientId)
+                    || !await _apiClients.Query()
+                        .WithIds(clientId)
+                        .WithUserIds(userId)
+                        .AnyAsync(c => c.ExpiresAt == null || c.ExpiresAt > now, ct))
+                {
+                    _logger.LogWarning("API client {ClientId} of user {UserId} is revoked or expired", clientIdRaw, userId);
+                    return PrincipalState.Invalid;
+                }
+            }
+
+            if (!await IsImpersonationValidAsync(claims, userId, ct))
+                return PrincipalState.Invalid;
+
+            return PrincipalState.Valid;
+        }
+
+        /// <summary>
+        /// An <c>act</c> token is only good while its record is open and the
+        /// actor still holds the stamp they started with.
+        /// </summary>
+        private async Task<bool> IsImpersonationValidAsync(ClaimsPrincipal claims, Guid targetId, CancellationToken ct)
+        {
+            var hasAct = claims.HasClaim(c => c.Type == EchoPhaseClaimTypes.Act);
+            var rawId = claims.FindFirstValue(EchoPhaseClaimTypes.ImpersonationId);
+
+            if (!hasAct && rawId is null)
+                return true;
+
+            if (!hasAct || !Guid.TryParse(rawId, out var impersonationId))
+            {
+                _logger.LogWarning("Malformed impersonation token for user {UserId}", targetId);
+                return false;
+            }
+
+            var impersonation = await _impersonations.Query()
+                .WithIds(impersonationId)
+                .WithTargetIds(targetId)
+                .Active(_time.GetUtcNow().UtcDateTime)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(ct);
+
+            var actor = impersonation is null
+                ? null
+                : await _userRepository.Query().WithIds(impersonation.ActorId).FirstOrDefaultAsync(ct);
+
+            if (impersonation is null || actor is null || actor.SecurityStamp != impersonation.ActorSecurityStamp)
+            {
+                _logger.LogWarning("Impersonation {ImpersonationId} of user {UserId} is no longer active", impersonationId, targetId);
+                return false;
+            }
+
+            return true;
         }
     }
 }

@@ -1,60 +1,58 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Text.Json;
-using EchoPhase.Configuration;
+using System.Reflection;
+using System.Text.Json.Serialization;
 using EchoPhase.Runners.Blocks.Contexts;
-using EchoPhase.Runners.Blocks.Models;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Runners.Blocks.Handlers
 {
-    public abstract class BlockHandlerBase<TParam> : IBlockHandler<TParam>
+    public abstract class BlockHandlerBase<TParam> : IBlockHandler
+        where TParam : class
     {
-        private readonly JsonSerializerOptions _serializerOptions = new();
-
         public Type ParamType => typeof(TParam);
 
         protected T GetService<T>(IBlockExecutionContext context) where T : notnull
+            => context.Services.GetRequiredService<T>();
+
+        public object Bind(object? param) => BlockParamsBinder.Bind(typeof(TParam), param);
+
+        public Task<BlockResult> ExecuteAsync(BlockCall call, object param)
+            => ExecuteAsync(call, (TParam)param);
+
+        public abstract Task<BlockResult> ExecuteAsync(BlockCall call, TParam param);
+
+
+        /// <summary>
+        /// Converts an API DTO into plain lists/dictionaries so scripts can address
+        /// its members by their JSON names.
+        /// </summary>
+        protected static object? ToVariable(object? obj)
         {
-            return context.Services.GetRequiredService<T>();
+            if (obj is null)
+                return null;
+
+            var type = obj.GetType();
+
+            if (type.IsPrimitive || obj is string || obj is decimal)
+                return obj;
+
+            if (obj is System.Collections.IEnumerable enumerable)
+                return enumerable
+                    .Cast<object?>()
+                    .Select(ToVariable)
+                    .ToList();
+
+            if (type.IsClass)
+                return type
+                    .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .ToDictionary(
+                        prop => prop.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name ?? prop.Name,
+                        prop => ToVariable(prop.GetValue(obj))
+                    );
+
+            return obj;
         }
-
-        public async Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, object param)
-        {
-            TParam? typedParam = default;
-
-            if (param is null)
-                throw new ArgumentNullException("Missing params exception.");
-
-            if (param is JsonElement jsonElement)
-                typedParam = jsonElement.Deserialize<TParam>(_serializerOptions);
-            else if (param is TParam typed)
-                typedParam = typed;
-
-            if (typedParam is null)
-                throw new InvalidCastException($"Invalid param type. Expected {typeof(TParam)}, got {param?.GetType()}.");
-
-            await ValidateParamAsync(context, typedParam);
-
-            return await ExecuteAsync(context, block, typedParam);
-        }
-
-        protected virtual async Task ValidateParamAsync(IBlockExecutionContext context, TParam param)
-        {
-            if (param is null)
-                throw new ArgumentNullException("Missing param exception.");
-
-            if (param is not IValidatable validatableParam)
-                throw new InvalidOperationException("Param is not validatable.");
-
-            var result = validatableParam.Validate();
-            if (!result.Successful)
-                throw new InvalidOperationException(result.Error.Value);
-
-            await Task.CompletedTask;
-        }
-
-        public abstract Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, TParam param);
     }
 }

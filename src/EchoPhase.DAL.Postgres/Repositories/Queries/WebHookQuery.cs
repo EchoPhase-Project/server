@@ -1,10 +1,8 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using EchoPhase.DAL.Abstractions.Repository;
 using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.Security.BitMasks;
-using EchoPhase.Types.Repository;
-using EchoPhase.Types.Result.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 // ── WebHookQuery ──────────────────────────────────────────────────────────────
@@ -13,12 +11,9 @@ namespace EchoPhase.DAL.Postgres.Repositories.Queries
 {
     public class WebHookQuery : RepositoryQuery<WebHook>
     {
-        private readonly IntentsBitMask _intentsBitmask;
-
-        public WebHookQuery(IQueryable<WebHook> query, IntentsBitMask intentsBitmask)
+        public WebHookQuery(IQueryable<WebHook> query)
             : base(query)
         {
-            _intentsBitmask = intentsBitmask;
         }
 
         public WebHookQuery WithIds(params Guid[] ids)
@@ -51,17 +46,11 @@ namespace EchoPhase.DAL.Postgres.Repositories.Queries
             return this;
         }
 
+        /// <summary>Webhooks subscribed to every one of <paramref name="intents"/>.</summary>
         public WebHookQuery WithIntents(params string[] intents)
         {
-            _query = _query
-                .AsEnumerable()
-                .Where(w =>
-                {
-                    if (_intentsBitmask.Deserialize(w.Intents).TryGetValue(out var value))
-                        return _intentsBitmask.Has(value, intents);
-                    return false;
-                })
-                .AsQueryable();
+            // Npgsql: @intents <@ "Intents" (commutator of @>), served by the GIN index.
+            Where(x => intents.All(i => x.Intents.Contains(i)));
             return this;
         }
 

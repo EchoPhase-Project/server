@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using EchoPhase.DAL.Scylla.Interfaces;
+
 namespace EchoPhase.DAL.Scylla.Builders
 {
     public class ModelBuilder
@@ -21,5 +23,11 @@ namespace EchoPhase.DAL.Scylla.Builders
 
         internal EntityBuilder<TEntity>? GetBuilder<TEntity>() where TEntity : class
             => _configs.TryGetValue(typeof(TEntity), out var b) ? (EntityBuilder<TEntity>)b : null;
+
+        internal IEntityBuilder? GetBuilder(Type entityType)
+            => _configs.TryGetValue(entityType, out var b) ? (IEntityBuilder)b : null;
+
+        internal IReadOnlyCollection<IEntityBuilder> GetAllBuilders()
+            => _configs.Values.Cast<IEntityBuilder>().ToList();
     }
 }

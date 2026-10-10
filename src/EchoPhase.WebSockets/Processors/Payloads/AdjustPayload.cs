@@ -10,7 +10,8 @@ namespace EchoPhase.WebSockets.Processors.Payloads
     [OpCodePayload(OpCodes.Adjust)]
     public class AdjustPayload : IPayload
     {
-        public string Intents { get; set; } = string.Empty;
+        /// <summary>The intent names to receive from now on; empty: none.</summary>
+        public string[] Intents { get; set; } = [];
 
         public AdjustPayload()
         {
@@ -18,9 +19,13 @@ namespace EchoPhase.WebSockets.Processors.Payloads
 
         public IValidationResult Validate()
         {
-            if (string.IsNullOrWhiteSpace(Intents))
+            if (Intents is { } list && (list.Length > IntentLimits.MaxIntents || list.Any(n => n?.Length > IntentLimits.MaxNameLength)))
                 return ValidationResult.Failure(error =>
-                    error.Set(nameof(Intents), "Intents cannot be empty."));
+                    error.Set(nameof(Intents), $"At most {IntentLimits.MaxIntents} intents of up to {IntentLimits.MaxNameLength} characters."));
+
+            if (Intents is null || Intents.Any(string.IsNullOrWhiteSpace))
+                return ValidationResult.Failure(error =>
+                    error.Set(nameof(Intents), "Intents must be a list of names."));
 
             return ValidationResult.Success();
         }

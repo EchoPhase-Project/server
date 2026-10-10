@@ -10,7 +10,7 @@ namespace EchoPhase.Clients.Discord
     {
         Task<Result<IEnumerable<DiscordUserGuildsResponseDto>>> GetUserGuildsAsync(
             DiscordUserGuildsQueryDto query,
-            string botToken,
+            ConnectionRef connection,
             CancellationToken ct = default);
     }
 }

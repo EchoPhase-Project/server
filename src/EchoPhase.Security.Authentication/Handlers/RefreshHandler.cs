@@ -3,8 +3,8 @@
 
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using EchoPhase.Security.Antiforgery;
 using EchoPhase.Security.Authentication.Jwt;
-using EchoPhase.Security.Authentication.Jwt.Exceptions;
 using EchoPhase.Security.Authentication.Jwt.Helpers;
 using EchoPhase.Security.Authentication.Jwt.Providers;
 using EchoPhase.Security.Authentication.Options;
@@ -37,13 +37,14 @@ namespace EchoPhase.Security.Authentication.Handlers
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
         {
             string? token = null;
-            token ??= Request.Cookies[CookieNames.AccessToken];
+            var fromHeader = false;
 
             var authorization = Request.Headers.Authorization.FirstOrDefault();
             if (!string.IsNullOrEmpty(authorization) &&
                 authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
             {
                 token = authorization["Bearer ".Length..].Trim();
+                fromHeader = true;
             }
 
             token ??= Request.Cookies[CookieNames.AccessToken];
@@ -55,8 +56,12 @@ namespace EchoPhase.Security.Authentication.Handlers
             await Options.Events.MessageReceived(messageReceivedContext);
             if (messageReceivedContext.Result is not null)
                 return messageReceivedContext.Result;
-            if (!string.IsNullOrEmpty(messageReceivedContext.Token))
+            if (!string.IsNullOrEmpty(messageReceivedContext.Token)
+                && messageReceivedContext.Token != token)
+            {
                 token = messageReceivedContext.Token;
+                fromHeader = false;
+            }
 
             ClaimsPrincipal? principal = null;
 
@@ -64,12 +69,12 @@ namespace EchoPhase.Security.Authentication.Handlers
             {
                 try
                 {
-                    principal = await _jwt.ValidateTokenAsync(token);
+                    principal = await _jwt.ValidateTokenAsync(token, Context.RequestAborted);
                 }
                 catch (SecurityTokenExpiredException)
                 {
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     var failedCtx = new AuthenticationFailedContext(Context, Scheme, Options)
                     {
@@ -82,10 +87,21 @@ namespace EchoPhase.Security.Authentication.Handlers
 
             if (principal is null)
             {
+                // A client that sends its own token manages it; falling back to
+                // cookies would silently switch identities (e.g. an expired
+                // impersonation token turning into the actor's own session).
+                if (fromHeader)
+                    return AuthenticateResult.NoResult();
+
+                // Cookie fallback: ambient credentials, so CSRF checks still apply.
                 principal = await TrySilentRefreshAsync();
 
                 if (principal is null)
                     return AuthenticateResult.NoResult();
+            }
+            else if (fromHeader)
+            {
+                CsrfExemption.MarkHeaderAuthenticated(Context);
             }
 
             var tokenValidatedContext = new TokenValidatedContext(Context, Scheme, Options)
@@ -102,29 +118,29 @@ namespace EchoPhase.Security.Authentication.Handlers
 
         private async Task<ClaimsPrincipal?> TrySilentRefreshAsync()
         {
-            if (!Request.Cookies.TryGetValue(CookieNames.RefreshToken, out var refreshToken) ||
-                !Request.Cookies.TryGetValue(CookieNames.RefreshId, out var refreshIdRaw) ||
-                !Guid.TryParse(refreshIdRaw, out var refreshId))
-            {
+            if (!Request.Cookies.TryGetValue(CookieNames.RefreshToken, out var refreshToken)
+                || string.IsNullOrEmpty(refreshToken))
                 return null;
-            }
 
             try
             {
-                var pair = await _signInManager.RefreshAsync(refreshId, refreshToken);
+                var pair = await _signInManager.RefreshAsync(refreshToken, Context.RequestAborted);
 
                 TokenCookieHelper.WriteRefreshed(Response, Request, pair);
 
-                return await _jwt.ValidateTokenAsync(pair.AccessToken);
+                return await _jwt.ValidateTokenAsync(pair.AccessToken, Context.RequestAborted);
             }
-            catch (RefreshTokenReusedException)
+            catch (UnauthorizedAccessException)
             {
+                // Unknown, reused or revoked token: the session is gone for good.
                 TokenCookieHelper.Clear(Response);
                 return null;
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                TokenCookieHelper.Clear(Response);
+                // Infrastructure failure (database, etc.): keep the cookies so the
+                // next request can retry instead of logging the user out.
+                Logger.LogWarning(ex, "Silent session refresh failed.");
                 return null;
             }
         }

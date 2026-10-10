@@ -7,29 +7,21 @@ using EchoPhase.WebSockets.Processors.Payloads;
 
 namespace EchoPhase.WebSockets.Processors.Handlers
 {
+    /// <summary>Acknowledges and closes the connection.</summary>
     public class DisconnectHandler : OpCodeHandlerBase<DisconnectPayload>
     {
-        private readonly WebSocketService _webSocketService;
-        private readonly WebSocketConnectionManager _connectionManager;
+        private readonly WebSocketConnectionManager _connections;
 
-        public DisconnectHandler(IServiceProvider serviceProvider)
-        : base(serviceProvider)
+        public DisconnectHandler(WebSocketService sockets, WebSocketConnectionManager connections)
+            : base(sockets)
         {
-            _webSocketService = GetService<WebSocketService>();
-            _connectionManager = GetService<WebSocketConnectionManager>();
+            _connections = connections;
         }
 
-        public override async Task HandleAsync(WebSocket webSocket, DisconnectPayload payload)
+        protected override async Task HandleAsync(WebSocketConnection connection, DisconnectPayload payload, CancellationToken ct)
         {
-            var userId = await _connectionManager.GetUserIdAsync(webSocket);
-            if (userId == Guid.Empty)
-                return;
-
-            var response = EventMessage.Create(OpCodes.DisconnectAck);
-
-            await _webSocketService.SendMessageAsync(webSocket, response);
-            await _connectionManager.CloseConnectionAsync(userId, webSocket);
+            await Sockets.SendAsync(connection, EventMessage.Create(OpCodes.DisconnectAck), ct);
+            await _connections.CloseConnectionAsync(connection, WebSocketCloseStatus.NormalClosure, "Disconnect requested");
         }
     }
 }
-

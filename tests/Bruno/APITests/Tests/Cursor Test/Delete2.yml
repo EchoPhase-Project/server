@@ -5,16 +5,10 @@ info:
 
 http:
   method: DELETE
-  url: "{{baseUrl}}/auth/refresh"
+  url: "{{baseUrl}}/sessions/{{SessionId2}}"
   headers:
     - name: X-CSRF-TOKEN
       value: "{{X-CSRF-TOKEN}}"
-  body:
-    type: json
-    data: |-
-      {
-        "DeviceId": "{{DeviceId2}}"
-      }
   auth: inherit
 
 settings:

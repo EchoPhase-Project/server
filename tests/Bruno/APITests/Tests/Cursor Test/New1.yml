@@ -5,47 +5,28 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/auth/refresh/new"
+  url: "{{baseUrl}}/auth/login"
   headers:
-    - name: X-CSRF-TOKEN
-      value: "{{X-CSRF-TOKEN}}"
+    - name: User-Agent
+      value: "{{DeviceId1}}"
   body:
     type: json
     data: |-
       {
-        "DeviceId": "{{DeviceId1}}",
-        "claims": {
-          "scopes": ["api"],
-          "intents": ["login"],
-          "permissions": {
-            "user":      ["read", "list"],
-            "tokens":    ["read", "create", "delete"],
-            "webSocket": ["connect"]
-          }
-        }
+        "username": "{{username}}",
+        "password": "{{password}}"
       }
   auth: inherit
 
 runtime:
-  variables:
-    - name: ""
-      value: ""
   actions:
     - type: set-variable
       phase: after-response
       selector:
-        expression: res.body["accessToken"]
+        expression: res.headers["x-csrf-token"]
         method: jsonq
       variable:
-        name: AccessToken
-        scope: runtime
-    - type: set-variable
-      phase: after-response
-      selector:
-        expression: res.body["refreshToken"]
-        method: jsonq
-      variable:
-        name: RefreshToken
+        name: X-CSRF-TOKEN
         scope: runtime
 
 settings:

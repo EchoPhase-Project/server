@@ -18,6 +18,12 @@ namespace EchoPhase.DAL.Scylla.Interfaces
 
     public interface IEntityBuilder
     {
+        /// <summary>The CLR type this builder maps.</summary>
+        Type EntityType { get; }
+
+        /// <summary>Keyspace set with ToTable, or null for the connection's keyspace.</summary>
+        string? Keyspace { get; }
+
         string GetTableName();
         string GetFullTableName();
         string GetColumn(string propertyName);

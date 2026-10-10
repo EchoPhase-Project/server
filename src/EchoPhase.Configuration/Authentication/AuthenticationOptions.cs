@@ -10,11 +10,15 @@ namespace EchoPhase.Configuration.Authentication
         public const string SectionName = "Authentication";
         public Bearer.BearerOptions Bearer { get; set; } = new();
         public Refresh.RefreshOptions Refresh { get; set; } = new();
+        public ApiClients.ApiClientOptions ApiClients { get; set; } = new();
+        public Impersonation.ImpersonationOptions Impersonation { get; set; } = new();
 
         public IValidationResult Validate()
         {
             return Bearer.Validate().WithPrefix(nameof(Bearer))
                 .Then(() => Refresh.Validate().WithPrefix(nameof(Refresh)))
+                .Then(() => ApiClients.Validate().WithPrefix(nameof(ApiClients)))
+                .Then(() => Impersonation.Validate().WithPrefix(nameof(Impersonation)))
                 .Then(() => ValidateSelf());
         }
 

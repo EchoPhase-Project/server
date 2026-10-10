@@ -5,17 +5,14 @@ namespace EchoPhase.Runners.Blocks.Models
 {
     public interface IBlock
     {
-        int Id
-        {
-            get; set;
-        }
-        BlockTypes Type
-        {
-            get; set;
-        }
-        object Params
-        {
-            get; set;
-        }
+        int Id { get; }
+        BlockTypes Type { get; }
+        /// <summary>Behaviour version of the type; old programs keep theirs.</summary>
+        int Version { get; }
+        /// <summary>Type-specific settings, deserialized by the handler.</summary>
+        object Params { get; }
+        bool Disabled { get; }
+        BlockErrorPolicy OnError { get; }
+        BlockRetry? Retry { get; }
     }
 }

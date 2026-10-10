@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using EchoPhase.DAL.Scylla.Cql;
+
 namespace EchoPhase.DAL.Scylla.Builders
 {
     public class AlterTableBuilder
@@ -27,24 +29,16 @@ namespace EchoPhase.DAL.Scylla.Builders
             return this;
         }
 
+        // Scylla can rename only primary key columns.
         public AlterTableBuilder RenameColumn(string oldName, string newName)
         {
             _alterations.Add($"ALTER TABLE {_keyspace}.{_name} RENAME {oldName} TO {newName};");
             return this;
         }
 
-        public AlterTableBuilder AlterColumnType(string name, string newType)
-        {
-            _alterations.Add($"ALTER TABLE {_keyspace}.{_name} ALTER {name} TYPE {newType};");
-            return this;
-        }
-
         public AlterTableBuilder WithCompaction(string compactionClass, params (string key, string value)[] options)
         {
-            var opts = options.Length > 0
-                ? ", " + string.Join(", ", options.Select(o => $"'{o.key}': '{o.value}'"))
-                : "";
-            _alterations.Add($"ALTER TABLE {_keyspace}.{_name} WITH compaction = {{'class': '{compactionClass}'{opts}}};");
+            _alterations.Add($"ALTER TABLE {_keyspace}.{_name} WITH compaction = {CqlLiteral.Options("class", compactionClass, options)};");
             return this;
         }
 

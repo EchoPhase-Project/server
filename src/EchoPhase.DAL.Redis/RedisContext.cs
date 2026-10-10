@@ -18,7 +18,6 @@ namespace EchoPhase.DAL.Redis
         {
             RegisterSet<QrUserCache>("user:{{key}}:qr");
             RegisterSet<QrCache>("qr:{{key}}:user");
-            RegisterSet<WebSocketCache>("webSocket:{{key}}:user");
             RegisterSet<SecurityStamp>("user:{{key}}:securityStamp");
         }
     }

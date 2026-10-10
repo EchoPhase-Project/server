@@ -1,0 +1,25 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+namespace EchoPhase.Services.Blocks
+{
+    /// <summary>What started a run (BlockRun.Trigger).</summary>
+    public static class BlockRunTriggers
+    {
+        public const string Manual = "manual";
+        public const string Webhook = "webhook";
+        public const string Schedule = "schedule";
+        public const string Discord = "discord";
+    }
+
+    /// <summary>
+    /// What to run: the program, where to start (null: its manual start),
+    /// the first blocks' input, and where it came from.
+    /// </summary>
+    public sealed record BlockRunStart(
+        EchoPhase.Runners.Blocks.Models.BlockProgram Program,
+        IReadOnlyCollection<int>? StartIds = null,
+        object? Input = null,
+        Guid? WorkflowId = null,
+        string Trigger = BlockRunTriggers.Manual);
+}

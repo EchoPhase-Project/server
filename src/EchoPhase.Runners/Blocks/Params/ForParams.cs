@@ -27,12 +27,6 @@ namespace EchoPhase.Runners.Blocks.Params
         [JsonPropertyName("step")]
         public int Step { get; set; } = 1;
 
-        [JsonPropertyName("bodyNext")]
-        public IEnumerable<int> BodyNext { get; set; } = new HashSet<int>();
-
-        [JsonPropertyName("afterNext")]
-        public IEnumerable<int> AfterNext { get; set; } = new HashSet<int>();
-
         public IValidationResult Validate()
         {
             if (string.IsNullOrWhiteSpace(CounterVar))

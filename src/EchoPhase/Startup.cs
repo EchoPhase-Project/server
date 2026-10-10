@@ -2,36 +2,42 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Reflection;
-using EchoPhase.Clients.Extensions;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using EchoPhase.Configuration.Extensions;
+using EchoPhase.Connections.Extensions;
+using EchoPhase.Connections.Services;
 using EchoPhase.DAL.Postgres.Extensions;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Redis.Extensions;
 using EchoPhase.DAL.Scylla.Extensions;
 using EchoPhase.Extensions;
-using EchoPhase.Helpers;
-using EchoPhase.Hubs;
-using EchoPhase.Hubs.Managers;
 using EchoPhase.Identity;
-using EchoPhase.Interfaces.Services;
 using EchoPhase.Middlewares;
 using EchoPhase.Profilers.Extensions;
 using EchoPhase.Projection.Extensions;
 using EchoPhase.QRCodes.Extensions;
 using EchoPhase.RouteConstraints;
+using EchoPhase.Runners.Blocks.Observers;
+using EchoPhase.Runners.Blocks.Runs;
 using EchoPhase.Runners.Extensions;
-using EchoPhase.Scheduling.Extensions;
-using EchoPhase.Scripting.Extensions;
 using EchoPhase.Security.Antiforgery.Extensions;
 using EchoPhase.Security.Authentication.Extensions;
+using EchoPhase.Security.Authentication.Impersonation;
 using EchoPhase.Security.Authorization.Extensions;
 using EchoPhase.Security.BitMasks.Extensions;
 using EchoPhase.Security.Cryptography.Extensions;
 using EchoPhase.Security.Hashers.Extensions;
+using EchoPhase.Services.Blocks;
+using EchoPhase.Services.Connections;
+using EchoPhase.Services.Health;
+using EchoPhase.Services.Impersonation;
+using EchoPhase.Services.Permissions;
+using EchoPhase.Services.Realtime;
+using EchoPhase.Services.Workflows;
 using EchoPhase.WebSockets.Extensions;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Options;
@@ -71,9 +77,19 @@ namespace EchoPhase
             {
                 builder.ClearProviders();
                 builder.SetMinimumLevel(LogLevel.Debug);
-                builder.AddConsole();
+                // Scopes carry the caller (PrincipalLoggingMiddleware) and the request id.
+                builder.AddJsonConsole(o =>
+                {
+                    o.IncludeScopes = true;
+                    o.UseUtcTimestamp = true;
+                    o.TimestampFormat = "O";
+                    // Logs are never embedded in HTML; keep '+' and non-ASCII readable.
+                    o.JsonWriterOptions = new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+                });
                 builder.AddDebug();
-                builder.AddFile("Logs/logs-{Date}.txt");
+                builder.AddFile(
+                    "Logs/logs-{Date}.txt",
+                    outputTemplate: "{Timestamp:o} {RequestId,13} [{Level:u3}] {Principal} {Message} ({EventId:x8}){NewLine}{Exception}");
             });
 
             services.Configure<RouteOptions>(options =>
@@ -82,13 +98,22 @@ namespace EchoPhase
                 options.ConstraintMap.Add("username", typeof(UsernameRouteConstraint));
             });
 
-            services.AddSingleton(TimeZoneInfo.Utc);
+            // The clock: inject TimeProvider instead of reading DateTime.UtcNow,
+            // so tests can substitute FakeTimeProvider.
+            services.AddSingleton(TimeProvider.System);
 
             services.AddSwaggerGen(o =>
             {
+                // Honour C# nullability: non-nullable members are required and
+                // not null, so generated client types are not all optional.
+                o.SupportNonNullableReferenceTypes();
+                o.NonNullableReferenceTypesAsRequired();
+
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-                o.IncludeXmlComments(xmlPath);
+                // Generated in Debug only (not shipped); the document still builds without it.
+                if (File.Exists(xmlPath))
+                    o.IncludeXmlComments(xmlPath);
                 o.SwaggerDoc("v1", new OpenApiInfo
                 {
                     Version = "v1",
@@ -111,22 +136,19 @@ namespace EchoPhase
 
             services.AddHttpContextAccessor();
 
-            services.AddPreparedMvc();
+            services.AddConfiguredForwardedHeaders();
+            services.AddConfiguredRateLimiting();
+
+            services.AddApiControllers();
             services.AddCorsPolicies();
             services.AddConfiguredAntiforgery();
             services.AddLocalizationOptions();
             services.AddConfigurations();
 
-            services.AddSignalR(options =>
-            {
-                options.EnableDetailedErrors = true;
-                options.MaximumReceiveMessageSize = 102400000;
-            });
-
             services.AddSingleton<IStringLocalizerFactory, ResourceManagerStringLocalizerFactory>();
-            services.AddSingleton<IUserConnectionManager, UserConnectionManager>();
+            services.AddHostedService<RealtimeCredentialMonitor>();
+            services.AddHostedService<PermissionGrantExpiryWorker>();
 
-            services.AddSingleton<FileHelper>();
             services.AddProjection();
 
             services.AddCryptography();
@@ -139,17 +161,26 @@ namespace EchoPhase
 
             services.AddScoped<UserManager<User>, UserManager<User>>();
 
-            services.AddScripting();
             services.AddProfiler();
 
             services.AddRunners();
-
-            services.AddScheduling();
+            services.AddSingleton<BlockRunRegistry>();
+            services.AddSingleton<BlockRunQueue>();
+            services.AddScoped<BlockRunService>();
+            services.AddScoped<BlockRunEventsNotifier>();
+            services.AddScoped<WorkflowService>();
+            services.AddHostedService<WorkflowScheduler>();
+            services.AddSingleton<DiscordTriggerService>();
+            services.AddHostedService(sp => sp.GetRequiredService<DiscordTriggerService>());
+            services.AddHostedService<DiscordGatewayErrorHandler>();
+            services.AddScoped<IBlockRunObserver, BlockRunProgressObserver>();
+            // One recorder per run, read by the worker for the run's execution data.
+            services.AddScoped<ExecutionRecorder>();
+            services.AddScoped<IBlockRunObserver>(sp => sp.GetRequiredService<ExecutionRecorder>());
+            services.AddHostedService<BlockRunWorker>();
 
             services.AddWebSocket();
             services.AddEventService();
-
-            services.AddGrpc();
 
             services.AddPostgres();
             services.AddScylla();
@@ -161,12 +192,19 @@ namespace EchoPhase
             services.AddAuthorizations();
             services.AddProblemDetails();
 
-            //services.AddTwitchClient(Configuration.GetSection("Twitch"));
             services.AddDiscordClient();
-            services.AddClientTokenProviders();
+            services.AddTwitchClient();
+            services.AddExternalConnections();
+            services.AddScoped<IConnectionEvents, ConnectionEventsNotifier>();
+            services.AddScoped<IImpersonationEvents, ImpersonationEventsNotifier>();
 
+            services.AddSingleton<WarmupState>();
+            services.AddHostedService<WarmupService>();
             services.AddHealthChecks()
-                .AddCheck("self", () => HealthCheckResult.Healthy());
+                // Liveness: the process answers. Never depends on dependencies or warm-up,
+                // or a slow start would get the pod restarted.
+                .AddCheck("self", () => HealthCheckResult.Healthy())
+                .AddCheck<WarmupHealthCheck>("warmup", tags: [WarmupHealthCheck.Tag]);
 
             /*
 			services.AddHealthChecks()
@@ -199,6 +237,10 @@ namespace EchoPhase
         /// <param name="loggerFactory">The logger factory for creating loggers.</param>
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IOptions<RequestLocalizationOptions> localizationOptions, ILoggerFactory loggerFactory)
         {
+            // First: everything after it (logging, HTTPS checks, rate limits) must
+            // see the client's real IP and scheme, not the proxy's.
+            app.UseForwardedHeaders();
+
             if (env.IsDevelopment() || env.IsStaging())
             {
                 app.UseDeveloperExceptionPage();
@@ -229,47 +271,6 @@ namespace EchoPhase
             app.UseXContentTypeOptions();
             app.UseReferrerPolicy(opts => opts.NoReferrer());
 
-            app.UseStaticFiles(new StaticFileOptions
-            {
-                OnPrepareResponse = ctx =>
-                {
-                    ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=86400");
-                },
-                DefaultContentType = "application/octet-stream",
-                ContentTypeProvider = new FileExtensionContentTypeProvider
-                {
-                    Mappings =
-                    {
-                        [".js"] = "application/javascript",
-                        [".mjs"] = "application/javascript",
-                        [".json"] = "application/json",
-                        [".wasm"] = "application/wasm",
-                        [".css"] = "text/css",
-                        [".html"] = "text/html",
-                        [".htm"] = "text/html",
-                        [".svg"] = "image/svg+xml",
-                        [".png"] = "image/png",
-                        [".jpg"] = "image/jpeg",
-                        [".jpeg"] = "image/jpeg",
-                        [".gif"] = "image/gif",
-                        [".webp"] = "image/webp",
-                        [".ico"] = "image/x-icon",
-                        [".ttf"] = "font/ttf",
-                        [".otf"] = "font/otf",
-                        [".woff"] = "font/woff",
-                        [".woff2"] = "font/woff2",
-                        [".eot"] = "application/vnd.ms-fontobject",
-                        [".mp4"] = "video/mp4",
-                        [".webm"] = "video/webm",
-                        [".mp3"] = "audio/mpeg",
-                        [".ogg"] = "audio/ogg",
-                        [".txt"] = "text/plain",
-                        [".xml"] = "application/xml",
-                        [".map"] = "application/json"
-                    }
-                }
-            });
-
             app.UseXfo(xfo => xfo.Deny());
             app.UseRedirectValidation();
 
@@ -281,6 +282,10 @@ namespace EchoPhase
             app.UseRequestLocalization(localizationOptions.Value);
 
             app.UseAuthentication();
+            // Tag the rest of the request's logs with the caller (user, API client, actor).
+            app.UsePrincipalLogging();
+            // After authentication so limits can be per user / API client.
+            app.UseRateLimiter();
             app.UseAuthorization();
 
             app.UseWebSockets();
@@ -290,12 +295,15 @@ namespace EchoPhase
                 endpoints.MapHealthChecks("/health/live", new HealthCheckOptions
                 {
                     Predicate = check => check.Name == "self"
-                });
+                }).DisableRateLimiting();
+
+                // Readiness: traffic only once warm-up has paid the cold start.
+                endpoints.MapHealthChecks("/health/ready", new HealthCheckOptions
+                {
+                    Predicate = check => check.Tags.Contains(WarmupHealthCheck.Tag)
+                }).DisableRateLimiting();
 
                 endpoints.MapControllers()
-                    .RequireAuthorization();
-
-                endpoints.MapHub<EventHub>("/eventHub")
                     .RequireAuthorization();
             });
         }

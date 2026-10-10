@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.Profilers.Extensions;
-using EchoPhase.Scripting.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -30,7 +29,6 @@ namespace EchoPhase.Scripting.Tests
 
             var services = new ServiceCollection();
             services.AddProfiler();
-            services.AddScripting();
             Provider = services.BuildServiceProvider();
         }
     }

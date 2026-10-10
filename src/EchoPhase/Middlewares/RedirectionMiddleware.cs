@@ -13,7 +13,7 @@ namespace EchoPhase.Middlewares
             { 401, "/auth/login" }
         };
 
-        private static IEnumerable<string> staticFileExtensions = new[]
+        private static readonly IEnumerable<string> StaticFileExtensions = new[]
         {
             ".css",
             ".js",
@@ -45,7 +45,7 @@ namespace EchoPhase.Middlewares
                 return;
 
             var requestPath = context.Request.Path.Value ?? string.Empty;
-            bool isStaticFile = staticFileExtensions.Any(ext => requestPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+            bool isStaticFile = StaticFileExtensions.Any(ext => requestPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
 
             if (!isStaticFile && StatusCodeToPath.TryGetValue(context.Response.StatusCode, out string? redirectPath))
                 context.Response.Redirect(redirectPath);

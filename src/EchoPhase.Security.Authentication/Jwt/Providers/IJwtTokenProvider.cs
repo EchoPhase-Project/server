@@ -13,6 +13,13 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             User user,
             TimeSpan? lifetime = null,
             ClaimsEnrichmentContext? context = null);
-        Task<ClaimsPrincipal?> ValidateTokenAsync(string token);
+        Task<ClaimsPrincipal?> ValidateTokenAsync(string token, CancellationToken ct = default);
+
+        /// <summary>
+        /// Re-checks a principal from an already validated token, for long-lived
+        /// connections: not expired, same security stamp, and its API client or
+        /// impersonation still active.
+        /// </summary>
+        Task<bool> IsPrincipalValidAsync(ClaimsPrincipal principal, CancellationToken ct = default);
     }
 }

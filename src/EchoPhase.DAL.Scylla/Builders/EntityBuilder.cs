@@ -17,6 +17,8 @@ namespace EchoPhase.DAL.Scylla.Builders
 
         #region Table Configuration
 
+        public Type EntityType => typeof(TEntity);
+
         public string? TableName { get; private set; }
         public string? Keyspace { get; private set; }
 

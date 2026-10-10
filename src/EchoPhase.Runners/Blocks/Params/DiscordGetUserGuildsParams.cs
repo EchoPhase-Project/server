@@ -1,37 +1,36 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Text.Json;
 using System.Text.Json.Serialization;
+using EchoPhase.Clients.Discord.Dto;
 using EchoPhase.Configuration;
 using EchoPhase.Types.Validation;
-using EchoPhase.Clients.Discord.Dto;
 
 namespace EchoPhase.Runners.Blocks.Params
 {
     public class DiscordGetUserGuildsParams : IValidatable
     {
+        /// <summary>
+        /// Optional variable to also store the guilds in; they are always the
+        /// block's output (blocks.b&lt;id&gt; or the next block's input).
+        /// </summary>
         [JsonPropertyName("name")]
-        public string Name { get; set; } = string.Empty;
+        public string? Name { get; set; }
 
-        [JsonPropertyName("token_name")]
-        public string TokenName { get; set; } = string.Empty;
+        /// <summary>
+        /// Name of the user's stored connection to call the API with.
+        /// </summary>
+        [JsonPropertyName("connection")]
+        public string Connection { get; set; } = string.Empty;
 
         [JsonPropertyName("query")]
         public DiscordUserGuildsQueryDto Query { get; set; } = new();
 
-        [JsonPropertyName("next")]
-        public IEnumerable<int> Next { get; set; } = new HashSet<int>();
-
         public IValidationResult Validate()
         {
-            if (string.IsNullOrWhiteSpace(Name))
+            if (string.IsNullOrWhiteSpace(Connection))
                 return ValidationResult.Failure(error =>
-                    error.Set(nameof(Name), "Name cannot be empty."));
-
-            if (string.IsNullOrWhiteSpace(TokenName))
-                return ValidationResult.Failure(error =>
-                    error.Set(nameof(TokenName), "TokenName cannot be empty."));
+                    error.Set(nameof(Connection), "Connection cannot be empty."));
 
             return ValidationResult.Success();
         }

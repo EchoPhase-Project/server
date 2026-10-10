@@ -2,10 +2,14 @@
   "solution": {
     "path": "../EchoPhase.slnx",
     "projects": [
-      "tests/EchoPhase.Security.Cryptography.Tests/EchoPhase.Security.Cryptography.Tests.csproj",
-      "tests/EchoPhase.Scripting.Tests/EchoPhase.Scripting.Tests.csproj",
+      "tests/EchoPhase.DAL.Postgres.Tests/EchoPhase.DAL.Postgres.Tests.csproj",
+      "tests/EchoPhase.DAL.Scylla.Tests/EchoPhase.DAL.Scylla.Tests.csproj",
       "tests/EchoPhase.Projection.Tests/EchoPhase.Projection.Tests.csproj",
-      "tests/EchoPhase.Scheduling.Tests/EchoPhase.Scheduling.Tests.csproj"
+      "tests/EchoPhase.Runners.Tests/EchoPhase.Runners.Tests.csproj",
+      "tests/EchoPhase.Scripting.Tests/EchoPhase.Scripting.Tests.csproj",
+      "tests/EchoPhase.Security.BitMasks.Tests/EchoPhase.Security.BitMasks.Tests.csproj",
+      "tests/EchoPhase.Security.Cryptography.Tests/EchoPhase.Security.Cryptography.Tests.csproj",
+      "tests/EchoPhase.Security.Hashers.Tests/EchoPhase.Security.Hashers.Tests.csproj"
     ]
   }
 }

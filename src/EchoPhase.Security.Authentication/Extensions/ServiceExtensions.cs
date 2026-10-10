@@ -4,14 +4,20 @@
 using System.IdentityModel.Tokens.Jwt;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.Security.Authentication.ApiClients;
+using EchoPhase.Security.Authentication.Impersonation;
 using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Security.Authentication.Jwt.Claims;
 using EchoPhase.Security.Authentication.Jwt.Claims.Providers;
 using EchoPhase.Security.Authentication.Jwt.Providers;
+using EchoPhase.Security.Authentication.Jwt.Verdicts;
+using EchoPhase.Security.Authentication.Secrets;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EchoPhase.Security.Authentication.Extensions
 {
@@ -73,12 +79,18 @@ namespace EchoPhase.Security.Authentication.Extensions
                     options.CopyFrom(authCookie));
 
             services.AddScoped<IJwtTokenProvider, JwtTokenProvider>();
-            services.AddScoped<IRefreshTokenProvider, RefreshTokenProvider>();
+            services.AddSingleton<IPrincipalVerdictCache, RedisPrincipalVerdictCache>();
+            // Picked up by AddPostgres: drops cached verdicts when users, API clients
+            // or impersonations change.
+            services.AddSingleton<IInterceptor, PrincipalVerdictInvalidationInterceptor>();
+            services.AddSingleton<SessionTokenHasher>();
+            services.AddSingleton<ApiClientSecretHasher>();
+            services.AddScoped<IApiClientService, ApiClientService>();
+            services.TryAddScoped<IImpersonationEvents, NullImpersonationEvents>();
+            services.AddScoped<IImpersonationService, ImpersonationService>();
+            services.AddScoped<ISessionProvider, SessionProvider>();
             services.AddScoped<IAuthenticationService, AuthenticationService>();
 
-            services.AddScoped<IClaimsProvider, RolesClaimsProvider>();
-            services.AddScoped<IClaimsProvider, ScopesClaimsProvider>();
-            services.AddScoped<IClaimsProvider, IntentsClaimsProvider>();
             services.AddScoped<IClaimsProvider, ResourcePermissionsClaimsProvider>();
 
             return services;

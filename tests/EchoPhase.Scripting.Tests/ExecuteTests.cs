@@ -1,20 +1,14 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using Microsoft.Extensions.DependencyInjection;
-
 namespace EchoPhase.Scripting.Tests
 {
     public class ExecuteTests : IClassFixture<Fixture>
     {
-        private readonly ILexer<Token> _lexer;
-        private readonly IParser<Token> _parser;
         private readonly ITestOutputHelper _output;
 
         public ExecuteTests(Fixture fixture, ITestOutputHelper output)
         {
-            _lexer = fixture.Provider.GetRequiredService<ILexer<Token>>();
-            _parser = fixture.Provider.GetRequiredService<IParser<Token>>();
             _output = output;
         }
 
@@ -42,7 +36,7 @@ namespace EchoPhase.Scripting.Tests
                 }
             };
 
-            var result = Eval.Execute<double>(_lexer, _parser, expr, variables);
+            var result = Eval.Execute<double>(expr, variables);
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
         }
@@ -57,7 +51,7 @@ namespace EchoPhase.Scripting.Tests
                     ["profile"] = new Dictionary<string, object?> { ["age"] = 25 }
                 }
             };
-            var result = Eval.Execute<double>(_lexer, _parser, "user.profile.age", variables);
+            var result = Eval.Execute<double>("user.profile.age", variables);
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(25, value));
         }
@@ -75,7 +69,7 @@ namespace EchoPhase.Scripting.Tests
                     }
                 }
             };
-            var result = Eval.Execute<double>(_lexer, _parser, "env.config.limits.max", variables);
+            var result = Eval.Execute<double>("env.config.limits.max", variables);
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(99, value));
         }
@@ -87,7 +81,7 @@ namespace EchoPhase.Scripting.Tests
             {
                 ["data"] = new Dictionary<string, object?> { ["info"] = null }
             };
-            var result = Eval.Execute<double>(_lexer, _parser, "data.info.age", variables);
+            var result = Eval.Execute<double>("data.info.age", variables);
             result.OnFailure(err => Assert.True(
                 err.Code.Contains("InvalidOperation") || err.Code.Contains("KeyNotFound"),
                 $"Unexpected error code: {err.Code}"));
@@ -105,7 +99,7 @@ namespace EchoPhase.Scripting.Tests
                     ["bonus"] = 200
                 }
             };
-            var result = Eval.Execute<double>(_lexer, _parser, "user.salary + user.bonus", vars);
+            var result = Eval.Execute<double>("user.salary + user.bonus", vars);
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(1200, value));
         }
@@ -118,7 +112,7 @@ namespace EchoPhase.Scripting.Tests
                 ["x"] = 5,
                 ["user"] = new Dictionary<string, object?> { ["multiplier"] = 4 }
             };
-            var result = Eval.Execute<double>(_lexer, _parser, "x * user.multiplier + 3", vars);
+            var result = Eval.Execute<double>("x * user.multiplier + 3", vars);
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(23, value));
         }

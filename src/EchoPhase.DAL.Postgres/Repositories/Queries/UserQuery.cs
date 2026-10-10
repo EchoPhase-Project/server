@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using EchoPhase.DAL.Abstractions.Repository;
 using EchoPhase.DAL.Postgres.Models;
-using EchoPhase.Types.Repository;
 using Microsoft.EntityFrameworkCore;
 
 // ── UserQuery ─────────────────────────────────────────────────────────────────
@@ -37,9 +37,9 @@ namespace EchoPhase.DAL.Postgres.Repositories.Queries
             return this;
         }
 
-        public UserQuery WithRefreshTokens()
+        public UserQuery WithSessions()
         {
-            Include(x => x.RefreshTokens);
+            Include(x => x.Sessions);
             return this;
         }
 

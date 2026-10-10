@@ -6,7 +6,6 @@ using System.Text;
 using EchoPhase.Configuration.Cryptography;
 using EchoPhase.Configuration.Cryptography.Aes;
 using EchoPhase.Security.Cryptography.Vaults;
-using EchoPhase.Types.Result.Extensions;
 using Microsoft.Extensions.Options;
 using SystemAesGcm = System.Security.Cryptography.AesGcm;
 
@@ -15,31 +14,18 @@ namespace EchoPhase.Security.Cryptography
     public class AesGcm
     {
         private readonly AesOptions _settings;
-        private byte[] _key;
+        private readonly KeyRing _keys;
 
         public AesGcm(
             IOptions<CryptographyOptions> settings,
-            IKeyVault keyVault
+            KeyRing keys
         )
         {
             _settings = settings.Value.Aes;
-
-            var result = keyVault.GetOrSet(_settings.Key);
-
-            result.OnFailure(err =>
-                throw new InvalidOperationException(err.Value));
-
-            if (!result.TryGetValue(out var key))
-                throw new InvalidOperationException($"Missing '{_settings.Key}' key.");
-
-            _key = key;
+            _keys = keys;
         }
 
-        public AesGcm WithKey(byte[] key)
-        {
-            _key = key;
-            return this;
-        }
+        private byte[] Key => _keys.Get(_settings.Key);
 
         public string EncryptToBase64(string plainText) =>
             EncryptToBase64(Encoding.UTF8.GetBytes(plainText));
@@ -56,7 +42,7 @@ namespace EchoPhase.Security.Cryptography
             byte[] ciphertext = new byte[bytes.Length];
             byte[] tag = new byte[_settings.TagSize];
 
-            using var aesGcm = new SystemAesGcm(_key, _settings.TagSize);
+            using var aesGcm = new SystemAesGcm(Key, _settings.TagSize);
             aesGcm.Encrypt(nonce, bytes, ciphertext, tag);
 
             byte[] result = new byte[_settings.NonceSize + ciphertext.Length + _settings.TagSize];
@@ -90,7 +76,7 @@ namespace EchoPhase.Security.Cryptography
 
             byte[] decryptedBytes = new byte[ciphertext.Length];
 
-            using var aesGcm = new SystemAesGcm(_key, _settings.TagSize);
+            using var aesGcm = new SystemAesGcm(Key, _settings.TagSize);
             aesGcm.Decrypt(nonce, ciphertext, tag, decryptedBytes);
 
             return decryptedBytes;

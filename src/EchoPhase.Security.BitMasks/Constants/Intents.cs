@@ -6,5 +6,8 @@ namespace EchoPhase.Security.BitMasks.Constants
     public class Intents : ConstantsBase<Intents>
     {
         public const string Login = "login";
+        public const string Connections = "connections";
+        public const string Impersonation = "impersonation";
+        public const string Blocks = "blocks";
     }
 }

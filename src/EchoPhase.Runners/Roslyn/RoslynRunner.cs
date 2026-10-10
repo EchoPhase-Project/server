@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.Clients.Discord;
+using EchoPhase.Clients.Twitch;
 using EchoPhase.Configuration.Runner;
 using EchoPhase.Runners.Roslyn.Contexts;
 using EchoPhase.Runners.Roslyn.Validators;
@@ -34,7 +35,7 @@ namespace EchoPhase.Runners.Roslyn
             };
         }
 
-        public async Task RunAsync<TPayload>(string code, TPayload payload)
+        public async Task RunAsync<TPayload>(string code, TPayload payload, CancellationToken ct = default)
         {
             var diagnostics = _validator.Validate(code).ToArray();
             if (diagnostics.Length > 0)
@@ -43,7 +44,8 @@ namespace EchoPhase.Runners.Roslyn
 
             var context = new ScriptContext
             {
-                DiscordClient = GetService<IDiscordClient>()
+                DiscordClient = GetService<IDiscordClient>(),
+                TwitchClient = GetService<ITwitchClient>()
             };
 
             var globals = new ScriptGlobals<TPayload> { Payload = payload, Context = context };
@@ -59,7 +61,7 @@ namespace EchoPhase.Runners.Roslyn
 
             // Globals type is ScriptGlobals<TPayload> — concrete, no interface wrapper.
             var script = CSharpScript.Create(code, options, typeof(ScriptGlobals<TPayload>));
-            await script.RunAsync(globals);
+            await script.RunAsync(globals, cancellationToken: ct);
         }
 
         private T GetService<T>() where T : notnull =>

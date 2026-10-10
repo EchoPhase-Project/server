@@ -2,20 +2,15 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.Scripting.Tests.Models;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Scripting.Tests
 {
     public class TemplateModelTests : IClassFixture<Fixture>
     {
-        private readonly ILexer<TemplateToken> _lexer;
-        private readonly IParser<TemplateToken> _parser;
         private readonly ITestOutputHelper _output;
 
         public TemplateModelTests(Fixture fixture, ITestOutputHelper output)
         {
-            _lexer = fixture.Provider.GetRequiredService<ILexer<TemplateToken>>();
-            _parser = fixture.Provider.GetRequiredService<IParser<TemplateToken>>();
             _output = output;
         }
 
@@ -26,7 +21,7 @@ namespace EchoPhase.Scripting.Tests
             string input = "Hello, @Name! You are @Age years old.";
             var expected = "Hello, Alice! You are 30 years old.";
 
-            var result = Eval.ProcessTemplate<Person, string>(_lexer, _parser, input, person);
+            var result = Eval.ProcessTemplate<Person, string>(input, person);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
@@ -39,7 +34,7 @@ namespace EchoPhase.Scripting.Tests
             string input = "Age squared: @((Age * Age))";
             var expected = "Age squared: 25";
 
-            var result = Eval.ProcessTemplate<Person, string>(_lexer, _parser, input, person);
+            var result = Eval.ProcessTemplate<Person, string>(input, person);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
@@ -52,7 +47,7 @@ namespace EchoPhase.Scripting.Tests
             string input = "Email: \\@bob or @@admin";
             var expected = "Email: @bob or @admin";
 
-            var result = Eval.ProcessTemplate<Person, string>(_lexer, _parser, input, person);
+            var result = Eval.ProcessTemplate<Person, string>(input, person);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
@@ -65,7 +60,7 @@ namespace EchoPhase.Scripting.Tests
             string input = "Name: @Name";
             var expected = "Name: ";
 
-            var result = Eval.ProcessTemplate<Person, string>(_lexer, _parser, input, person);
+            var result = Eval.ProcessTemplate<Person, string>(input, person);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
@@ -77,7 +72,7 @@ namespace EchoPhase.Scripting.Tests
         {
             Assert.Throws<ArgumentNullException>(() =>
             {
-                Eval.ProcessTemplate(_lexer, _parser, "Test @Name", (Person)null!);
+                Eval.ProcessTemplate("Test @Name", (Person)null!);
             });
         }
         */
@@ -89,7 +84,7 @@ namespace EchoPhase.Scripting.Tests
             string input = "City: @Address.City";
             var expected = "City: London";
 
-            var result = Eval.ProcessTemplate<Person, string>(_lexer, _parser, input, person);
+            var result = Eval.ProcessTemplate<Person, string>(input, person);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));

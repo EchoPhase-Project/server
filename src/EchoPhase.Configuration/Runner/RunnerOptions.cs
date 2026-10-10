@@ -9,10 +9,12 @@ namespace EchoPhase.Configuration.Runner
     {
         public const string SectionName = "Runner";
         public Roslyn.RoslynOptions Roslyn { get; set; } = new();
+        public Blocks.BlocksOptions Blocks { get; set; } = new();
 
         public IValidationResult Validate()
         {
             return Roslyn.Validate().WithPrefix(nameof(Roslyn))
+                .Then(() => Blocks.Validate().WithPrefix(nameof(Blocks)))
                 .Then(() => ValidateSelf());
         }
 

@@ -6,6 +6,7 @@ namespace EchoPhase.Configuration.Authentication.Bearer
     public class BearerOptions : IValidatable
     {
         private const int MinLifetimeMinutes = 5;
+        private static readonly TimeSpan MaxVerdictCacheTtl = TimeSpan.FromMinutes(5);
 
         public const string SectionName = "Authentication:Bearer";
         public string Key { get; set; } = "jwt";
@@ -15,12 +16,23 @@ namespace EchoPhase.Configuration.Authentication.Bearer
         public IEnumerable<string> ValidAudiences { get; set; } = new HashSet<string>();
         public TimeSpan Lifetime { get; set; } = TimeSpan.FromMinutes(525600);
 
+        /// <summary>
+        /// How long a "token still valid" verdict is cached. Revocations that miss
+        /// the cache invalidation take effect within this delay; zero disables it.
+        /// </summary>
+        public TimeSpan VerdictCacheTtl { get; set; } = TimeSpan.FromSeconds(30);
+
         public IValidationResult Validate()
         {
             if (Lifetime.TotalMinutes < MinLifetimeMinutes)
                 return ValidationResult.Failure(error =>
                     error.Set(nameof(Lifetime),
                         $"Lifetime must be at least {MinLifetimeMinutes} minutes."));
+
+            if (VerdictCacheTtl < TimeSpan.Zero || VerdictCacheTtl > MaxVerdictCacheTtl)
+                return ValidationResult.Failure(error =>
+                    error.Set(nameof(VerdictCacheTtl),
+                        $"VerdictCacheTtl must be between 0 and {MaxVerdictCacheTtl}."));
 
             if (string.IsNullOrWhiteSpace(Key))
                 return ValidationResult.Failure(error =>

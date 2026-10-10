@@ -1,20 +1,14 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using Microsoft.Extensions.DependencyInjection;
-
 namespace EchoPhase.Scripting.Tests
 {
     public class ProcessTests : IClassFixture<Fixture>
     {
-        private readonly ILexer<TemplateToken> _lexer;
-        private readonly IParser<TemplateToken> _parser;
         private readonly ITestOutputHelper _output;
 
         public ProcessTests(Fixture fixture, ITestOutputHelper output)
         {
-            _lexer = fixture.Provider.GetRequiredService<ILexer<TemplateToken>>();
-            _parser = fixture.Provider.GetRequiredService<IParser<TemplateToken>>();
             _output = output;
         }
 
@@ -30,7 +24,7 @@ namespace EchoPhase.Scripting.Tests
             var input = "Hello, @name! You are @age years old.";
             var expected = "Hello, Alice! You are 30 years old.";
 
-            var result = Eval.Process<string>(_lexer, _parser, input, variables);
+            var result = Eval.Process<string>(input, variables);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
@@ -48,7 +42,7 @@ namespace EchoPhase.Scripting.Tests
             var input = "Sum: @(a + b), product: @(a * b)";
             var expected = "Sum: 15, product: 50";
 
-            var result = Eval.Process<string>(_lexer, _parser, input, variables);
+            var result = Eval.Process<string>(input, variables);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
@@ -66,7 +60,7 @@ namespace EchoPhase.Scripting.Tests
             var input = "Variables: @x and @y, sum: @(x + y)";
             var expected = "Variables: 2 and 3, sum: 5";
 
-            var result = Eval.Process<string>(_lexer, _parser, input, variables);
+            var result = Eval.Process<string>(input, variables);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
@@ -79,7 +73,7 @@ namespace EchoPhase.Scripting.Tests
             var input = "Square plus one: @((val * val) + 1)";
             var expected = "Square plus one: 17";
 
-            var result = Eval.Process<string>(_lexer, _parser, input, variables);
+            var result = Eval.Process<string>(input, variables);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
@@ -92,7 +86,7 @@ namespace EchoPhase.Scripting.Tests
             var input = "This is @@escaped and \\@also escaped, real: @test";
             var expected = "This is @escaped and @also escaped, real: value";
 
-            var result = Eval.Process<string>(_lexer, _parser, input, variables);
+            var result = Eval.Process<string>(input, variables);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));
@@ -105,7 +99,7 @@ namespace EchoPhase.Scripting.Tests
             var input = "Unknown variable: @unknown";
             var expected = "KeyNotFound";
 
-            var result = Eval.Process<string>(_lexer, _parser, input, variables);
+            var result = Eval.Process<string>(input, variables);
 
             result.OnFailure(err => Assert.Contains(expected, err.Code));
             result.OnSuccess(value => Assert.Fail($"Evaluation succeeded"));
@@ -116,9 +110,9 @@ namespace EchoPhase.Scripting.Tests
         {
             var variables = new Dictionary<string, object>();
             var input = "Invalid expression: @(1 + )";
-            var expected = "NotSupported";
+            var expected = "ScriptSyntax";
 
-            var result = Eval.Process<string>(_lexer, _parser, input, variables);
+            var result = Eval.Process<string>(input, variables);
 
             result.OnFailure(err => Assert.Contains(expected, err.Code));
             result.OnSuccess(value => Assert.Fail($"Evaluation succeeded"));
@@ -135,7 +129,7 @@ namespace EchoPhase.Scripting.Tests
                 ["test"] = inj,
             };
 
-            var result = Eval.Process<string>(_lexer, _parser, expr, variables);
+            var result = Eval.Process<string>(expr, variables);
 
             result.OnFailure(err => Assert.Fail($"Evaluation failed: {err.Message}"));
             result.OnSuccess(value => Assert.Equal(expected, value));

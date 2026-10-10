@@ -1,0 +1,49 @@
+info:
+  name: Create
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api-clients"
+  headers:
+    - name: X-CSRF-TOKEN
+      value: "{{X-CSRF-TOKEN}}"
+  body:
+    type: json
+    data: |-
+      {
+        "Name": "bruno-bot",
+        "Claims": {
+          "Permissions": {
+            "users":  ["read"],
+            "events": ["connect"]
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body["client"]["Id"]
+        method: jsonq
+      variable:
+        name: ClientId
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body["clientSecret"]
+        method: jsonq
+      variable:
+        name: ClientSecret
+        scope: runtime
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

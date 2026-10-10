@@ -7,37 +7,29 @@ namespace EchoPhase.Runners.Blocks.Contexts
 {
     public class BlockExecutionContext : IBlockExecutionContext
     {
-        public IEnumerable<int> StartIds { get; set; } = new HashSet<int>() { 0 };
-        public IEnumerable<IBlock> Blocks { get; set; } = new HashSet<IBlock>();
-        public IDictionary<string, object> Variables { get; set; } = new Dictionary<string, object>();
-        public IDictionary<string, int> LoopStates { get; set; } = new Dictionary<string, int>();
-        public IList<string> Output { get; set; } = [];
-        public IList<BlockError> Errors { get; set; } = [];
-        public IServiceProvider Services { get; init; }
-        public Guid UserId { get; init; } = Guid.Empty;
-
-        public BlockExecutionContext(IServiceProvider services)
+        public BlockExecutionContext(BlockProgram program, IServiceProvider services, Guid userId, CancellationToken ct = default)
         {
-            Services = services;
-        }
-
-        public BlockExecutionContext(IEnumerable<int> startIds, IEnumerable<IBlock> blocks, IServiceProvider services, Guid userId)
-        {
-            StartIds = startIds;
-            Blocks = blocks;
+            Graph = new BlockGraph(program.Blocks, program.Connections);
+            Settings = program.Settings;
             Services = services;
             UserId = userId;
+            CancellationToken = ct;
         }
 
-        public BlockExecutionContext Clone()
-        {
-            return new BlockExecutionContext(StartIds, Blocks, Services, UserId)
-            {
-                Variables = new Dictionary<string, object>(Variables),
-                Output = new List<string>(Output),
-                Errors = new List<BlockError>(Errors),
-                LoopStates = new Dictionary<string, int>(LoopStates),
-            };
-        }
+        public BlockGraph Graph { get; }
+        public BlockProgramSettings Settings { get; }
+        public IDictionary<string, object> Variables { get; init; } = new Dictionary<string, object>();
+        public IDictionary<string, object?> BlockOutputs { get; } = new Dictionary<string, object?>();
+        public IList<string> Output { get; } = [];
+        public IList<BlockError> Errors { get; } = [];
+        public IServiceProvider Services { get; }
+        public Guid UserId { get; }
+        public Guid RunId { get; init; }
+        public CancellationToken CancellationToken { get; }
+        public BlockLimits Limits { get; init; } = BlockLimits.Unlimited;
+        public int Steps { get; set; }
+        public int Depth { get; set; }
+
+        public static string OutputKey(int blockId) => $"b{blockId}";
     }
 }

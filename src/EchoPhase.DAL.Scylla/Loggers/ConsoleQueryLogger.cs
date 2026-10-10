@@ -10,11 +10,16 @@ namespace EchoPhase.DAL.Scylla.Loggers
     {
         private readonly bool _enableTiming;
         private readonly bool _formatCql;
+        private readonly bool _includeParameterValues;
 
-        public ConsoleQueryLogger(bool enableTiming = true, bool formatCql = true)
+        /// <param name="includeParameterValues">
+        /// Print bound values. Off by default: they may contain user data or secrets.
+        /// </param>
+        public ConsoleQueryLogger(bool enableTiming = true, bool formatCql = true, bool includeParameterValues = false)
         {
             _enableTiming = enableTiming;
             _formatCql = formatCql;
+            _includeParameterValues = includeParameterValues;
         }
 
         public void LogQuery(string cql, Type resultType, object[] parameters)
@@ -24,7 +29,9 @@ namespace EchoPhase.DAL.Scylla.Loggers
 
             if (parameters.Length > 0)
             {
-                Console.WriteLine($"      Parameters: [{string.Join(", ", parameters)}]");
+                Console.WriteLine(_includeParameterValues
+                    ? $"      Parameters: [{string.Join(", ", parameters)}]"
+                    : $"      Parameters: {parameters.Length}");
             }
 
             var formattedCql = _formatCql ? CqlFormatter.Format(cql) : cql;
@@ -43,6 +50,11 @@ namespace EchoPhase.DAL.Scylla.Loggers
         {
             Console.WriteLine($"      ✗ Query failed: {ex.Message}");
             Console.WriteLine($"      Query: {cql}");
+        }
+
+        public void LogWarning(string message)
+        {
+            Console.WriteLine($"      ! {message}");
         }
     }
 }

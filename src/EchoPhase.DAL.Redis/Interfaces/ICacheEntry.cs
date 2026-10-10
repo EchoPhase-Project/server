@@ -5,12 +5,12 @@ namespace EchoPhase.DAL.Redis.Interfaces
 {
     public interface ICacheEntry<T>
     {
-        Task SetAsync(T data, TimeSpan cacheDuration);
-        Task<T> SetAsync(Func<Task<T>> getData, TimeSpan cacheDuration);
-        Task<T> SetAsync(Func<T> getData, TimeSpan cacheDuration);
-        Task<T> GetAsync();
-        Task<T> GetOrSetAsync(Func<Task<T>> getData, TimeSpan cacheDuration);
-        Task<T> GetOrSetAsync(Func<T> getData, TimeSpan cacheDuration);
-        Task RemoveAsync();
+        Task SetAsync(T data, TimeSpan cacheDuration, CancellationToken ct = default);
+        Task<T> SetAsync(Func<Task<T>> getData, TimeSpan cacheDuration, CancellationToken ct = default);
+        Task<T> SetAsync(Func<T> getData, TimeSpan cacheDuration, CancellationToken ct = default);
+        Task<T> GetAsync(CancellationToken ct = default);
+        Task<T> GetOrSetAsync(Func<Task<T>> getData, TimeSpan cacheDuration, CancellationToken ct = default);
+        Task<T> GetOrSetAsync(Func<T> getData, TimeSpan cacheDuration, CancellationToken ct = default);
+        Task RemoveAsync(CancellationToken ct = default);
     }
 }

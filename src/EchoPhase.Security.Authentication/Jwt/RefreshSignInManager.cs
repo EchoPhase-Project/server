@@ -7,6 +7,7 @@ using EchoPhase.Security.Authentication.Jwt.Claims;
 using EchoPhase.Security.Authentication.Jwt.Exceptions;
 using EchoPhase.Security.Authentication.Jwt.Helpers;
 using EchoPhase.Security.Authentication.Jwt.Providers;
+using EchoPhase.Security.Hashers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
@@ -16,21 +17,24 @@ namespace EchoPhase.Security.Authentication.Jwt
     public class RefreshSignInManager
     {
         private readonly UserManager<User> _userManager;
-        private readonly IRefreshTokenProvider _refresh;
+        private readonly ISessionProvider _refresh;
         private readonly IHttpContextAccessor _httpContext;
         private readonly IUserPrincipalFactory _principalFactory;
         private readonly ILogger<RefreshSignInManager> _logger;
         private readonly UserRepository _userRepository;
+        private readonly PasswordHashingGate _hashing;
 
         public RefreshSignInManager(
             UserManager<User> userManager,
-            IRefreshTokenProvider refresh,
+            PasswordHashingGate hashing,
+            ISessionProvider refresh,
             IHttpContextAccessor httpContext,
             IUserPrincipalFactory principalFactory,
             ILogger<RefreshSignInManager> logger,
             UserRepository userRepository)
         {
             _userManager = userManager;
+            _hashing = hashing;
             _refresh = refresh;
             _httpContext = httpContext;
             _principalFactory = principalFactory;
@@ -38,7 +42,7 @@ namespace EchoPhase.Security.Authentication.Jwt
             _userRepository = userRepository;
         }
 
-        public async Task LoginAsync(string username, string password, string deviceId)
+        public async Task LoginAsync(string username, string password, string deviceId, CancellationToken ct = default)
         {
             var user = await _userManager.FindByNameAsync(username)
                        ?? throw new UnauthorizedAccessException("Invalid credentials.");
@@ -46,7 +50,7 @@ namespace EchoPhase.Security.Authentication.Jwt
             if (await _userManager.IsLockedOutAsync(user))
                 throw new UnauthorizedAccessException("Account locked out.");
 
-            var valid = await _userManager.CheckPasswordAsync(user, password);
+            var valid = await _hashing.RunAsync(() => _userManager.CheckPasswordAsync(user, password), ct);
             if (!valid)
             {
                 await _userManager.AccessFailedAsync(user);
@@ -58,54 +62,54 @@ namespace EchoPhase.Security.Authentication.Jwt
             var context = _httpContext.HttpContext
                           ?? throw new InvalidOperationException("HttpContext is not available.");
 
-            var initial = await _refresh.CreateAsync(user, deviceId);
+            var initial = await _refresh.CreateAsync(user, deviceId, ct);
             context.User = await _principalFactory.CreateAsync(user);
 
             TokenCookieHelper.WriteInitial(context.Response, context.Request, initial);
         }
 
-        public async Task LogoutAsync(Guid userId, Guid tokenId)
+        public async Task LogoutAsync(Guid userId, string refreshToken, CancellationToken ct = default)
         {
-            await _refresh.RevokeAsync(userId, tokenId);
-            await InvalidateUserAsync(userId);
+            await _refresh.RevokeByTokenAsync(userId, refreshToken, ct);
+            await InvalidateUserAsync(userId, ct);
             var context = _httpContext.HttpContext
                           ?? throw new InvalidOperationException("HttpContext is not available.");
             TokenCookieHelper.Clear(context.Response);
         }
 
-        public async Task LogoutAllAsync(Guid userId)
+        public async Task LogoutAllAsync(Guid userId, CancellationToken ct = default)
         {
-            await _refresh.RevokeAllAsync(userId);
-            await InvalidateUserAsync(userId);
+            await _refresh.RevokeAllAsync(userId, ct);
+            await InvalidateUserAsync(userId, ct);
             var context = _httpContext.HttpContext
                           ?? throw new InvalidOperationException("HttpContext is not available.");
             TokenCookieHelper.Clear(context.Response);
         }
 
-        public async Task<TokenPair> RefreshAsync(Guid refreshId, string refreshToken)
+        public async Task<TokenPair> RefreshAsync(string refreshToken, CancellationToken ct = default)
         {
             try
             {
-                return await _refresh.RefreshAsync(refreshId, refreshToken);
+                return await _refresh.RefreshAsync(refreshToken, ct);
             }
             catch (RefreshTokenReusedException ex)
             {
-                await InvalidateUserAsync(ex.UserId);
+                await InvalidateUserAsync(ex.UserId, ct);
                 throw;
             }
         }
 
-        public async Task RevokeSessionAsync(Guid userId, Guid tokenId)
+        public async Task RevokeSessionAsync(Guid userId, Guid sessionId, CancellationToken ct = default)
         {
-            await _refresh.RevokeAsync(userId, tokenId);
-            await InvalidateUserAsync(userId);
+            await _refresh.RevokeAsync(userId, sessionId, ct);
+            await InvalidateUserAsync(userId, ct);
         }
 
-        private async Task InvalidateUserAsync(Guid userId)
+        private async Task InvalidateUserAsync(Guid userId, CancellationToken ct)
         {
-            var user = _userRepository.Query()
+            var user = await _userRepository.Query()
                 .WithIds(userId)
-                .FirstOrDefault()
+                .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("Missing user.");
 
             await _userManager.UpdateSecurityStampAsync(user);

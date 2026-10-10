@@ -1,7 +1,6 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Net.Http.Headers;
 using System.Text.Json;
 using EchoPhase.Clients.Abstractions;
 using EchoPhase.Clients.Discord.Models;
@@ -18,24 +17,23 @@ namespace EchoPhase.Clients.Discord
         }
 
         /// <summary>
-        /// Sends a Discord API request authenticated with a Bot token and
-        /// returns a <see cref="Result{TR}"/>.
+        /// Sends a Discord API request on behalf of <paramref name="connection"/>
+        /// and returns a <see cref="Result{TR}"/>. The bot token is applied by
+        /// the connection authentication handler.
         /// </summary>
         protected Task<Result<TR>> SendAsync<TQ, TB, TR>(
             string uri,
             HttpMethod method,
             TQ? query,
             TB? body,
-            string botToken,
+            ConnectionRef connection,
             CancellationToken ct = default)
             where TQ : class
             where TB : class
             where TR : class
         {
-            var auth = new AuthenticationHeaderValue("Bot", botToken);
-
             return SendRawAsync<TQ, TB, TR, DiscordApiError>(
-                uri, method, query, body, auth,
+                uri, method, query, body, null,
                 readError: (stream, token) =>
                     JsonSerializer.DeserializeAsync<DiscordApiError>(
                         stream, JsonOptions, token).AsTask(),
@@ -44,7 +42,8 @@ namespace EchoPhase.Clients.Discord
                         err?.Code ?? 0,
                         err?.Message,
                         err?.Errors),
-                ct);
+                ct,
+                connection);
         }
     }
 }

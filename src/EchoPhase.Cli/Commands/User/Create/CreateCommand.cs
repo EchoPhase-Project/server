@@ -18,13 +18,13 @@ namespace EchoPhase.Cli.Commands.User.Create
             _userService = userService;
         }
 
-        protected override async Task<int> ExecuteAsync(CommandContext context, CreateSettings settings, CancellationToken cancellationToken)
+        public override async Task<int> ExecuteAsync(CommandContext context, CreateSettings settings, CancellationToken cancellationToken)
         {
             var password = settings.Password;
             if (password.TryFromBase64String(out var bytes))
                 password = Encoding.UTF8.GetString(bytes);
 
-            var result = await _userService.CreateUserAsync(settings.Name, settings.Username, password, settings.Roles);
+            var result = await _userService.CreateUserAsync(settings.Name, settings.Username, password, timeZone: null, settings.Roles);
 
             if (!result.Succeeded)
             {

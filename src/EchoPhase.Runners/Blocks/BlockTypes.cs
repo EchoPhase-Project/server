@@ -13,6 +13,12 @@ namespace EchoPhase.Runners.Blocks
         If,
         For,
         While,
-        DiscordGetUserGuilds
+        Merge,
+        ManualTrigger,
+        WebhookTrigger,
+        ScheduleTrigger,
+        DiscordEventTrigger,
+        DiscordGetUserGuilds,
+        TwitchGetVips
     }
 }

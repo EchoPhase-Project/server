@@ -7,38 +7,38 @@ namespace EchoPhase.Runners.Blocks.Contexts
 {
     public interface IBlockExecutionContext
     {
-        IEnumerable<int> StartIds
-        {
-            get; set;
-        }
-        IEnumerable<IBlock> Blocks
-        {
-            get; set;
-        }
-        IDictionary<string, object> Variables
-        {
-            get; set;
-        }
-        IDictionary<string, int> LoopStates
-        {
-            get; set;
-        }
-        IList<string> Output
-        {
-            get; set;
-        }
-        IList<BlockError> Errors
-        {
-            get; set;
-        }
-        IServiceProvider Services
-        {
-            get; init;
-        }
-        Guid UserId
-        {
-            get; init;
-        }
-        BlockExecutionContext Clone();
+        /// <summary>The program being run.</summary>
+        BlockGraph Graph { get; }
+
+        BlockProgramSettings Settings { get; }
+
+        /// <summary>Named values: Set writes them, expressions read them.</summary>
+        IDictionary<string, object> Variables { get; }
+
+        /// <summary>Each block's latest output by "b{id}"; expressions read it as blocks.b3.</summary>
+        IDictionary<string, object?> BlockOutputs { get; }
+
+        IList<string> Output { get; }
+
+        /// <summary>Failures that stopped the run (or a branch); handled ones are block outputs instead.</summary>
+        IList<BlockError> Errors { get; }
+
+        IServiceProvider Services { get; }
+
+        Guid UserId { get; }
+
+        /// <summary>The stored run this executes, for observers; empty outside one.</summary>
+        Guid RunId { get; }
+
+        /// <summary>Aborts the run (e.g. the HTTP request was cancelled); checked between blocks.</summary>
+        CancellationToken CancellationToken { get; }
+
+        BlockLimits Limits { get; }
+
+        /// <summary>Blocks executed so far in this run, loop iterations included.</summary>
+        int Steps { get; set; }
+
+        /// <summary>Nesting: 0 for the program, +1 inside each branch a block runs (loop bodies).</summary>
+        int Depth { get; set; }
     }
 }

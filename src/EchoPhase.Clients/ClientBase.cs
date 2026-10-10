@@ -63,13 +63,14 @@ namespace EchoPhase.Clients
             AuthenticationHeaderValue? auth,
             Func<System.IO.Stream, CancellationToken, Task<TErr?>> readError,
             Func<TErr?, ApiError> toApiError,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            ConnectionRef? connection = null)
             where TQ : class
             where TB : class
             where TR : class
         {
             var (statusCode, stream) = await _sender
-                .SendAsync(uri, method, query, body, auth, ct);
+                .SendAsync(uri, method, query, body, auth, ct, connection);
 
             await using (stream)
             {
@@ -93,13 +94,14 @@ namespace EchoPhase.Clients
             Func<TWrapper, TR> selectData,
             Func<TWrapper, IPageInfo?> selectPage,
             Func<System.IO.Stream, CancellationToken, Task<ApiError?>> readError,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            ConnectionRef? connection = null)
             where TQ : class
             where TB : class
             where TWrapper : class
         {
             var (statusCode, stream) = await _sender
-                .SendAsync(uri, method, query, body, auth, ct);
+                .SendAsync(uri, method, query, body, auth, ct, connection);
 
             await using (stream)
             {

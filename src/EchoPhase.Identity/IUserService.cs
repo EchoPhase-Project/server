@@ -2,9 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Security.Claims;
+using EchoPhase.DAL.Abstractions.Service;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
-using EchoPhase.Types.Service;
 using Microsoft.AspNetCore.Identity;
 
 namespace EchoPhase.Identity
@@ -15,7 +15,12 @@ namespace EchoPhase.Identity
             string name,
             string username,
             string password,
+            string? timeZone = null,
             params string[] roles);
+        /// <summary>
+        /// Changes the given profile fields; null leaves a field as it is.
+        /// </summary>
+        Task<IdentityResult> UpdateProfileAsync(User user, string? name, string? timeZone);
         Task<IdentityResult> DeleteUserAsync(User user);
         Task<User?> GetAsync(ClaimsPrincipal userPrincipal);
         Task<string> GetOrSetCodeAsync(User user);

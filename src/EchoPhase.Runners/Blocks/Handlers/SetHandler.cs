@@ -2,49 +2,27 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Text.Json;
-using EchoPhase.Runners.Blocks.Contexts;
-using EchoPhase.Runners.Blocks.Models;
 using EchoPhase.Runners.Blocks.Params;
 using EchoPhase.Scripting;
-using EchoPhase.Scripting.Lexers;
-using EchoPhase.Scripting.Parsers;
-using EchoPhase.Scripting.Tokens;
-using EchoPhase.Types.Result.Extensions;
 
 namespace EchoPhase.Runners.Blocks.Handlers
 {
-    [BlockTypeHandler(BlockTypes.Set)]
+    [BlockType(BlockTypes.Set, Description = "Sets a variable; its output is the value.")]
     public class SetHandler : BlockHandlerBase<SetParams>
     {
-        private readonly ILexer<TemplateToken> _lexer;
-        private readonly IParser<TemplateToken> _parser;
-        private readonly ILexer<PathToken> _pathLexer;
-        private readonly IPathParser<PathToken> _pathParser;
-
-        public SetHandler(ILexer<TemplateToken> lexer, IParser<TemplateToken> parser, ILexer<PathToken> pathLexer, IPathParser<PathToken> pathParser)
+        public override Task<BlockResult> ExecuteAsync(BlockCall call, SetParams param)
         {
-            _lexer = lexer;
-            _parser = parser;
-            _pathLexer = pathLexer;
-            _pathParser = pathParser;
-        }
-
-        public override Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, SetParams param)
-        {
+            var context = call.Context;
             object? value;
 
             switch (param.Value.ValueKind)
             {
                 case JsonValueKind.String:
-                    var raw = param.Value.GetString()
-                        ?? throw new InvalidOperationException("Variable string parse exception.");
-                    var result = Eval.Process<string>(_lexer, _parser, raw, context.Variables);
-                    if (!result.TryGetValue(out var processed))
-                        if (result.TryGetError(out var err))
-                            throw new InvalidOperationException(err.Message);
-                        else
-                            throw new InvalidOperationException("Unknown error");
-                    value = TryParsePrimitive(processed);
+                    var raw = param.Value.GetString() ?? string.Empty;
+                    // "@items" or "@(a + 1)" keeps its value's type (a list stays a
+                    // list); mixed text is text, and plain text like "5" reads as 5.
+                    var evaluated = Eval.Evaluate(raw, call.Scope);
+                    value = evaluated is string text ? TryParsePrimitive(text) : evaluated;
                     break;
 
                 case JsonValueKind.Number:
@@ -65,59 +43,23 @@ namespace EchoPhase.Runners.Blocks.Handlers
                     value = null;
                     break;
 
-                case JsonValueKind.Object:
-                    value = JsonElementToDictionary(param.Value);
-                    break;
-
-                case JsonValueKind.Array:
-                    value = JsonElementToList(param.Value);
-                    break;
-
                 default:
-                    value = param.Value.ToString();
+                    value = Eval.Plain(param.Value);
                     break;
             }
 
             if (value != null)
-                Eval.Set(_pathLexer, _pathParser, context.Variables, param.Name, value);
+                Eval.Set(context.Variables, param.Name, value);
 
-            return Task.FromResult(param.Next);
+            return Task.FromResult(BlockResult.Main(value));
         }
-
-        private static Dictionary<string, object?> JsonElementToDictionary(JsonElement element)
-        {
-            var dict = new Dictionary<string, object?>();
-            foreach (var prop in element.EnumerateObject())
-                dict[prop.Name] = JsonElementToObject(prop.Value);
-            return dict;
-        }
-
-        private static List<object?> JsonElementToList(JsonElement element)
-        {
-            var list = new List<object?>();
-            foreach (var item in element.EnumerateArray())
-                list.Add(JsonElementToObject(item));
-            return list;
-        }
-
-        private static object? JsonElementToObject(JsonElement element) => element.ValueKind switch
-        {
-            JsonValueKind.String => element.GetString(),
-            JsonValueKind.Number => element.TryGetInt64(out long l) ? (object)l : element.GetDouble(),
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            JsonValueKind.Null => null,
-            JsonValueKind.Object => JsonElementToDictionary(element),
-            JsonValueKind.Array => JsonElementToList(element),
-            _ => element.GetRawText()
-        };
 
         private object TryParsePrimitive(string input)
         {
             if (string.IsNullOrEmpty(input))
                 return input;
 
-            if (int.TryParse(input, out int i))
+            if (long.TryParse(input, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long i))
                 return i;
 
             if (double.TryParse(input, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double d))

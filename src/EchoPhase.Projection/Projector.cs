@@ -17,8 +17,8 @@ namespace EchoPhase.Projection
     {
         internal readonly ProjectionOptions _defaultOptions;
 
-        private static readonly ConcurrentDictionary<Type, (PropertyInfo Prop, bool IsExposed)[]> _propCache = new();
-        private static readonly ConcurrentDictionary<Type, IReadOnlySet<string>> _exposePathCache = new();
+        private static readonly ConcurrentDictionary<Type, (PropertyInfo Prop, bool IsExposed)[]> PropCache = new();
+        private static readonly ConcurrentDictionary<Type, IReadOnlySet<string>> ExposePathCache = new();
 
         public Projector() => _defaultOptions = new ProjectionOptions();
         public Projector(ProjectionOptions defaultOptions) => _defaultOptions = defaultOptions;
@@ -47,7 +47,7 @@ namespace EchoPhase.Projection
 
             if (fields != null && options.IncludeOnlyExpose)
             {
-                var cached = _exposePathCache.GetOrAdd(source.GetType(), t =>
+                var cached = ExposePathCache.GetOrAdd(source.GetType(), t =>
                 {
                     var set = new HashSet<string>(StringComparer.Ordinal);
                     CollectExposePaths(set, t, "", new HashSet<Type>());
@@ -234,7 +234,7 @@ namespace EchoPhase.Projection
         }
 
         private static (PropertyInfo Prop, bool IsExposed)[] GetCachedProperties(Type type) =>
-            _propCache.GetOrAdd(type, t =>
+            PropCache.GetOrAdd(type, t =>
                 t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                  .Where(p => p.GetIndexParameters().Length == 0)
                  .Select(p => (p, Attribute.IsDefined(p, typeof(ExposeAttribute))))

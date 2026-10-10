@@ -22,10 +22,15 @@ namespace EchoPhase.DAL.Scylla.Builders
             _commands.Add(keyspaceBuilder.Build());
         }
 
+        /// <summary>
+        /// NetworkTopologyStrategy with <paramref name="replicationFactor"/> in every
+        /// datacenter: SimpleStrategy is rejected by keyspaces using tablets
+        /// (the Scylla default since 2025).
+        /// </summary>
         public void CreateKeyspace(string name, int replicationFactor = 1, bool ifNotExists = true, bool durableWrites = true)
         {
             CreateKeyspace(name, ks => ks
-                .WithSimpleStrategy(replicationFactor)
+                .WithNetworkTopologyStrategy(replicationFactor)
                 .WithDurableWrites(durableWrites)
                 .IfNotExists(ifNotExists)
             );

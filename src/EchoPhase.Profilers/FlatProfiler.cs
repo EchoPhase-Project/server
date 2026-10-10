@@ -1,126 +1,32 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Runtime.CompilerServices;
+using System.Collections.Concurrent;
 using System.Text;
 using EchoPhase.Profilers.Models;
+using Microsoft.Extensions.Logging;
 
 namespace EchoPhase.Profilers
 {
-    public class FlatProfiler : IProfiler
+    /// <summary>One entry per step name, however it was reached.</summary>
+    public class FlatProfiler : ProfilerBase
     {
-        private readonly object _lock = new();
-        private readonly Dictionary<string, ProfileNode> _callerTimings = new();
+        private readonly ConcurrentDictionary<string, ProfileNode> _nodes = new();
 
-        public bool IsEnabled { get; private set; } = true;
-
-        public void Enable()
+        public FlatProfiler(bool enabled = true, ILogger<FlatProfiler>? logger = null)
+            : base(enabled, logger)
         {
-            Clear();
-            IsEnabled = true;
         }
 
-        public void Disable() => IsEnabled = false;
+        public override void Clear() => _nodes.Clear();
 
-        public void Clear()
+        protected override IDisposable Begin(string name)
+            => new StepTimer(_nodes.GetOrAdd(name, static n => new ProfileNode(n, parent: null)));
+
+        protected override void DumpTo(StringBuilder sb)
         {
-            lock (_lock)
-            {
-                _callerTimings.Clear();
-            }
-        }
-
-        public IDisposable Step([CallerMemberName] string memberName = "")
-        {
-            if (!IsEnabled)
-                return DisposableEmpty.Instance;
-
-            var node = GetOrCreateNode(memberName);
-            return new StepTimer(node);
-        }
-
-        public void Step(Action action, [CallerMemberName] string memberName = "")
-        {
-            using (Step(memberName))
-            {
-                action();
-            }
-        }
-
-        public T Step<T>(Func<T> action, [CallerMemberName] string memberName = "")
-        {
-            using (Step(memberName))
-            {
-                return action();
-            }
-        }
-
-        public async Task StepAsync(Func<Task> func, [CallerMemberName] string memberName = "")
-        {
-            if (!IsEnabled)
-            {
-                await func();
-                return;
-            }
-
-            using (Step(memberName))
-            {
-                await func();
-            }
-        }
-
-        public async Task<T> StepAsync<T>(Func<Task<T>> func, [CallerMemberName] string memberName = "")
-        {
-            if (!IsEnabled)
-                return await func();
-
-            using (Step(memberName))
-            {
-                return await func();
-            }
-        }
-
-        public string Dump()
-        {
-            var sb = new StringBuilder();
-            lock (_lock)
-            {
-                foreach (var kvp in _callerTimings)
-                {
-                    DumpNodeStats(sb, kvp.Value, kvp.Key);
-                }
-            }
-            return sb.ToString();
-        }
-
-        private ProfileNode GetOrCreateNode(string name)
-        {
-            lock (_lock)
-            {
-                if (!_callerTimings.TryGetValue(name, out var node))
-                    _callerTimings[name] = node = new ProfileNode(name);
-
-                return node;
-            }
-        }
-
-        private void DumpNodeStats(StringBuilder sb, ProfileNode node, string label)
-        {
-            sb.AppendLine($"{label}: count={node.Count}, avg={node.AverageMs:F3} ms, min={node.MinMs:F3} ms, max={node.MaxMs:F3} ms, total={node.TotalMs:F3} ms, memoryChange={FormatBytes(node.TotalMemoryChangeBytes)}");
-        }
-
-        private static string FormatBytes(long bytes)
-        {
-            if (bytes == 0) return "0 B";
-            string[] sizes = { "B", "KB", "MB", "GB" };
-            int order = 0;
-            double len = bytes;
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len /= 1024;
-            }
-            return $"{len:F2} {sizes[order]}";
+            foreach (var node in _nodes.Values.OrderByDescending(n => n.TotalMs))
+                AppendStats(sb, node);
         }
     }
 }

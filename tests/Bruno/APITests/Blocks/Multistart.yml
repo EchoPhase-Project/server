@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/blocks/run"
+  url: "{{baseUrl}}/blocks/runs"
   headers:
     - name: ""
       value: ""
@@ -13,23 +13,24 @@ http:
     type: json
     data: |-
       {
-        "startIds": [1, 10],
+        "startIds": [
+          1,
+          10
+        ],
         "blocks": [
           {
             "id": 1,
             "type": "Set",
             "params": {
               "name": "a",
-              "value": "1",
-              "next": [2]
+              "value": "1"
             }
           },
           {
             "id": 2,
             "type": "Print",
             "params": {
-              "text": "Chain A: a = @a",
-              "next": []
+              "text": "Chain A: a = @a"
             }
           },
           {
@@ -37,17 +38,27 @@ http:
             "type": "Set",
             "params": {
               "name": "b",
-              "value": "99",
-              "next": [11]
+              "value": "99"
             }
           },
           {
             "id": 11,
             "type": "Print",
             "params": {
-              "text": "Chain B: b = @b",
-              "next": []
+              "text": "Chain B: b = @b"
             }
+          }
+        ],
+        "connections": [
+          {
+            "from": 1,
+            "output": "main",
+            "to": 2
+          },
+          {
+            "from": 10,
+            "output": "main",
+            "to": 11
           }
         ]
       }

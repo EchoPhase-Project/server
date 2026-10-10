@@ -4,21 +4,26 @@
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using EchoPhase.Identity;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Security.BitMasks.Extensions;
-using EchoPhase.WebSockets.Exceptions;
 using Microsoft.Extensions.Logging;
 
 namespace EchoPhase.WebSockets
 {
+    /// <summary>
+    /// Sends to gateway connections. A message is serialized once and the
+    /// same bytes go to every recipient; a connection without the required
+    /// intents is skipped; a failed send is logged and does not stop the rest.
+    /// </summary>
     public class WebSocketService
     {
-        private static readonly JsonSerializerOptions JsonOptions = new()
+        // Sent to clients, never embedded in HTML: keep quotes and non-ASCII readable.
+        public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = false
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
         private readonly IRoleService _roleService;
@@ -38,240 +43,90 @@ namespace EchoPhase.WebSockets
             _logger = logger;
         }
 
-        public async Task SendMessageAsync<T>(WebSocket webSocket, T message)
-        {
-            if (webSocket.State != WebSocketState.Open)
-            {
-                _logger.LogWarning("Cannot send message: WebSocket is not open (State: {State})",
-                    webSocket.State);
-                return;
-            }
+        /// <summary>To one connection, whatever its intents (protocol replies).</summary>
+        public Task SendAsync<T>(WebSocketConnection connection, T message, CancellationToken ct = default)
+            => SendBytesAsync(connection, Serialize(message), ct);
 
-            try
-            {
-                var messageBytes = Encoding.UTF8.GetBytes(SerializeMessage(message));
-                await webSocket.SendAsync(
-                    new ArraySegment<byte>(messageBytes),
-                    WebSocketMessageType.Text,
-                    endOfMessage: true,
-                    CancellationToken.None);
-            }
-            catch (WebSocketException ex)
-            {
-                _logger.LogError(ex, "WebSocket error while sending message");
-                throw;
-            }
+        public Task SendMessageToUsersAsync<T>(
+            ISet<Guid> userIds, T message, ISet<string> requiredIntents, CancellationToken ct = default)
+        {
+            var bytes = Serialize(message);
+            var required = Required(requiredIntents);
+            return Task.WhenAll(userIds
+                .SelectMany(id => Eligible(id, required))
+                .Select(c => SendBytesAsync(c, bytes, ct)));
         }
 
-        public Task SendMessageAsync<T>(WebSocketConnection connection, T message) =>
-            SendMessageAsync(connection.WebSocket, message);
-
-        public async Task SendMessageAsync<T>(
-            WebSocketConnection connection,
-            T message,
-            ISet<string> requiredIntents)
-        {
-            if (!_intentsBitmask.Has(connection.Intents, requiredIntents.ToArray()))
-            {
-                _logger.LogWarning(
-                    "Connection {ConnectionId} lacks required intents. Required: {Required}, Has: {Has}",
-                    connection.Id,
-                    string.Join(", ", requiredIntents),
-                    connection.Intents);
-
-                throw new MissingIntentsException(
-                    "Connection {0} lacks required intents. Required: {1}",
-                    connection.Id,
-                    string.Join(", ", requiredIntents));
-            }
-
-            await SendMessageAsync(connection, message);
-        }
-
-        public async Task SendMessageToUserAsync<T>(
-            Guid userId,
-            T message,
-            ISet<string> requiredIntents)
-        {
-            var eligible = GetEligibleConnections(userId, requiredIntents);
-            if (eligible.Count == 0)
-            {
-                _logger.LogDebug("No connections with required intents for UserId: {UserId}", userId);
-                return;
-            }
-
-            await Task.WhenAll(eligible.Select(c => TrySendAsync(c, message)));
-        }
-
-        public async Task SendMessageToUserAsync<T, TShardId>(
-            Guid userId,
-            T message,
-            ISet<string> requiredIntents,
-            TShardId shardId)
+        /// <summary>To one connection per user, picked by hashing <paramref name="shardId"/>.</summary>
+        public Task SendMessageToUsersAsync<T, TShardId>(
+            ISet<Guid> userIds, T message, ISet<string> requiredIntents, TShardId shardId, CancellationToken ct = default)
             where TShardId : struct
         {
-            var eligible = GetEligibleConnections(userId, requiredIntents);
-            if (eligible.Count == 0)
-            {
-                _logger.LogDebug(
-                    "No connections with required intents for UserId: {UserId}, Intents: {Intents}",
-                    userId, string.Join(", ", requiredIntents));
-                return;
-            }
-
-            var shardIndex = CalculateShardIndex(shardId, eligible.Count);
-            var connection = eligible[shardIndex];
-
-            await TrySendAsync(connection, message, shardIndex, eligible.Count);
+            var bytes = Serialize(message);
+            var required = Required(requiredIntents);
+            return Task.WhenAll(userIds
+                .Select(id => Eligible(id, required))
+                .Where(eligible => eligible.Count > 0)
+                .Select(eligible => SendBytesAsync(eligible[ShardIndex(shardId, eligible.Count)], bytes, ct)));
         }
 
-        public async Task SendMessageToUsersAsync<T>(
-            ISet<Guid> userIds,
-            T message,
-            ISet<string> requiredIntents)
-        {
-            var tasks = userIds.Select(userId =>
-                SendMessageToUserAsync(userId, message, requiredIntents));
+        public Task BroadcastMessageAsync<T>(T message, ISet<string> requiredIntents, CancellationToken ct = default)
+            => SendMessageToUsersAsync(_connectionManager.GetConnectedUserIds().ToHashSet(), message, requiredIntents, ct);
 
-            await Task.WhenAll(tasks);
-        }
-
-        public async Task SendMessageToUsersAsync<T, TShardId>(
-            ISet<Guid> userIds,
-            T message,
-            ISet<string> requiredIntents,
-            TShardId shardId)
+        public Task BroadcastMessageAsync<T, TShardId>(
+            T message, ISet<string> requiredIntents, TShardId shardId, CancellationToken ct = default)
             where TShardId : struct
-        {
-            var tasks = userIds.Select(userId =>
-                SendMessageToUserAsync(userId, message, requiredIntents, shardId));
-
-            await Task.WhenAll(tasks);
-        }
-
-        public async Task BroadcastMessageAsync<T>(T message, ISet<string> requiredIntents)
-        {
-            var userIds = _connectionManager.GetConnectedUserIds().ToHashSet();
-            await SendMessageToUsersAsync(userIds, message, requiredIntents);
-        }
-
-        public async Task BroadcastMessageAsync<T, TShardId>(
-            T message,
-            ISet<string> requiredIntents,
-            TShardId shardId)
-            where TShardId : struct
-        {
-            var userIds = _connectionManager.GetConnectedUserIds().ToHashSet();
-            await SendMessageToUsersAsync(userIds, message, requiredIntents, shardId);
-        }
+            => SendMessageToUsersAsync(_connectionManager.GetConnectedUserIds().ToHashSet(), message, requiredIntents, shardId, ct);
 
         public async Task SendMessageToRoleAsync<T>(
-            string role,
-            T message,
-            ISet<string> requiredIntents)
-        {
-            var usersWithRole = await _roleService.GetUsersInRoleAsync(role);
-            var userIds = usersWithRole.Select(u => u.Id).ToHashSet();
-            await SendMessageToUsersAsync(userIds, message, requiredIntents);
-        }
-
-        public async Task SendMessageToRoleAsync<T, TShardId>(
-            string role,
-            T message,
-            ISet<string> requiredIntents,
-            TShardId shardId)
-            where TShardId : struct
-        {
-            var usersWithRole = await _roleService.GetUsersInRoleAsync(role);
-            var userIds = usersWithRole.Select(u => u.Id).ToHashSet();
-            await SendMessageToUsersAsync(userIds, message, requiredIntents, shardId);
-        }
+            string role, T message, ISet<string> requiredIntents, CancellationToken ct = default)
+            => await SendMessageToUsersAsync(await UsersInAsync(new HashSet<string> { role }), message, requiredIntents, ct);
 
         public async Task SendMessageToRolesAsync<T>(
-            ISet<string> roles,
-            T message,
-            ISet<string> requiredIntents)
-        {
-            var usersWithRole = await _roleService.GetUsersInRolesAsync(roles);
-            var userIds = usersWithRole.Select(u => u.Id).ToHashSet();
-            await SendMessageToUsersAsync(userIds, message, requiredIntents);
-        }
+            ISet<string> roles, T message, ISet<string> requiredIntents, CancellationToken ct = default)
+            => await SendMessageToUsersAsync(await UsersInAsync(roles), message, requiredIntents, ct);
 
         public async Task SendMessageToRolesAsync<T, TShardId>(
-            ISet<string> roles,
-            T message,
-            ISet<string> requiredIntents,
-            TShardId shardId)
+            ISet<string> roles, T message, ISet<string> requiredIntents, TShardId shardId, CancellationToken ct = default)
             where TShardId : struct
+            => await SendMessageToUsersAsync(await UsersInAsync(roles), message, requiredIntents, shardId, ct);
+
+        public static byte[] Serialize<T>(T message)
+            => message is string text ? Encoding.UTF8.GetBytes(text) : JsonSerializer.SerializeToUtf8Bytes(message, JsonOptions);
+
+        private async Task<HashSet<Guid>> UsersInAsync(ISet<string> roles)
+            => (await _roleService.GetUsersInRolesAsync(roles)).Select(u => u.Id).ToHashSet();
+
+        private string[] Required(ISet<string> intents) => [.. intents];
+
+        // Only users with sockets here cost anything: others are not in the manager.
+        private List<WebSocketConnection> Eligible(Guid userId, string[] required)
         {
-            var usersWithRole = await _roleService.GetUsersInRolesAsync(roles);
-            var userIds = usersWithRole.Select(u => u.Id).ToHashSet();
-            await SendMessageToUsersAsync(userIds, message, requiredIntents, shardId);
+            var connections = _connectionManager.GetConnections(userId);
+            var eligible = new List<WebSocketConnection>(connections.Count);
+            foreach (var connection in connections)
+                if (connection.IsOpen && _intentsBitmask.Has(connection.Intents, required))
+                    eligible.Add(connection);
+            return eligible;
         }
 
-        private List<WebSocketConnection> GetEligibleConnections(
-            Guid userId,
-            ISet<string> requiredIntents)
-        {
-            if (!_connectionManager.TryGetConnections(userId, out var connections) ||
-                connections is null)
-                return [];
-
-            return connections
-                .Where(c => _intentsBitmask.Has(c.Intents, requiredIntents.ToArray()))
-                .ToList();
-        }
-
-        private async Task TrySendAsync<T>(WebSocketConnection connection, T message)
+        private async Task SendBytesAsync(WebSocketConnection connection, byte[] bytes, CancellationToken ct)
         {
             try
             {
-                await SendMessageAsync(connection, message);
+                await connection.SendAsync(bytes, ct);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is WebSocketException or ObjectDisposedException or OperationCanceledException)
             {
-                _logger.LogError(ex,
-                    "Error sending message to connection {ConnectionId}",
-                    connection.Id);
+                _logger.LogDebug(ex, "Could not send to connection {ConnectionId}", connection.Id);
             }
         }
 
-        private async Task TrySendAsync<T>(
-            WebSocketConnection connection,
-            T message,
-            int shardIndex,
-            int total)
+        private static int ShardIndex<T>(T value, int shardCount) where T : struct
         {
-            try
-            {
-                await SendMessageAsync(connection, message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "Error sending sharded message to connection {ConnectionId} (shard {Shard}/{Total})",
-                    connection.Id, shardIndex, total);
-            }
-        }
-
-        private int CalculateShardIndex<T>(T value, int shardCount) where T : struct
-        {
-            if (shardCount <= 0)
-                throw new ArgumentException("Shard count must be positive", nameof(shardCount));
-
-            ReadOnlySpan<T> span = MemoryMarshal.CreateReadOnlySpan(ref value, 1);
-            ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(span);
-
+            ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref value, 1));
             ulong hash = BitConverter.ToUInt64(bytes.ComputeXxHash3());
             return (int)(hash % (ulong)shardCount);
-        }
-
-        private string SerializeMessage<T>(T message)
-        {
-            if (message is string str)
-                return str;
-
-            return JsonSerializer.Serialize(message, JsonOptions);
         }
     }
 }

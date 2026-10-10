@@ -1,0 +1,16 @@
+// Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
+// See the LICENCE file in the repository root for full licence text.
+
+namespace EchoPhase.DAL.Scylla.Tests
+{
+    public class AuditEntry
+    {
+        public Guid ImpersonationId { get; set; }
+        public Guid At { get; set; }
+        public string? Method { get; set; }
+        public string? Path { get; set; }
+        public int? Status { get; set; }
+        public HashSet<string>? Tags { get; set; }
+        public bool Flagged { get; set; }
+    }
+}

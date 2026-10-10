@@ -8,7 +8,7 @@ namespace EchoPhase.DAL.Scylla.Interfaces
 {
     public interface ISaveStrategy
     {
-        Task<int> ExecuteAsync(IEnumerable<TrackedEntity> entities, Transaction? transaction);
-        int Execute(IEnumerable<TrackedEntity> entities, Transaction? transaction);
+        Task<int> ExecuteAsync(IEnumerable<TrackedEntity> entities, Batch? batch, CancellationToken ct = default);
+        int Execute(IEnumerable<TrackedEntity> entities, Batch? batch);
     }
 }

@@ -44,8 +44,11 @@ namespace EchoPhase.Configuration.Extensions
                     !string.IsNullOrEmpty(pgPw) && !string.IsNullOrEmpty(pgUser) &&
                     !string.IsNullOrEmpty(pgDb))
                 {
+                    // GSS (Kerberos) encryption is unused; Npgsql's default (Prefer)
+                    // tries to load libgssapi_krb5, absent from the aspnet image,
+                    // and logs an error on every start.
                     options.Postgres.ConnectionString =
-                        $"Host={pgHost};Port={pgPort};Database={pgDb};Username={pgUser};Password={pgPw}";
+                        $"Host={pgHost};Port={pgPort};Database={pgDb};Username={pgUser};Password={pgPw};GSS Encryption Mode=Disable";
                 }
 
                 // Scylla env override
@@ -53,6 +56,8 @@ namespace EchoPhase.Configuration.Extensions
                 var scyllaKeyspace = Environment.GetEnvironmentVariable("SCYLLA_KEYSPACE");
                 var scyllaUser = Environment.GetEnvironmentVariable("SCYLLA_USERNAME");
                 var scyllaPw = Environment.GetEnvironmentVariable("SCYLLA_PASSWORD");
+                var scyllaLocalDc = Environment.GetEnvironmentVariable("SCYLLA_LOCAL_DC");
+                var scyllaAutoCreate = Environment.GetEnvironmentVariable("SCYLLA_AUTO_CREATE_KEYSPACE");
 
                 if (!string.IsNullOrWhiteSpace(scyllaContact))
                     options.Scylla.ContactPoint = scyllaContact;
@@ -62,6 +67,10 @@ namespace EchoPhase.Configuration.Extensions
                     options.Scylla.Username = scyllaUser;
                 if (!string.IsNullOrWhiteSpace(scyllaPw))
                     options.Scylla.Password = scyllaPw;
+                if (!string.IsNullOrWhiteSpace(scyllaLocalDc))
+                    options.Scylla.LocalDatacenter = scyllaLocalDc;
+                if (bool.TryParse(scyllaAutoCreate, out var autoCreate))
+                    options.Scylla.AutoCreateKeyspace = autoCreate;
             });
 
             services.AddOptions<Database.DatabaseOptions>()
@@ -77,6 +86,27 @@ namespace EchoPhase.Configuration.Extensions
                 .ValidateOnStart();
 
             services.AddSingleton<IValidateOptions<Configuration.Authentication.AuthenticationOptions>, Configuration.Authentication.AuthenticationValidator>();
+
+            services.AddOptions<Configuration.Network.ForwardedHeadersSettings>()
+                .BindConfiguration(Configuration.Network.ForwardedHeadersSettings.SectionName)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<Configuration.Network.ForwardedHeadersSettings>, Configuration.Network.ForwardedHeadersValidator>();
+
+            services.AddOptions<Configuration.RateLimiting.RateLimitingSettings>()
+                .BindConfiguration(Configuration.RateLimiting.RateLimitingSettings.SectionName)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<Configuration.RateLimiting.RateLimitingSettings>, Configuration.RateLimiting.RateLimitingValidator>();
+
+            services.AddOptions<Configuration.Clients.ClientsOptions>()
+                .BindConfiguration(Configuration.Clients.ClientsOptions.SectionName)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<Configuration.Clients.ClientsOptions>, Configuration.Clients.ClientsValidator>();
 
             services.AddOptions<Configuration.WebSocket.WebSocketOptions>()
                 .BindConfiguration(Configuration.WebSocket.WebSocketOptions.SectionName)

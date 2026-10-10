@@ -18,7 +18,12 @@ namespace EchoPhase.Clients.Discord.WebSocket
         /// <param name="userId">The user whose connection produced the payload.</param>
         /// <param name="tokenName">The token / connection name the payload arrived on.</param>
         /// <param name="connectionId">The exact connection ID.</param>
-        /// <param name="payload">The raw Gateway JSON payload.</param>
-        Task OnPayloadAsync(Guid userId, string tokenName, Guid connectionId, JsonDocument payload);
+        /// <param name="payload">
+        /// The raw Gateway JSON payload. It is disposed once this call completes:
+        /// clone (<c>RootElement.Clone()</c>) anything that must outlive it.
+        /// </param>
+        /// <param name="ct">Cancelled when the connection closes.</param>
+        Task OnPayloadAsync(
+            Guid userId, string tokenName, Guid connectionId, JsonDocument payload, CancellationToken ct = default);
     }
 }

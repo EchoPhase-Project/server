@@ -5,80 +5,110 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/blocks/run"
+  url: "{{baseUrl}}/blocks/runs"
   headers:
     - name: ""
       value: ""
   body:
     type: json
     data: |-
-      {                                                        
-        "startIds": [1],                  
+      {
+        "startIds": [
+          1
+        ],
         "blocks": [
-          {               
-            "id": 1,    
-            "type": "Set",   
-            "params": {              
-              "name": "i",           
-              "value": "0",
-              "next": [2]
-            }             
-          },                         
-          {                   
-            "id": 2,
-            "type": "For",  
+          {
+            "id": 1,
+            "type": "Set",
             "params": {
-              "counterVar": "j",    
-              "start": 1,     
-              "end": 3,       
-              "step": 1,        
-              "bodyNext": [3],             
-              "afterNext": [7]                                     
-            }           
-          },       
+              "name": "i",
+              "value": "0"
+            }
+          },
+          {
+            "id": 2,
+            "type": "For",
+            "params": {
+              "counterVar": "j",
+              "start": 1,
+              "end": 3,
+              "step": 1
+            }
+          },
           {
             "id": 3,
-            "type": "If", 
+            "type": "If",
             "params": {
-              "condition": "(j % 2) == 0",
-              "trueNext": [4],
-              "falseNext": [5]
+              "condition": "(j % 2) == 0"
             }
           },
           {
             "id": 4,
             "type": "Print",
             "params": {
-              "text": "Even number: @j",
-              "next": [6]     
-            }                 
-          },            
-          {                   
-            "id": 5,          
+              "text": "Even number: @j"
+            }
+          },
+          {
+            "id": 5,
             "type": "Print",
-            "params": {     
-              "text": "Odd number: @j",
-              "next": [6]      
-            }            
-          },           
-          {                                 
-            "id": 6,          
-            "type": "Set",    
-            "params": {   
+            "params": {
+              "text": "Odd number: @j"
+            }
+          },
+          {
+            "id": 6,
+            "type": "Set",
+            "params": {
               "name": "i",
-              "value": "@(i + j)",
-              "next": []         
-            }               
-          },           
-          {                             
-            "id": 7,     
+              "value": "@(i + j)"
+            }
+          },
+          {
+            "id": 7,
             "type": "Print",
-            "params": {     
-              "text": "Loop ended, sum = @i",
-              "next": []              
-            }               
-          }            
-        ]                              
+            "params": {
+              "text": "Loop ended, sum = @i"
+            }
+          }
+        ],
+        "connections": [
+          {
+            "from": 1,
+            "output": "main",
+            "to": 2
+          },
+          {
+            "from": 2,
+            "output": "body",
+            "to": 3
+          },
+          {
+            "from": 2,
+            "output": "done",
+            "to": 7
+          },
+          {
+            "from": 3,
+            "output": "true",
+            "to": 4
+          },
+          {
+            "from": 3,
+            "output": "false",
+            "to": 5
+          },
+          {
+            "from": 4,
+            "output": "main",
+            "to": 6
+          },
+          {
+            "from": 5,
+            "output": "main",
+            "to": 6
+          }
+        ]
       }
   auth: inherit
 

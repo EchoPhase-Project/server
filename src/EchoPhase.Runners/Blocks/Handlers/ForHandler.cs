@@ -1,57 +1,39 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using EchoPhase.Runners.Blocks.Contexts;
 using EchoPhase.Runners.Blocks.Models;
 using EchoPhase.Runners.Blocks.Params;
 
 namespace EchoPhase.Runners.Blocks.Handlers
 {
-    [BlockTypeHandler(BlockTypes.For)]
+    [BlockType(BlockTypes.For, Outputs = [BlockOutputs.Done, BlockOutputs.Body],
+        Description = "Runs \"body\" once per counter value (its input is the counter), then goes on through \"done\" with the iteration count.")]
     public class ForHandler : BlockHandlerBase<ForParams>
     {
-        private readonly BlocksRunner _runner;
-
-        public ForHandler(BlocksRunner runner)
+        public override async Task<BlockResult> ExecuteAsync(BlockCall call, ForParams param)
         {
-            _runner = runner;
-        }
-
-        public override async Task<IEnumerable<int>> ExecuteAsync(IBlockExecutionContext context, IBlock block, ForParams param)
-        {
-            if (!context.LoopStates.TryGetValue(param.CounterVar, out int counter))
+            var context = call.Context;
+            int iterations = 0;
+            try
             {
-                counter = param.Start;
-                context.LoopStates[param.CounterVar] = counter;
+                for (int counter = param.Start;
+                     param.Step > 0 ? counter <= param.End : counter >= param.End;
+                     counter += param.Step)
+                {
+                    context.CancellationToken.ThrowIfCancellationRequested();
+                    BlocksRunner.CountStep(context, call.Block.Id);
+
+                    context.Variables[param.CounterVar] = counter;
+                    await call.RunBranchAsync(BlockOutputs.Body, counter);
+                    iterations++;
+                }
+            }
+            finally
+            {
+                context.Variables.Remove(param.CounterVar);
             }
 
-            while (true)
-            {
-                if ((param.Step > 0 && counter > param.End) || (param.Step < 0 && counter < param.End))
-                    break;
-
-                context.Variables[param.CounterVar] = counter;
-
-                var originalStartIds = context.StartIds;
-
-                try
-                {
-                    context.StartIds = param.BodyNext;
-                    await _runner.ExecuteAsync(context);
-                }
-                finally
-                {
-                    context.StartIds = originalStartIds;
-                }
-
-                counter += param.Step;
-                context.LoopStates[param.CounterVar] = counter;
-            }
-
-            context.LoopStates.Remove(param.CounterVar);
-            context.Variables.Remove(param.CounterVar);
-
-            return param.AfterNext;
+            return BlockResult.To(BlockOutputs.Done, iterations);
         }
     }
 }
