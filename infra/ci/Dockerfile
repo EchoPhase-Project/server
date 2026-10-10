@@ -6,7 +6,7 @@ FROM jdxcode/mise:2026.9.18-debian
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      git curl ca-certificates python3 libatomic1 \
+      git openssh-client curl ca-certificates python3 libatomic1 \
       $(apt-cache search --names-only '^libicu[0-9]+$' | cut -d' ' -f1) \
  && rm -rf /var/lib/apt/lists/*
 

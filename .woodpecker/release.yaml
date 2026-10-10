@@ -1,16 +1,18 @@
 # Release: pushes to main and manual runs (UI "Run pipeline", `mise run ci:run`)
 # publish this commit's images and API contract to the in-cluster registry and
-# deploy them. GitHub Actions does the checks (all OSes); this only needs what
-# GitHub cannot reach: the registry and the cluster.
+# release them by committing the tag to the deploy repository (Flux deploys).
+# GitHub Actions does the checks (all OSes); this only needs what GitHub
+# cannot reach: the registry.
 #
 # Manual-run variables:
 #   DEPLOY=false   publish only, do not touch the release
 #
-# Requires the repository to be "trusted" in Woodpecker (privileged builds).
+# Requires the repository to be "trusted" in Woodpecker (privileged builds)
+# and the secret deploy_key (write deploy key of EchoPhase-Project/deploy).
 
 variables:
   # Step image: mise + the tools of mise.lock. `mise run ci:image` updates it.
-  - &ci-image localhost:30500/echophase/ci:9b5e1df7a569
+  - &ci-image localhost:30500/echophase/ci:bc7a46ea9cdb
   - &buildkit moby/buildkit:v0.33.0
   # From pipeline pods the registry is its Service; image references in the
   # chart keep localhost:30500, the address the node pulls from.
@@ -96,19 +98,25 @@ steps:
           requests: { cpu: "1", memory: 1Gi }
           limits: { cpu: "4", memory: 4Gi }
 
-  - name: deploy
+  # GitOps: commit the tag to EchoPhase-Project/deploy; Flux upgrades the
+  # release from there. The step has no rights in the cluster at all.
+  - name: release
     image: *ci-image
     depends_on: [server-image, webapp-image, openapi]
     when:
       - evaluate: 'DEPLOY != "false"'
     environment:
-      REGISTRY_API: *registry
-      # Empty: helm uses the pod's ServiceAccount (in-cluster config).
-      KUBECONFIG: ""
+      # Write deploy key of EchoPhase-Project/deploy (Woodpecker secret).
+      DEPLOY_KEY:
+        from_secret: deploy_key
+      GIT_AUTHOR_NAME: Woodpecker CI
+      GIT_AUTHOR_EMAIL: ci@echophase.invalid
+      GIT_COMMITTER_NAME: Woodpecker CI
+      GIT_COMMITTER_EMAIL: ci@echophase.invalid
     commands:
-      - export IMAGE_TAG=$(cat .image-tag)
-      # No helm/secrets.yaml here: keep the release's values, change the tag.
-      - mise run helm:upgrade --reuse-values
-    backend_options:
-      kubernetes:
-        serviceAccountName: deployer
+      - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+      - printf '%s\n' "$${DEPLOY_KEY}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+      # GitHub's published host key (api.github.com/meta), not ssh-keyscan.
+      - echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > ~/.ssh/known_hosts
+      - git clone -q --depth 1 git@github.com:EchoPhase-Project/deploy.git /tmp/deploy
+      - DEPLOY_DIR=/tmp/deploy mise run release:bump --tag "$(cat .image-tag)" --push

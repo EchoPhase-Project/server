@@ -127,3 +127,37 @@ fi
 echo "$out"
 echo "$WOODPECKER_SERVER/repos"
 '''
+
+# A release is a commit in the deploy repository: the image tags in
+# apps/echophase/helmrelease.yaml (lines marked `# ci:image-tag`). Flux sees
+# it and upgrades. Run by the Woodpecker release workflow, or by hand.
+["release:bump"]
+description = "Set the release's image tags in the deploy repository and commit"
+usage = '''
+flag "--tag <tag>" help="Image tag (default: this checkout's)"
+flag "--push" help="Push the commit (retries on a concurrent push)"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+. scripts/lib.sh
+tag=${usage_tag:-$(image_tag)}
+file=apps/echophase/helmrelease.yaml
+cd "$DEPLOY_DIR"
+sed -i -E "s#^([[:space:]]*tag: )\"[^\"]*\"( \# ci:image-tag)\$#\1\"$tag\"\2#" "$file"
+if git diff --quiet -- "$file"; then
+    echo "deploy repository already at $tag"
+    exit 0
+fi
+git add "$file"
+git commit -q -m "release: echophase $tag"
+echo "committed release $tag"
+if [ "${usage_push:-false}" = true ]; then
+    for attempt in 1 2 3; do
+        git push -q origin HEAD && { echo "pushed"; exit 0; }
+        git pull -q --rebase origin "$(git branch --show-current)"
+    done
+    echo "push failed" >&2
+    exit 1
+fi
+'''

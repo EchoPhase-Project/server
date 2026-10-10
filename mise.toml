@@ -11,6 +11,10 @@ kubectl = "1.36.1"
 oras = "1.3.4"
 # Not in mise's registry: taken from the GitHub release.
 "github:oasdiff/oasdiff" = "1.32.1"
+# GitOps: Flux CLI, and SOPS + age for the encrypted values in the deploy repo.
+flux2 = "2.9.5"
+sops = "3.13.3"
+age = "1.3.2"
 # Woodpecker's CLI (ci:run, linting .woodpecker/); same version as the server.
 "github:woodpecker-ci/woodpecker" = { version = "3.18.1", matching_regex = "^woodpecker-cli_" }
 
@@ -38,5 +42,7 @@ KUBECONFIG = "{{ get_env(name='KUBECONFIG', default=get_env(name='HOME', default
 # CLI token are per machine: mise.local.toml (see mise.local.toml.example).
 WOODPECKER_ADMIN_USER = "{{ get_env(name='WOODPECKER_ADMIN_USER', default='CodeHeister') }}"
 WOODPECKER_REPO = "{{ get_env(name='WOODPECKER_REPO', default='CodeHeister/EchoPhase') }}"
+# Checkout of EchoPhase-Project/deploy (Flux's source of truth).
+DEPLOY_DIR = "{{ get_env(name='DEPLOY_DIR', default=config_root ~ '/../deploy') }}"
 # Isopoh.Cryptography.Argon2 checkout, built into src/packages (isopoh:pack).
 ISOPOH_DIR = "{{ get_env(name='ISOPOH_DIR', default=config_root ~ '/../Isopoh.Cryptography.Argon2/Isopoh.Cryptography.Argon2') }}"
