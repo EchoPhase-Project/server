@@ -1,13 +1,15 @@
+# syntax=docker/dockerfile:1
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dotnet-build
 WORKDIR /src
 
-COPY *.sln* ./
-COPY *.props ./
+# Restore first, from the project files alone, so the layer is reused until
+# a dependency changes. --parents keeps each csproj in its own folder.
+COPY EchoPhase.slnx Directory.Build.props Directory.Packages.props NuGet.config ./
+COPY packages ./packages
+COPY --parents */*.csproj ./
 
-COPY */*.csproj ./
-RUN for file in $(ls *.csproj); do mkdir -p ${file%.*}/ && mv $file ${file%.*}/; done
-
-RUN dotnet restore
+RUN dotnet restore EchoPhase.slnx
 
 COPY . .
 

@@ -3,16 +3,23 @@
   "isRoot": true,
   "tools": {
     "dotnet-outdated-tool": {
-      "version": "4.7.0",
+      "version": "4.8.1",
       "commands": [
         "dotnet-outdated"
       ],
       "rollForward": false
     },
     "dotnet-ef": {
-      "version": "10.0.3",
+      "version": "10.0.12",
       "commands": [
         "dotnet-ef"
+      ],
+      "rollForward": false
+    },
+    "swashbuckle.aspnetcore.cli": {
+      "version": "10.3.0",
+      "commands": [
+        "swagger"
       ],
       "rollForward": false
     }

@@ -67,7 +67,7 @@ packages/
 # Ignore Rider specific files
 *.sln.iml
 
-# Ignore node_modules directory if using npm for frontend packages
+# Ignore node_modules directory if using npm for webapp packages
 node_modules/
 
 # Ignore backup and session files for vim
@@ -80,3 +80,9 @@ Logs/
 *.env
 *.crt
 *.key
+
+# Local NuGet source (see packages/README.md): must reach the build. Keep last,
+# after the packages/ and *.nupkg rules above.
+!packages/
+!packages/*.nupkg
+!packages/README.md
