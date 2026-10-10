@@ -43,7 +43,7 @@ namespace EchoPhase.Controllers.Api.v1.Users
                 return NotFound();
 
             return Ok(users.Select(user =>
-                _projector.For(user).Include(u => u.Id, u => u.Name, u => u.UserName).Build()));
+                _projector.For(user).Only(u => u.Id, u => u.Name, u => u.UserName).Build()));
         }
     }
 }

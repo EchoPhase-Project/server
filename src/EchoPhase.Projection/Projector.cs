@@ -18,7 +18,6 @@ namespace EchoPhase.Projection
         internal readonly ProjectionOptions _defaultOptions;
 
         private static readonly ConcurrentDictionary<Type, (PropertyInfo Prop, bool IsExposed)[]> PropCache = new();
-        private static readonly ConcurrentDictionary<Type, IReadOnlySet<string>> ExposePathCache = new();
 
         public Projector() => _defaultOptions = new ProjectionOptions();
         public Projector(ProjectionOptions defaultOptions) => _defaultOptions = defaultOptions;
@@ -31,207 +30,188 @@ namespace EchoPhase.Projection
 
         // ── Entry point ───────────────────────────────────────────────────────
 
+        /// <param name="exclusive">
+        /// Only the listed fields (<see cref="ProjectionBuilder{T}.Only"/>): exposed
+        /// properties are not added next to them.
+        /// </param>
         internal object? Execute<T>(
             T source,
             ProjectionOptions options,
             IReadOnlyList<Expression<Func<T, object?>>> includeProperties,
-            IReadOnlyDictionary<string, ICollectionConfig>? collectionConfigs = null)
+            IReadOnlyDictionary<string, ICollectionConfig>? collectionConfigs = null,
+            bool exclusive = false)
         {
             if (source == null) return null;
 
-            HashSet<string>? fields;
-            if (includeProperties.Count > 0)
-                fields = includeProperties.Select(ExtractMemberPath).ToHashSet(StringComparer.Ordinal);
-            else
-                fields = options.IncludeOnlyExpose ? new HashSet<string>(StringComparer.Ordinal) : null;
+            ISet<string>? paths = includeProperties.Count > 0
+                ? includeProperties.Select(ExtractMemberPath).ToHashSet(StringComparer.Ordinal)
+                : null;
 
-            if (fields != null && options.IncludeOnlyExpose)
-            {
-                var cached = ExposePathCache.GetOrAdd(source.GetType(), t =>
-                {
-                    var set = new HashSet<string>(StringComparer.Ordinal);
-                    CollectExposePaths(set, t, "", new HashSet<Type>());
-                    return set;
-                });
-                foreach (var path in cached)
-                    fields.Add(path);
-            }
+            var context = new Context(
+                options,
+                MergeExposed: options.IncludeOnlyExpose && !exclusive,
+                collectionConfigs ?? new Dictionary<string, ICollectionConfig>());
 
-            var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
-            collectionConfigs ??= new Dictionary<string, ICollectionConfig>();
+            context.Visited.Add(source);
+            var result = context.NewObject();
+            FillObject(result, source, paths, context);
+            return result;
+        }
 
-            return options.UseExpando
-                ? ProjectToExpando(source!, fields, visited, options, collectionConfigs)
-                : ProjectToDictionary(source!, fields, visited, options, collectionConfigs);
+        /// <summary>
+        /// One projection run. Selection at each level: with no paths (nothing
+        /// included at or above it), every property, or only [Expose] ones under
+        /// IncludeOnlyExpose; with paths, the listed ones and the ancestors of
+        /// deeper ones, plus the exposed ones unless the run is exclusive.
+        /// </summary>
+        private sealed record Context(
+            ProjectionOptions Options,
+            bool MergeExposed,
+            IReadOnlyDictionary<string, ICollectionConfig> CollectionConfigs)
+        {
+            public HashSet<object> Visited { get; } = new(ReferenceEqualityComparer.Instance);
+
+            public IDictionary<string, object?> NewObject() =>
+                Options.UseExpando ? new ExpandoObject() : new Dictionary<string, object?>();
         }
 
         // ── Projection ────────────────────────────────────────────────────────
 
-        private Dictionary<string, object?> ProjectToDictionary(
-            object source, ISet<string>? includePaths,
-            HashSet<object> visited, ProjectionOptions options,
-            IReadOnlyDictionary<string, ICollectionConfig> collectionConfigs)
-        {
-            var dict = new Dictionary<string, object?>();
-            FillDict(dict, source, includePaths, visited, options, collectionConfigs,
-                (s, p, v) => ProjectToDictionary(s, p, v, options, collectionConfigs));
-            return dict;
-        }
-
-        private ExpandoObject ProjectToExpando(
-            object source, ISet<string>? includePaths,
-            HashSet<object> visited, ProjectionOptions options,
-            IReadOnlyDictionary<string, ICollectionConfig> collectionConfigs)
-        {
-            var expando = new ExpandoObject();
-            FillDict(expando, source, includePaths, visited, options, collectionConfigs,
-                (s, p, v) => ProjectToExpando(s, p, v, options, collectionConfigs));
-            return expando;
-        }
-
         private object? ConvertToObject(
-            object? source, ISet<string>? includePaths,
-            HashSet<object> visited, ProjectionOptions options,
-            IReadOnlyDictionary<string, ICollectionConfig> collectionConfigs,
-            Func<object, ISet<string>?, HashSet<object>, object?> recursion,
+            object? source, ISet<string>? paths, Context context,
             ICollectionConfig? collectionConfig = null)
         {
             if (source == null) return null;
 
-            if (source is JsonElement jsonElem)
+            if (source is JsonElement json)
             {
-                switch (jsonElem.ValueKind)
+                switch (json.ValueKind)
                 {
                     case JsonValueKind.Object:
-                        var jdict = new Dictionary<string, object?>();
-                        FillDict(jdict, jsonElem, includePaths, visited, options, collectionConfigs, recursion);
-                        return jdict;
+                        var obj = context.NewObject();
+                        FillObject(obj, json, paths, context);
+                        return obj;
                     case JsonValueKind.Array:
-                        var jlist = new List<object?>();
-                        foreach (var item in jsonElem.EnumerateArray())
-                            jlist.Add(ConvertToObject(item, includePaths, visited, options, collectionConfigs, recursion));
-                        return jlist;
+                        return json.EnumerateArray()
+                            .Select(item => ConvertToObject(item, paths, context))
+                            .ToList();
                     default:
-                        return GetJsonSimpleValue(jsonElem);
+                        return GetJsonSimpleValue(json);
                 }
             }
 
-            if (source is IDictionary rawDict && source is not string)
+            if (IsSimple(source.GetType())) return source;
+
+            if (source is IDictionary or IEnumerable)
             {
-                if (!visited.Add(source)) return null;
-                var dict = new Dictionary<string, object?>();
-                foreach (DictionaryEntry entry in rawDict)
+                // Cycles through collections too (a list containing its owner).
+                if (!context.Visited.Add(source)) return null;
+                try
                 {
-                    var key = entry.Key?.ToString() ?? "";
-                    if (includePaths != null && !includePaths.Contains(key)) continue;
-                    dict[key] = entry.Value is null
-                        ? null
-                        : ConvertToObject(entry.Value, includePaths, visited, options, collectionConfigs, recursion);
-                }
-                visited.Remove(source);
-                return dict;
-            }
+                    if (source is IDictionary dictionary)
+                    {
+                        var obj = context.NewObject();
+                        foreach (DictionaryEntry entry in dictionary)
+                        {
+                            var key = entry.Key.ToString() ?? "";
+                            // Dictionary keys carry no [Expose]: they count as exposed.
+                            if (!Includes(paths, key, isExposed: true, context)) continue;
+                            obj[key] = ConvertToObject(entry.Value, ChildPaths(paths, key, context), context);
+                        }
+                        return obj;
+                    }
 
-            if (source is IEnumerable enumerable && source is not string)
-            {
-                var list = new List<object?>();
-                foreach (var item in enumerable)
+                    var list = new List<object?>();
+                    foreach (var item in (IEnumerable)source)
+                    {
+                        list.Add(item is not null && collectionConfig is not null
+                            ? collectionConfig.ApplyBoxed(this, item).Build()
+                            : ConvertToObject(item, paths, context));
+                    }
+                    return list;
+                }
+                finally
                 {
-                    if (item == null) { list.Add(null); continue; }
-                    // Use typed ApplyBoxed — the cast happens inside CollectionConfig<TItem>
-                    list.Add(collectionConfig != null
-                        ? collectionConfig.ApplyBoxed(this, item).Build()
-                        : ConvertToObject(item, includePaths, visited, options, collectionConfigs, recursion));
+                    context.Visited.Remove(source);
                 }
-                return list;
             }
 
-            if (!IsSimple(source.GetType()))
+            if (!context.Visited.Add(source)) return null;
+            try
             {
-                if (!visited.Add(source)) return null;
-                var dict = new Dictionary<string, object?>();
-                FillDict(dict, source, includePaths, visited, options, collectionConfigs, recursion);
-                visited.Remove(source);
-                return dict;
+                var obj = context.NewObject();
+                FillObject(obj, source, paths, context);
+                return obj;
             }
-
-            return source;
+            finally
+            {
+                context.Visited.Remove(source);
+            }
         }
 
-        private void FillDict(
-            IDictionary<string, object?> dict,
-            object source, ISet<string>? includePaths,
-            HashSet<object> visited, ProjectionOptions options,
-            IReadOnlyDictionary<string, ICollectionConfig> collectionConfigs,
-            Func<object, ISet<string>?, HashSet<object>, object?> recursion)
+        private void FillObject(IDictionary<string, object?> target, object source, ISet<string>? paths, Context context)
         {
-            bool ShouldInclude(string path)
+            if (source is JsonElement json)
             {
-                if (includePaths == null) return true;
-                if (includePaths.Contains(path)) return true;
-                if (!options.IncludeSubPaths) return false;
-                var needle = path + ".";
-                foreach (var p in includePaths)
-                    if (p.StartsWith(needle, StringComparison.Ordinal)) return true;
-                return false;
-            }
-
-            if (source is JsonElement jsonElem)
-            {
-                foreach (var prop in jsonElem.EnumerateObject())
+                foreach (var prop in json.EnumerateObject())
                 {
-                    if (!ShouldInclude(prop.Name)) continue;
-                    var subPaths = options.IncludeNestedContent && includePaths != null && includePaths.Contains(prop.Name)
-                        ? null
-                        : SubPaths(includePaths, prop.Name);
-                    dict[prop.Name] = ConvertToObject(prop.Value, subPaths,
-                        visited, options, collectionConfigs, recursion);
+                    if (!Includes(paths, prop.Name, isExposed: true, context)) continue;
+                    target[prop.Name] = ConvertToObject(prop.Value, ChildPaths(paths, prop.Name, context), context);
                 }
                 return;
             }
 
-            foreach (var (prop, _) in GetCachedProperties(source.GetType()))
+            foreach (var (prop, isExposed) in GetCachedProperties(source.GetType()))
             {
-                if (!ShouldInclude(prop.Name)) continue;
+                if (!Includes(paths, prop.Name, isExposed, context)) continue;
 
-                var val = prop.GetValue(source);
-                if (val is null) { dict[prop.Name] = null; continue; }
-
-                var subPaths = options.IncludeNestedContent && includePaths != null && includePaths.Contains(prop.Name)
-                    ? null
-                    : SubPaths(includePaths, prop.Name);
-
-                collectionConfigs.TryGetValue(prop.Name, out var colConfig);
-                dict[prop.Name] = ConvertToObject(
-                    val, subPaths,
-                    visited, options, collectionConfigs, recursion,
-                    collectionConfig: colConfig);
+                context.CollectionConfigs.TryGetValue(prop.Name, out var collectionConfig);
+                target[prop.Name] = ConvertToObject(
+                    prop.GetValue(source), ChildPaths(paths, prop.Name, context), context, collectionConfig);
             }
+        }
+
+        private static bool Includes(ISet<string>? paths, string name, bool isExposed, Context context)
+        {
+            if (paths == null) return isExposed || !context.Options.IncludeOnlyExpose;
+            if (context.MergeExposed && isExposed) return true;
+            if (paths.Contains(name)) return true;
+
+            var prefix = name + ".";
+            foreach (var path in paths)
+                if (path.StartsWith(prefix, StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// The paths below <paramref name="name"/>. Null (its whole content, by
+        /// the [Expose] rule) when nothing deeper is listed or when the parent
+        /// level selected everything, and, with IncludeSubPaths or
+        /// IncludeNestedContent, when the property itself is listed.
+        /// </summary>
+        private static ISet<string>? ChildPaths(ISet<string>? paths, string name, Context context)
+        {
+            if (paths == null) return null;
+
+            var listed = paths.Contains(name);
+            if (listed && context.Options.IncludeNestedContent) return null;
+
+            var prefix = name + ".";
+            HashSet<string>? deeper = null;
+            foreach (var path in paths)
+            {
+                if (!path.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                deeper ??= new HashSet<string>(StringComparer.Ordinal);
+                deeper.Add(path[prefix.Length..]);
+            }
+
+            if (deeper != null) return deeper;
+            return listed && !context.Options.IncludeSubPaths
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : null;
         }
 
         // ── Path / reflection helpers ─────────────────────────────────────────
-
-        private void CollectExposePaths(ISet<string> fields, Type type, string basePath, HashSet<Type> visitedTypes)
-        {
-            if (!visitedTypes.Add(type)) return;
-
-            foreach (var (prop, isExposed) in GetCachedProperties(type))
-            {
-                var path = basePath.Length == 0 ? prop.Name : string.Concat(basePath, ".", prop.Name);
-
-                if (isExposed) fields.Add(path);
-                if (!isExposed) continue;
-
-                var propType = prop.PropertyType;
-                var elementType = GetCollectionElementType(propType);
-                if (elementType != null) propType = elementType;
-
-                if (!IsSimple(propType))
-                    CollectExposePaths(fields, propType, path, visitedTypes);
-            }
-
-            visitedTypes.Remove(type);
-        }
 
         private static (PropertyInfo Prop, bool IsExposed)[] GetCachedProperties(Type type) =>
             PropCache.GetOrAdd(type, t =>
@@ -239,23 +219,6 @@ namespace EchoPhase.Projection
                  .Where(p => p.GetIndexParameters().Length == 0)
                  .Select(p => (p, Attribute.IsDefined(p, typeof(ExposeAttribute))))
                  .ToArray());
-
-        private static Type? GetCollectionElementType(Type type)
-        {
-            if (type.IsArray) return type.GetElementType();
-            if (type.IsGenericType)
-            {
-                var def = type.GetGenericTypeDefinition();
-                if (def == typeof(IEnumerable<>) || def == typeof(ICollection<>) ||
-                    def == typeof(IList<>) || def == typeof(List<>))
-                    return type.GetGenericArguments()[0];
-
-                var iface = type.GetInterfaces().FirstOrDefault(i =>
-                    i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
-                if (iface != null) return iface.GetGenericArguments()[0];
-            }
-            return null;
-        }
 
         internal static string ExtractMemberPath<T>(Expression<Func<T, object?>> expr)
         {
@@ -283,27 +246,18 @@ namespace EchoPhase.Projection
             sb.Append(member.Member.Name);
         }
 
-        private static ISet<string>? SubPaths(ISet<string>? paths, string parent)
+        /// <summary>Values serialized as they are, not projected property by property.</summary>
+        private static bool IsSimple(Type type)
         {
-            if (paths == null) return null;
-
-            var prefix = parent + ".";
-            HashSet<string>? result = null;
-            foreach (var p in paths)
-            {
-                if (!p.StartsWith(prefix, StringComparison.Ordinal)) continue;
-                result ??= new HashSet<string>(StringComparer.Ordinal);
-                result.Add(p[prefix.Length..]);
-            }
-
-            return result ?? new HashSet<string>(StringComparer.Ordinal);
+            type = Nullable.GetUnderlyingType(type) ?? type;
+            return type.IsPrimitive || type.IsEnum ||
+                type == typeof(string) || type == typeof(decimal) ||
+                type == typeof(DateTime) || type == typeof(DateTimeOffset) ||
+                type == typeof(DateOnly) || type == typeof(TimeOnly) || type == typeof(TimeSpan) ||
+                type == typeof(Guid) || type == typeof(Uri) || type == typeof(Version) ||
+                type == typeof(Half) || type == typeof(Int128) || type == typeof(UInt128) ||
+                type == typeof(System.Numerics.BigInteger);
         }
-
-        private static bool IsSimple(Type type) =>
-            type.IsPrimitive || type.IsEnum ||
-            type == typeof(string) || type == typeof(decimal) ||
-            type == typeof(DateTime) || type == typeof(Guid) ||
-            type == typeof(DateTimeOffset) || type == typeof(TimeSpan);
 
         private static object? GetJsonSimpleValue(JsonElement elem) => elem.ValueKind switch
         {

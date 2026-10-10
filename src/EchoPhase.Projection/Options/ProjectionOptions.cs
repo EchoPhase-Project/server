@@ -10,12 +10,13 @@ namespace EchoPhase.Projection.Options
     {
         /// <summary>
         /// When true, only properties marked with <see cref="EchoPhase.Projection.Attributes.ExposeAttribute"/>
-        /// are included (unless explicit fields are provided via Include()).
+        /// are included, at every level. Include() adds fields to them; Only() replaces them.
         /// </summary>
         public bool IncludeOnlyExpose { get; set; } = true;
 
         /// <summary>
-        /// When true, if a parent path is included, all its children are included automatically.
+        /// When true, an included object or collection keeps its content (by the [Expose]
+        /// rule) unless deeper paths narrow it; when false, it is empty without them.
         /// </summary>
         public bool IncludeSubPaths { get; set; } = true;
 
@@ -26,9 +27,8 @@ namespace EchoPhase.Projection.Options
         public bool UseExpando { get; set; } = false;
 
         /// <summary>
-        /// When true, included fields that are collections or dictionaries
-        /// will have their full content projected recursively,
-        /// instead of being filtered by includePaths.
+        /// When true, an included property keeps its whole content (by the [Expose] rule)
+        /// even when deeper paths of it are listed too.
         /// </summary>
         public bool IncludeNestedContent { get; set; } = false;
 

@@ -21,8 +21,6 @@ namespace EchoPhase.Projection
 
     /// <summary>
     /// Strongly-typed collection projection config.
-    /// Replaces the previous <c>CollectionConfig</c> class that used <c>object</c>
-    /// for both the item type and the apply delegate, forcing an unsafe cast in Projector.
     /// </summary>
     internal sealed class CollectionConfig<TItem> : ICollectionConfig
     {
