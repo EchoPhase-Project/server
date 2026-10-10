@@ -119,4 +119,4 @@ steps:
       # GitHub's published host key (api.github.com/meta), not ssh-keyscan.
       - echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > ~/.ssh/known_hosts
       - git clone -q --depth 1 git@github.com:EchoPhase-Project/deploy.git /tmp/deploy
-      - DEPLOY_DIR=/tmp/deploy mise run release:bump --tag "$(cat .image-tag)" --push
+      - mise run release:bump --deploy-dir /tmp/deploy --tag "$(cat .image-tag)" --push

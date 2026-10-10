@@ -134,6 +134,7 @@ echo "$WOODPECKER_SERVER/repos"
 ["release:bump"]
 description = "Set the release's image tags in the deploy repository and commit"
 usage = '''
+flag "--deploy-dir <dir>" help="Local checkout of EchoPhase-Project/deploy" env="DEPLOY_DIR" required=#true
 flag "--tag <tag>" help="Image tag (default: this checkout's)"
 flag "--push" help="Push the commit (retries on a concurrent push)"
 '''
@@ -143,7 +144,8 @@ set -euo pipefail
 . scripts/lib.sh
 tag=${usage_tag:-$(image_tag)}
 file=apps/echophase/helmrelease.yaml
-cd "$DEPLOY_DIR"
+# Relative paths count from where mise was called, not the task's directory.
+cd "$(cd "${MISE_ORIGINAL_CWD:-.}" && realpath "$usage_deploy_dir")"
 sed -i -E "s#^([[:space:]]*tag: )\"[^\"]*\"( \# ci:image-tag)\$#\1\"$tag\"\2#" "$file"
 if git diff --quiet -- "$file"; then
     echo "deploy repository already at $tag"

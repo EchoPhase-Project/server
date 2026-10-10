@@ -53,7 +53,9 @@ mise run <task> --help         # arguments and flags of a task
 | `registry:prune [--keep n] [--dry-run]` | delete old tags, then garbage-collect |
 | `registry:migrate [--from host:port]` | copy all server/webapp tags from another registry |
 | `k3s:image-prune` | unused images in k3s's containerd (sudo) |
-| `isopoh:pack [--version v]` | pack Isopoh.Cryptography.Argon2 into `src/packages` |
+| `isopoh:pack --isopoh-dir <checkout> [--version v]` | pack Isopoh.Cryptography.Argon2 into `src/packages` |
+| `flux:install --deploy-dir <checkout>`, `flux:status`, `flux:reconcile` | Flux in k3s, synced from EchoPhase-Project/deploy |
+| `release:bump --deploy-dir <checkout> [--tag t] [--push]` | release: commit the image tag to the deploy repository |
 
 ### Environment
 
@@ -67,8 +69,10 @@ overrides work (`DOCKER_REGISTRY=registry.example mise run docker:publish`):
 | `HELM_RELEASE`, `HELM_NAMESPACE` | `echophase` |
 | `HELM_VALUES`, `HELM_SECRETS` | `values.k3s.yaml`, `secrets.yaml` (in `helm/`, used when present) |
 | `KUBECONFIG` | `~/.kube/config` |
-| `ISOPOH_DIR` | `../Isopoh.Cryptography.Argon2/Isopoh.Cryptography.Argon2` |
 | `IMAGE_TAG` | not set: computed from git (see below) |
+
+Local checkouts of other repositories are task arguments (`--deploy-dir`,
+`--isopoh-dir`); `DEPLOY_DIR` / `ISOPOH_DIR` in `mise.local.toml` can stand in.
 
 ### Image tags
 
@@ -104,13 +108,16 @@ Credentials for the chart go in `helm/secrets.yaml` (gitignored; copy
 
 GitHub Actions (`.github/workflows/test.yml`) checks every push and PR on Linux,
 Windows and macOS. Woodpecker in the local k3s (`.woodpecker/release.yaml`)
-does what needs the registry and the cluster: on pushes to `main` and manual
-runs it builds the images, publishes the API contract (failing on breaking
-changes) and deploys.
+does what needs the in-cluster registry: on pushes to `main` and manual runs
+it builds the images, publishes the API contract (failing on breaking changes)
+and releases by committing the image tag to
+[EchoPhase-Project/deploy](https://github.com/EchoPhase-Project/deploy).
+Flux deploys from there; CI has no rights in the cluster.
 
 ```
 GitHub ─webhook─▶ tailscale funnel :8443 /api/hook ─▶ Woodpecker (k3s)
 you (tailnet) ──▶ tailscale serve  :9443 (UI, API)  ─▶ Woodpecker
+Woodpecker ──git push (deploy key)──▶ deploy repo ◀──poll── Flux ──▶ helm upgrade
 ```
 
 Setup, once:
@@ -122,13 +129,17 @@ Setup, once:
 3. `cp mise.local.toml.example mise.local.toml` and fill it in.
 4. `mise run woodpecker:install && mise run tailscale:expose`
 5. In the Woodpecker UI: enable the repository and mark it trusted
-   (privileged image builds, the deploy step's ServiceAccount).
+   (security: privileged image builds); add the secret `deploy_key`, a write
+   deploy key of EchoPhase-Project/deploy (events push and manual).
+6. `mise run flux:install --deploy-dir ../deploy` (Flux, with the SOPS age key
+   from `~/.config/sops/age/keys.txt`).
 
 Then:
 
 ```bash
 mise run ci:run                    # release main now
-mise run ci:run --no-deploy        # images and contract only
+mise run ci:run --no-deploy        # images and contract only, no release
+mise run flux:status               # what Flux has applied
 mise run ci:image                  # rebuild the step image after mise.lock changes
 ```
 

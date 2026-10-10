@@ -50,13 +50,18 @@ ASPNETCORE_ENVIRONMENT=Development \
 # Isopoh.Cryptography.Argon2 is built from source (upstream v2 + our patches,
 # branch `echophase`): nuget.org still serves the 1.x API as 2.0.0.
 ["isopoh:pack"]
-description = "Pack the Isopoh libraries from $ISOPOH_DIR into src/packages"
-usage = 'flag "--version <version>" help="Package version" default="2.1.0-echophase.2"'
+description = "Pack the Isopoh libraries from a local checkout into src/packages"
+usage = '''
+flag "--isopoh-dir <dir>" help="Local checkout of Isopoh.Cryptography.Argon2 (branch echophase)" env="ISOPOH_DIR" required=#true
+flag "--version <version>" help="Package version" default="2.1.0-echophase.2"
+'''
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
+# Relative paths count from where mise was called, not the task's directory.
+isopoh=$(cd "${MISE_ORIGINAL_CWD:-.}" && realpath "$usage_isopoh_dir")
 for p in SecureArray Blake2b Argon2; do
-    proj="$ISOPOH_DIR/lib/Isopoh.Cryptography.$p/Isopoh.Cryptography.$p.csproj"
+    proj="$isopoh/lib/Isopoh.Cryptography.$p/Isopoh.Cryptography.$p.csproj"
     dotnet build "$proj" -c Release -v q -p:GeneratePackageOnBuild=false
     dotnet pack "$proj" -c Release --no-build -p:PackageVersion="$usage_version" -o src/packages
 done

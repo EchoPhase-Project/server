@@ -42,7 +42,3 @@ KUBECONFIG = "{{ get_env(name='KUBECONFIG', default=get_env(name='HOME', default
 # CLI token are per machine: mise.local.toml (see mise.local.toml.example).
 WOODPECKER_ADMIN_USER = "{{ get_env(name='WOODPECKER_ADMIN_USER', default='CodeHeister') }}"
 WOODPECKER_REPO = "{{ get_env(name='WOODPECKER_REPO', default='CodeHeister/EchoPhase') }}"
-# Checkout of EchoPhase-Project/deploy (Flux's source of truth).
-DEPLOY_DIR = "{{ get_env(name='DEPLOY_DIR', default=config_root ~ '/../deploy') }}"
-# Isopoh.Cryptography.Argon2 checkout, built into src/packages (isopoh:pack).
-ISOPOH_DIR = "{{ get_env(name='ISOPOH_DIR', default=config_root ~ '/../Isopoh.Cryptography.Argon2/Isopoh.Cryptography.Argon2') }}"

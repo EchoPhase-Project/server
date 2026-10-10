@@ -45,55 +45,6 @@ spec:
       cpu: "4"
       memory: 4Gi
 ---
-# Identity of the deploy step (backend_options.kubernetes.serviceAccountName):
-# it can change the echophase namespace and nothing else.
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: deployer
-  namespace: woodpecker-pipelines
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: woodpecker-deployer
-  namespace: echophase
-subjects:
-- kind: ServiceAccount
-  name: deployer
-  namespace: woodpecker-pipelines
-roleRef:
-  # Built-in: everything inside one namespace, no cluster-wide rights.
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: admin
----
-# The built-in admin role covers core and apps resources only, not CRDs: the
-# chart's Traefik rate-limit Middleware needs its own grant.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: woodpecker-deployer-crds
-  namespace: echophase
-rules:
-- apiGroups: ["traefik.io"]
-  resources: ["middlewares"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: woodpecker-deployer-crds
-  namespace: echophase
-subjects:
-- kind: ServiceAccount
-  name: deployer
-  namespace: woodpecker-pipelines
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: woodpecker-deployer-crds
----
 # The chart has no hostPort: this forwards 127.0.0.1:30800 on the node to the
 # server, for `tailscale serve` (UI, API) and `tailscale funnel` (webhooks).
 # Bound to 127.0.0.1 only, so the LAN cannot reach Woodpecker.
