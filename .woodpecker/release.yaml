@@ -10,7 +10,7 @@
 
 variables:
   # Step image: mise + the tools of mise.lock. `mise run ci:image` updates it.
-  - &ci-image localhost:30500/echophase/ci:78ef71177f41
+  - &ci-image localhost:30500/echophase/ci:9b5e1df7a569
   - &buildkit moby/buildkit:v0.33.0
   # From pipeline pods the registry is its Service; image references in the
   # chart keep localhost:30500, the address the node pulls from.
@@ -33,7 +33,11 @@ steps:
   - name: image-tag
     image: *ci-image
     commands:
-      - mise run -q image-tag | tee .image-tag
+      # Computed first, written after: a file created during the computation
+      # would count as an uncommitted change and make the tag "-dirty".
+      - TAG=$(mise run -q image-tag)
+      - echo "$${TAG}" > .image-tag
+      - echo "image tag $${TAG}"
 
   - name: server-image
     image: *buildkit

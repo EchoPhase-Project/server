@@ -84,3 +84,5 @@ mise.local.toml
 mise.local.lock
 # NuGet symbol packages: not needed to restore
 src/packages/*.snupkg
+# Image tag the Woodpecker release workflow hands between its steps
+.image-tag
