@@ -54,8 +54,10 @@ ehthumbs.db
 .vscode/
 
 # Ignore build output and logs
-bin/
-obj/
+# Build outputs at any depth (plain bin/ only matches the context root):
+# local builds and the CI openapi step write them next to the sources.
+**/bin/
+**/obj/
 dist/
 *.log
 
