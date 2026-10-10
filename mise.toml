@@ -4,7 +4,7 @@
 [tools]
 # Microsoft's SDK build, the same version as Arch's dotnet-sdk 10.0.12.sdk112.
 dotnet = "10.0.112"
-node = "26.10.0"
+node = "26.11.1"
 helm = "4.3.0"
 # Matches the k3s server (v1.36.1).
 kubectl = "1.36.1"
