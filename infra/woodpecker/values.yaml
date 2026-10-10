@@ -8,6 +8,8 @@ server:
   env:
     WOODPECKER_OPEN: "false"
     WOODPECKER_GITHUB: "true"
+    # infra/woodpecker/postgres.yaml; the datasource comes from Secret woodpecker-db.
+    WOODPECKER_DATABASE_DRIVER: postgres
     # Set by woodpecker:install:
     #   WOODPECKER_HOST                 https://<node>.<tailnet>.ts.net (tailscale serve)
     #   WOODPECKER_EXPERT_WEBHOOK_HOST  same host, port 8443 (tailscale funnel)
@@ -17,6 +19,8 @@ server:
     - woodpecker-github
     # WOODPECKER_GRPC_SECRET (created once by woodpecker:install).
     - woodpecker-grpc
+    # WOODPECKER_DATABASE_DATASOURCE (created once by woodpecker:install).
+    - woodpecker-db
   persistentVolume:
     enabled: true
     size: 5Gi

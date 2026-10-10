@@ -46,6 +46,14 @@ if ! kubectl -n woodpecker get secret woodpecker-grpc >/dev/null 2>&1; then
     kubectl -n woodpecker create secret generic woodpecker-grpc \
         --from-env-file=<(printf 'WOODPECKER_GRPC_SECRET=%s\n' "$(head -c 32 /dev/urandom | base64 | tr -d '/+=')")
 fi
+# Woodpecker's own Postgres; the password is random, made once.
+if ! kubectl -n woodpecker get secret woodpecker-db >/dev/null 2>&1; then
+    pw=$(head -c 32 /dev/urandom | base64 | tr -d '/+=')
+    kubectl -n woodpecker create secret generic woodpecker-db \
+        --from-env-file=<(printf 'POSTGRES_PASSWORD=%s\nWOODPECKER_DATABASE_DATASOURCE=postgres://woodpecker:%s@woodpecker-postgres:5432/woodpecker?sslmode=disable\n' "$pw" "$pw")
+fi
+kubectl apply -f infra/woodpecker/postgres.yaml
+kubectl -n woodpecker rollout status statefulset/woodpecker-postgres --timeout=180s
 helm upgrade --install woodpecker oci://ghcr.io/woodpecker-ci/helm/woodpecker --version 3.7.3 \
     --namespace woodpecker --values infra/woodpecker/values.yaml \
     --set-string "server.env.WOODPECKER_HOST=$WOODPECKER_SERVER" \
