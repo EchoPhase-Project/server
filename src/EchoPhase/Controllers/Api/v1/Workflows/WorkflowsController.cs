@@ -9,7 +9,6 @@ using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
 using EchoPhase.Services.Workflows;
-using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Controllers.Api.v1.Workflows
@@ -150,14 +149,5 @@ namespace EchoPhase.Controllers.Api.v1.Workflows
             schedules = details.Workflow.Schedules
                 .Select(s => new { blockId = s.BlockId, cron = s.Cron, timeZone = s.TimeZone, nextRunAt = s.NextRunAt })
         };
-
-        private ObjectResult Failure(IServiceError error) => Error(error, error.Code switch
-        {
-            WorkflowErrors.NotFound => StatusCodes.Status404NotFound,
-            WorkflowErrors.Conflict => StatusCodes.Status409Conflict,
-            Services.Blocks.BlockRunErrors.TooManyActive => StatusCodes.Status429TooManyRequests,
-            Services.Blocks.BlockRunErrors.QueueFull => StatusCodes.Status503ServiceUnavailable,
-            _ => StatusCodes.Status400BadRequest
-        });
     }
 }

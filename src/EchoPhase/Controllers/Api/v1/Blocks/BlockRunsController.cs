@@ -7,7 +7,6 @@ using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
 using EchoPhase.Services.Blocks;
-using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Controllers.Api.v1.Blocks
@@ -107,14 +106,5 @@ namespace EchoPhase.Controllers.Api.v1.Blocks
             steps = run.Steps,
             errorCount = run.ErrorCount
         };
-
-        private ObjectResult Failure(IServiceError error) => Error(error, error.Code switch
-        {
-            BlockRunErrors.NotFound => StatusCodes.Status404NotFound,
-            BlockRunErrors.AlreadyFinished => StatusCodes.Status409Conflict,
-            BlockRunErrors.TooManyActive => StatusCodes.Status429TooManyRequests,
-            BlockRunErrors.QueueFull => StatusCodes.Status503ServiceUnavailable,
-            _ => StatusCodes.Status400BadRequest
-        });
     }
 }

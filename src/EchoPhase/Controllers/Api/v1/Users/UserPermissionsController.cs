@@ -8,7 +8,6 @@ using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
-using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Controllers.Api.v1.Users
@@ -113,12 +112,5 @@ namespace EchoPhase.Controllers.Api.v1.Users
 
         private ObjectResult UserNotFound(string username)
             => Error(UserPermissionErrors.NotFound, $"User '{username}' not found.", StatusCodes.Status404NotFound);
-
-        private ObjectResult Failure(IServiceError error) => Error(error, error.Code switch
-        {
-            UserPermissionErrors.NotFound => StatusCodes.Status404NotFound,
-            UserPermissionErrors.Forbidden => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status400BadRequest
-        });
     }
 }

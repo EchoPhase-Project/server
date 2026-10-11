@@ -7,7 +7,6 @@ using EchoPhase.Security.Authentication.ApiClients;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
-using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Controllers.Api.v1.ApiClients
@@ -92,9 +91,5 @@ namespace EchoPhase.Controllers.Api.v1.ApiClients
             var result = await _clients.DeleteAsync(User.GetUserId(), id, ct);
             return result.Successful ? NoContent() : Failure(result.Error);
         }
-
-        private ObjectResult Failure(IServiceError error) => Error(error, error.Code == ApiClientErrors.NotFound
-            ? StatusCodes.Status404NotFound
-            : StatusCodes.Status400BadRequest);
     }
 }

@@ -9,7 +9,6 @@ using EchoPhase.Security.Authentication.Impersonation;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
 using EchoPhase.Types.Claims;
-using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -77,13 +76,5 @@ namespace EchoPhase.Controllers.Api.v1.Impersonation
         [RequirePermission(Resources.Sessions, Permissions.Read)]
         public async Task<IActionResult> List(CancellationToken ct = default)
             => Ok(_projector.ForCollection(await _impersonation.ListAsync(User.GetUserId(), ct)).Build());
-
-        private ObjectResult Failure(IServiceError error) => Error(error, error.Code switch
-        {
-            ImpersonationErrors.NotFound => StatusCodes.Status404NotFound,
-            ImpersonationErrors.InvalidCredentials => StatusCodes.Status401Unauthorized,
-            ImpersonationErrors.Forbidden => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status400BadRequest
-        });
     }
 }

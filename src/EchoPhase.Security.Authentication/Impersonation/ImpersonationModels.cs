@@ -1,16 +1,18 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using EchoPhase.Types.Result;
+
 namespace EchoPhase.Security.Authentication.Impersonation
 {
     public static class ImpersonationErrors
     {
-        public const string NotFound = "NotFound";
-        public const string Invalid = "Invalid";
-        public const string InvalidCredentials = "InvalidCredentials";
+        public const string NotFound = ErrorCodes.NotFound;
+        public const string Invalid = ErrorCodes.Invalid;
+        public const string InvalidCredentials = ErrorCodes.InvalidCredentials;
 
         /// <summary>Missing permission, or the target ranks equal to or above the actor.</summary>
-        public const string Forbidden = "Forbidden";
+        public const string Forbidden = ErrorCodes.Forbidden;
     }
 
     /// <summary>

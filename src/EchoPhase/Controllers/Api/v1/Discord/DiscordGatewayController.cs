@@ -5,7 +5,6 @@ using EchoPhase.Clients.Abstractions;
 using EchoPhase.Clients.Discord.WebSocket;
 using EchoPhase.Connections;
 using EchoPhase.Connections.Services;
-using EchoPhase.Controllers.Api.v1.Connections;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
@@ -41,7 +40,7 @@ namespace EchoPhase.Controllers.Api.v1.Discord
             var credential = await _connections.ResolveAsync(
                 new ConnectionRef(userId, dto.Name), ConnectionProviders.Discord, ct);
             if (!credential.Successful)
-                return this.ConnectionError(credential.Error);
+                return Failure(credential.Error);
 
             var connectionId = await _manager.ConnectAsync(
                 userId, dto.Name, credential.Value!.AccessToken, dto.Intents ?? DiscordGatewayIntents.Default, ct);

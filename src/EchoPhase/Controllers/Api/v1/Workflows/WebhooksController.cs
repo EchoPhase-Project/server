@@ -37,14 +37,7 @@ namespace EchoPhase.Controllers.Api.v1.Workflows
         {
             var result = await _workflows.TriggerWebhookAsync(workflowId, blockId, secret, body, ct);
             if (!result.Successful)
-                return Error(result.Error, result.Error.Code switch
-                {
-                    WorkflowErrors.NotFound => StatusCodes.Status404NotFound,
-                    WorkflowErrors.Unauthorized => StatusCodes.Status401Unauthorized,
-                    Services.Blocks.BlockRunErrors.TooManyActive => StatusCodes.Status429TooManyRequests,
-                    Services.Blocks.BlockRunErrors.QueueFull => StatusCodes.Status503ServiceUnavailable,
-                    _ => StatusCodes.Status400BadRequest
-                });
+                return Failure(result.Error);
 
             return Accepted(new { runId = result.Value!.RunId, status = BlockRunStatus.Queued });
         }

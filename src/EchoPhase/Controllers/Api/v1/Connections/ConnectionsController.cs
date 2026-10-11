@@ -59,7 +59,7 @@ namespace EchoPhase.Controllers.Api.v1.Connections
                 new ManualConnectionRequest(dto.Name, dto.AccessToken, dto.RefreshToken, dto.ClientSecret),
                 ct);
 
-            return result.Successful ? Ok(result.Value) : this.ConnectionError(result.Error);
+            return result.Successful ? Ok(result.Value) : Failure(result.Error);
         }
 
         /// <summary>
@@ -76,7 +76,7 @@ namespace EchoPhase.Controllers.Api.v1.Connections
         {
             var result = await _oauth.BeginAsync(User.GetUserId(), provider, dto.Name, dto.AppId, ct);
             if (!result.Successful)
-                return this.ConnectionError(result.Error);
+                return Failure(result.Error);
 
             Response.Cookies.Append(NonceCookie, result.Value!.Nonce, new CookieOptions
             {
@@ -129,7 +129,7 @@ namespace EchoPhase.Controllers.Api.v1.Connections
         public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
         {
             var result = await _connections.DeleteAsync(User.GetUserId(), id, ct);
-            return result.Successful ? NoContent() : this.ConnectionError(result.Error);
+            return result.Successful ? NoContent() : Failure(result.Error);
         }
 
         private IActionResult ReturnToApp(string status, string? reason, string? connection = null)

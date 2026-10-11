@@ -24,10 +24,10 @@ namespace EchoPhase.Services.Workflows
 {
     public static class WorkflowErrors
     {
-        public const string NotFound = "NotFound";
-        public const string Invalid = "Invalid";
-        public const string Conflict = "Conflict";
-        public const string Unauthorized = "Unauthorized";
+        public const string NotFound = ErrorCodes.NotFound;
+        public const string Invalid = ErrorCodes.Invalid;
+        public const string Conflict = ErrorCodes.Conflict;
+        public const string Unauthorized = ErrorCodes.Unauthorized;
     }
 
     /// <summary>A workflow with its definition parsed.</summary>

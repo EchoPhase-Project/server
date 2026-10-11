@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.Connections.Services;
-using EchoPhase.Controllers.Api.v1.Connections;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
@@ -39,7 +38,7 @@ namespace EchoPhase.Controllers.Api.v1.OAuthApps
             var result = await _apps.SaveAsync(
                 User.GetUserId(), dto.Provider, dto.Name, dto.ClientId, dto.ClientSecret, ct);
 
-            return result.Successful ? Ok(result.Value) : this.ConnectionError(result.Error);
+            return result.Successful ? Ok(result.Value) : Failure(result.Error);
         }
 
         [HttpDelete("{id:guid}")]
@@ -48,7 +47,7 @@ namespace EchoPhase.Controllers.Api.v1.OAuthApps
         public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
         {
             var result = await _apps.DeleteAsync(User.GetUserId(), id, ct);
-            return result.Successful ? NoContent() : this.ConnectionError(result.Error);
+            return result.Successful ? NoContent() : Failure(result.Error);
         }
     }
 }

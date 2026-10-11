@@ -47,7 +47,7 @@ namespace EchoPhase.Controllers.Api.v1.Sessions
         public async Task<IActionResult> RevokeCurrentSession(CancellationToken ct = default)
         {
             var result = await _authService.LogoutAsync(User.GetUserId(), ct);
-            return result.Successful ? NoContent() : BadRequest(ErrorBody.From(result.Error));
+            return result.Successful ? NoContent() : Failure(result.Error);
         }
 
         [HttpDelete("{id:guid}")]
@@ -58,7 +58,7 @@ namespace EchoPhase.Controllers.Api.v1.Sessions
         public async Task<IActionResult> RevokeSession([FromRoute] Guid id, CancellationToken ct = default)
         {
             var result = await _authService.RevokeSessionAsync(User.GetUserId(), id, ct);
-            return result.Successful ? NoContent() : BadRequest(ErrorBody.From(result.Error));
+            return result.Successful ? NoContent() : Failure(result.Error);
         }
 
         [HttpDelete]
@@ -69,7 +69,7 @@ namespace EchoPhase.Controllers.Api.v1.Sessions
         public async Task<IActionResult> RevokeAllSessions(CancellationToken ct = default)
         {
             var result = await _authService.LogoutAllAsync(User.GetUserId(), ct);
-            return result.Successful ? NoContent() : BadRequest(ErrorBody.From(result.Error));
+            return result.Successful ? NoContent() : Failure(result.Error);
         }
     }
 }
