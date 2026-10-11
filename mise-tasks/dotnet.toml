@@ -75,6 +75,30 @@ for p in SecureArray Blake2b Argon2; do
 done
 '''
 
+["migrations:add"]
+description = "Add a Postgres (EF Core) migration for the current model"
+usage = '''
+arg "<name>" help="Migration name, e.g. AddWorkflowTags"
+'''
+run = [
+  "dotnet tool restore",
+  "dotnet ef migrations add \"$usage_name\" --project src/EchoPhase.DAL.Postgres --startup-project src/EchoPhase.DAL.Postgres",
+]
+
+["migrations:check"]
+description = "Fail when the Postgres model has changes no migration covers"
+run = [
+  "dotnet tool restore",
+  "dotnet ef migrations has-pending-model-changes --project src/EchoPhase.DAL.Postgres --startup-project src/EchoPhase.DAL.Postgres",
+]
+
+["migrations:script"]
+description = "Idempotent SQL of all Postgres migrations: artifacts/migrations.sql"
+run = [
+  "dotnet tool restore",
+  "dotnet ef migrations script --idempotent --project src/EchoPhase.DAL.Postgres --startup-project src/EchoPhase.DAL.Postgres --output artifacts/migrations.sql",
+]
+
 [clean]
 description = "Remove build outputs and artifacts"
 run = [

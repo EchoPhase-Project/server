@@ -120,6 +120,10 @@ jobs:
       - name: Export OpenAPI document
         run: mise run openapi
 
+      # A model change without its migration would only fail at deploy time.
+      - name: Migrations cover the model
+        run: mise run migrations:check
+
 
   # The image builds from a clean checkout (Dockerfile, .dockerignore, the
   # local NuGet source in src/packages).

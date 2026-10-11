@@ -24,9 +24,8 @@ namespace EchoPhase.DAL.Postgres.Extensions
                 options
                     .UseNpgsql(sp.GetRequiredService<IOptions<Configuration.Database.DatabaseOptions>>().Value.Postgres.ConnectionString, o =>
                     {
-                        o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                        PostgresContext.ConfigureNpgsql(o);
                         o.EnableRetryOnFailure(maxRetryCount: 3);
-                        o.MigrationsHistoryTable("__EFMigrationsHistory", "public");
                     })
                     .AddInterceptors(sp.GetRequiredService<AuditInterceptor>())
                     // Other modules hook into saves by registering an IInterceptor.

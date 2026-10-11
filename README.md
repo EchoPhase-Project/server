@@ -32,6 +32,7 @@ mise tasks                     # everything below
 | `test:coverage` | tests with coverage, Cobertura reports in `artifacts/coverage` |
 | `lint` / `format` | check / apply code style |
 | `openapi` | export `artifacts/openapi.json` (skipped while sources are unchanged) |
+| `migrations:add <name>`, `migrations:check`, `migrations:script` | Postgres migrations (EF Core; `dotnet-ef` from `.config/dotnet-tools.json`) |
 | `openapi:check [--base tag]` | fail on breaking API changes against a published contract |
 | `openapi:publish` | push the contract to `$DOCKER_REGISTRY/echophase/openapi:<tag>` and `latest` |
 | `docker:build`, `docker:push [--tag t]`, `docker:publish` | the server image |

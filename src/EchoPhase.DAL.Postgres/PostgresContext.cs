@@ -7,12 +7,25 @@ using EchoPhase.DAL.Abstractions;
 using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 
 namespace EchoPhase.DAL.Postgres
 {
     public class PostgresContext : IdentityDbContext<User, UserRole, Guid>
     {
         public const string DefaultSchema = "EchoPhase";
+
+        /// <summary>
+        /// Npgsql settings shared by the application and the EF tools
+        /// (<see cref="PostgresContextFactory"/>), so migrations made or scripted
+        /// at design time match the ones the application applies.
+        /// </summary>
+        public static void ConfigureNpgsql(NpgsqlDbContextOptionsBuilder options)
+        {
+            options.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+            // Explicitly in public: unqualified, it would follow search_path.
+            options.MigrationsHistoryTable("__EFMigrationsHistory", "public");
+        }
 
         public PostgresContext(DbContextOptions<PostgresContext> options) : base(options) { }
 

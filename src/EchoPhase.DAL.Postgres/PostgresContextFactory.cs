@@ -6,13 +6,23 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace EchoPhase.DAL.Postgres
 {
+    /// <summary>
+    /// The context for the EF tools (dotnet ef migrations add/script/...). Building
+    /// migrations needs no database; for commands that connect (database update,
+    /// migrations list), set ECHOPHASE_POSTGRES_CONNECTION or pass --connection.
+    /// </summary>
     public class PostgresContextFactory : IDesignTimeDbContextFactory<PostgresContext>
     {
+        public const string ConnectionVariable = "ECHOPHASE_POSTGRES_CONNECTION";
+
         public PostgresContext CreateDbContext(string[] args)
         {
-            var optionsBuilder = new DbContextOptionsBuilder<PostgresContext>();
-            optionsBuilder.UseNpgsql("Host=localhost;Database=dummy;Username=dummy;Password=dummy");
-            return new PostgresContext(optionsBuilder.Options);
+            var connection = Environment.GetEnvironmentVariable(ConnectionVariable)
+                ?? "Host=localhost;Database=echophase;Username=echophase";
+            var options = new DbContextOptionsBuilder<PostgresContext>()
+                .UseNpgsql(connection, PostgresContext.ConfigureNpgsql)
+                .Options;
+            return new PostgresContext(options);
         }
     }
 }
