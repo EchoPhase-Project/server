@@ -45,6 +45,27 @@ Without `--tag` or `IMAGE_TAG`, images get a tag from git
 `0.0.0-g938156d` before any release, plus `-dirty.<time>` for uncommitted
 changes.
 
+## Command line
+
+The server binary doubles as an admin tool: with arguments it runs the command
+and exits (`--continue` starts the server afterwards). In a container:
+`docker exec -i <server> dotnet EchoPhase.dll <command>`, or
+`kubectl exec -i deploy/echophase -c server -- dotnet EchoPhase.dll <command>`.
+
+| Command | What |
+|---|---|
+| `migrate [--status]` | apply the Postgres and Scylla migrations, or only list what is pending |
+| `users`, `roles` | list users (roles, lockouts); list roles and what each grants |
+| `user <name> create <full name> <password> [roles]` | create a user |
+| `user <name> roles add\|remove <roles>` | change a user's roles |
+| `user <name> password` | new password from stdin (or asked for); ends their sessions |
+| `user <name> unlock` | lift a lockout after failed sign-ins |
+| `user <name> sessions [--revoke-all]` | list or end a user's sessions |
+| `user <name> apiclients list\|create <client> [-p resource:actions] [--expires-in days]\|delete <id>` | API clients; `create` prints the secret once |
+| `healthcheck [--url u]` | exit 0 when the server answers |
+
+Exit codes: 0 done, 1 failed (with the reason).
+
 ## CI and releases
 
 - **GitHub Actions** (`.github/workflows/test.yml`): every push and PR, tests

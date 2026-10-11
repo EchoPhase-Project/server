@@ -26,6 +26,17 @@ namespace EchoPhase.Cli.Commands.Database.Migrate
             var pgPendingMigrations = await _pgContext.Database.GetPendingMigrationsAsync(cancellationToken);
             var scyllaPendingMigrations = await _scyllaContext.Database.GetPendingMigrationsAsync(cancellationToken);
 
+            if (settings.Status)
+            {
+                // Before an upgrade: what the next start (or 'migrate') would apply.
+                var applied = await _pgContext.Database.GetAppliedMigrationsAsync(cancellationToken);
+                var table = new Table().AddColumns("Database", "Applied", "Pending");
+                table.AddRow("Postgres", applied.Count().ToString(), Markup.Escape(string.Join(", ", pgPendingMigrations)));
+                table.AddRow("Scylla", "", Markup.Escape(string.Join(", ", scyllaPendingMigrations.Select(m => m.Id))));
+                AnsiConsole.Write(table);
+                return CliExit.Success;
+            }
+
             if (pgPendingMigrations.Any())
             {
                 await _pgContext.Database.MigrateAsync(cancellationToken);

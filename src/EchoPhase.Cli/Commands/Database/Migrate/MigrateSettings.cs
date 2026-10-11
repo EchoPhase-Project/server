@@ -12,6 +12,11 @@ namespace EchoPhase.Cli.Commands.Database.Migrate
         [Description("Start the server after the command")]
         public bool Continue { get; set; } = false;
 
+        [CommandOption("--status")]
+        [DefaultValue(false)]
+        [Description("Only list applied and pending migrations; apply nothing")]
+        public bool Status { get; set; } = false;
+
         [CommandOption("--verbose|-v")]
         [DefaultValue(false)]
         [Description("Show command output")]
