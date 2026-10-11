@@ -5,6 +5,7 @@ namespace EchoPhase.Types.Result
 {
     /// <summary>
     /// Represents an error object used in service result models for conveying error codes and messages.
+    /// Read-only: a result's error is shared by every step it is forwarded through.
     /// </summary>
     public interface IServiceError
     {
@@ -54,11 +55,5 @@ namespace EchoPhase.Types.Result
         /// <returns>A string in the format "Code: Message", or an empty string if the error is empty.</returns>
         string ToString();
 
-        /// <summary>
-        /// Applies the given configuration action to the underlying error instance.
-        /// </summary>
-        /// <param name="configure">An action that modifies the error instance.</param>
-        /// <returns>The current <see cref="IServiceError"/> instance for chaining.</returns>
-        IServiceError Configure(Action<ServiceError> configure);
     }
 }

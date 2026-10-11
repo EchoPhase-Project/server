@@ -127,30 +127,20 @@ namespace EchoPhase.Types.Result
         /// <summary>
         /// Transforms the value inside a successful result using <paramref name="mapper"/>,
         /// wrapping the output in a new <see cref="IServiceResult{TOut}"/>.
-        /// If the current result is a failure or <see cref="Value"/> is <c>null</c>,
-        /// <paramref name="mapper"/> is not invoked and the existing error is forwarded.
-        /// Any exception thrown by <paramref name="mapper"/> is caught and converted into a failure result.
+        /// If the current result is a failure, <paramref name="mapper"/> is not invoked and
+        /// the existing error is forwarded. A successful result passes its value as it is,
+        /// <c>null</c> included. Exceptions from <paramref name="mapper"/> propagate: they
+        /// are bugs or infrastructure failures, not results.
         /// </summary>
         /// <typeparam name="TOut">The type of the transformed value.</typeparam>
         /// <param name="mapper">A function that transforms a value of <typeparamref name="T"/> into <typeparamref name="TOut"/>.</param>
         /// <returns>
-        /// A successful result containing the transformed value, or a failure result
-        /// if this instance already failed or <paramref name="mapper"/> threw an exception.
+        /// A successful result containing the transformed value, or this failure.
         /// </returns>
         public IServiceResult<TOut> Map<TOut>(Func<T, TOut> mapper)
-        {
-            if (!Successful || Value is null)
-                return ServiceResult<TOut>.Failure(Error);
-            try
-            {
-                return ServiceResult<TOut>.Success(mapper(Value));
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<TOut>.Failure(err =>
-                    err.Set(ex.GetType().Name, ex.Message));
-            }
-        }
+            => Successful
+                ? ServiceResult<TOut>.Success(mapper(Value!))
+                : ServiceResult<TOut>.Failure(Error);
 
         // ── Bind ──────────────────────────────────────────────────────────────
 
@@ -158,30 +148,16 @@ namespace EchoPhase.Types.Result
         /// Passes the value of a successful result into <paramref name="binder"/>,
         /// which itself returns an <see cref="IServiceResult{TOut}"/>.
         /// Use this to chain operations where each step can independently succeed or fail.
-        /// If the current result is a failure or <see cref="Value"/> is <c>null</c>,
-        /// <paramref name="binder"/> is not invoked and the existing error is forwarded.
-        /// Any exception thrown by <paramref name="binder"/> is caught and converted into a failure result.
+        /// If the current result is a failure, <paramref name="binder"/> is not invoked and
+        /// the existing error is forwarded; exceptions from it propagate.
         /// </summary>
         /// <typeparam name="TOut">The type of the value returned by the next operation.</typeparam>
         /// <param name="binder">A function that receives the current value and returns a new result.</param>
         /// <returns>
-        /// The result produced by <paramref name="binder"/>, or a failure result
-        /// if this instance already failed or <paramref name="binder"/> threw an exception.
+        /// The result produced by <paramref name="binder"/>, or this failure.
         /// </returns>
         public IServiceResult<TOut> Bind<TOut>(Func<T, IServiceResult<TOut>> binder)
-        {
-            if (!Successful || Value is null)
-                return ServiceResult<TOut>.Failure(Error);
-            try
-            {
-                return binder(Value);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<TOut>.Failure(err =>
-                    err.Set(ex.GetType().Name, ex.Message));
-            }
-        }
+            => Successful ? binder(Value!) : ServiceResult<TOut>.Failure(Error);
 
         // ── BindAsync ─────────────────────────────────────────────────────────
 
@@ -189,31 +165,19 @@ namespace EchoPhase.Types.Result
         /// Asynchronous variant of <see cref="Bind{TOut}"/>.
         /// Passes the value of a successful result into the async <paramref name="binder"/>,
         /// which returns a <see cref="Task{IServiceResult{TOut}}"/>.
-        /// If the current result is a failure or <see cref="Value"/> is <c>null</c>,
-        /// <paramref name="binder"/> is not invoked and the existing error is forwarded.
-        /// Any exception thrown by <paramref name="binder"/> is caught and converted into a failure result.
+        /// If the current result is a failure, <paramref name="binder"/> is not invoked and
+        /// the existing error is forwarded; exceptions from it (cancellation included) propagate.
         /// </summary>
         /// <typeparam name="TOut">The type of the value returned by the next async operation.</typeparam>
         /// <param name="binder">An async function that receives the current value and returns a new result.</param>
         /// <returns>
-        /// A task whose result is the value produced by <paramref name="binder"/>, or a failure result
-        /// if this instance already failed or <paramref name="binder"/> threw an exception.
+        /// A task whose result is the one produced by <paramref name="binder"/>, or this failure.
         /// </returns>
-        public async Task<IServiceResult<TOut>> BindAsync<TOut>(
+        public Task<IServiceResult<TOut>> BindAsync<TOut>(
             Func<T, Task<IServiceResult<TOut>>> binder)
-        {
-            if (!Successful || Value is null)
-                return ServiceResult<TOut>.Failure(Error);
-            try
-            {
-                return await binder(Value);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<TOut>.Failure(err =>
-                    err.Set(ex.GetType().Name, ex.Message));
-            }
-        }
+            => Successful
+                ? binder(Value!)
+                : Task.FromResult(ServiceResult<TOut>.Failure(Error));
 
         // ── Static factory ────────────────────────────────────────────────────
 

@@ -34,5 +34,6 @@
     <Project Path="tests/EchoPhase.Projection.Tests/EchoPhase.Projection.Tests.csproj" />
     <Project Path="tests/EchoPhase.DAL.Postgres.Tests/EchoPhase.DAL.Postgres.Tests.csproj" />
     <Project Path="tests/EchoPhase.DAL.Scylla.Tests/EchoPhase.DAL.Scylla.Tests.csproj" />
+    <Project Path="tests/EchoPhase.Types.Tests/EchoPhase.Types.Tests.csproj" />
   </Folder>
 </Solution>

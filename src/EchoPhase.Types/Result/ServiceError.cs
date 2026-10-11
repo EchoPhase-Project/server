@@ -5,9 +5,12 @@ namespace EchoPhase.Types.Result
 {
     /// <summary>
     /// Represents an error object used to describe service operation errors with a code and message.
+    /// Set while it is being built (the constructor's configure action), read-only afterwards.
     /// </summary>
     public class ServiceError : IServiceError
     {
+        private bool _built;
+
         /// <summary>
         /// Gets the error code representing the type or category of the error.
         /// </summary>
@@ -47,6 +50,7 @@ namespace EchoPhase.Types.Result
         /// </summary>
         public ServiceError()
         {
+            _built = true;
         }
 
         /// <summary>
@@ -56,6 +60,7 @@ namespace EchoPhase.Types.Result
         public ServiceError(Action<ServiceError> configure)
         {
             configure.Invoke(this);
+            _built = true;
         }
 
         /// <summary>
@@ -65,19 +70,9 @@ namespace EchoPhase.Types.Result
         /// <param name="message">The error message.</param>
         public ServiceError(string code, string message)
         {
-            Code = code;
-            Message = message;
-        }
-
-        /// <summary>
-        /// Applies the specified configuration action to this error instance.
-        /// </summary>
-        /// <param name="configure">An action that modifies this error instance.</param>
-        /// <returns>The current <see cref="IServiceError"/> instance.</returns>
-        public IServiceError Configure(Action<ServiceError> configure)
-        {
-            configure.Invoke(this);
-            return this;
+            Code = code ?? string.Empty;
+            Message = message ?? string.Empty;
+            _built = true;
         }
 
         /// <summary>
@@ -90,18 +85,26 @@ namespace EchoPhase.Types.Result
             IsNullOrEmpty ? string.Empty : $"{Code}: {Message}";
 
         /// <summary>
-        /// Sets the error code.
+        /// Sets the error code. Only inside the constructor's configure action.
         /// </summary>
         /// <param name="code">The error code to set. If null, sets to an empty string.</param>
-        public void SetCode(string code) =>
+        /// <exception cref="InvalidOperationException">The error is already built.</exception>
+        public void SetCode(string code)
+        {
+            EnsureBuilding();
             Code = code ?? string.Empty;
+        }
 
         /// <summary>
-        /// Sets the error message.
+        /// Sets the error message. Only inside the constructor's configure action.
         /// </summary>
         /// <param name="message">The error message to set. If null, sets to an empty string.</param>
-        public void SetMessage(string message) =>
+        /// <exception cref="InvalidOperationException">The error is already built.</exception>
+        public void SetMessage(string message)
+        {
+            EnsureBuilding();
             Message = message ?? string.Empty;
+        }
 
         /// <summary>
         /// Sets both the error code and message.
@@ -112,6 +115,12 @@ namespace EchoPhase.Types.Result
         {
             SetCode(code);
             SetMessage(message);
+        }
+
+        private void EnsureBuilding()
+        {
+            if (_built)
+                throw new InvalidOperationException("A service error is read-only once built.");
         }
     }
 }
