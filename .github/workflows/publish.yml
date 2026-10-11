@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
   packages: write
+  # Build provenance: signed with the workflow's OIDC identity, stored next to
+  # the image in GHCR and listed under the org's linked artifacts.
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 env:
   MISE_AUTO_INSTALL: "false"
@@ -46,17 +51,37 @@ jobs:
           fi
 
       - name: Server image
+        id: server
         run: |
           version="${GITHUB_REF_NAME#v}"
           docker build -t "$REGISTRY/server:$version" -t "$REGISTRY/server:latest" ./src
           docker push "$REGISTRY/server:$version"
           docker push "$REGISTRY/server:latest"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$REGISTRY/server:$version")
+          echo "digest=${digest#*@}" >> "$GITHUB_OUTPUT"
+
+      - name: Server image provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/server
+          subject-digest: ${{ steps.server.outputs.digest }}
+          push-to-registry: true
 
       - name: Publish API contract
+        id: openapi
         run: |
           version="${GITHUB_REF_NAME#v}"
           cd artifacts
-          oras push --artifact-type application/vnd.echophase.openapi \
+          digest=$(oras push --artifact-type application/vnd.echophase.openapi \
             --annotation "org.opencontainers.image.source=https://github.com/EchoPhase-Project/server" \
-            "$REGISTRY/openapi:$version" openapi.json:application/vnd.oai.openapi+json
+            --format go-template='{{.digest}}' \
+            "$REGISTRY/openapi:$version" openapi.json:application/vnd.oai.openapi+json)
           oras tag "$REGISTRY/openapi:$version" latest
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: API contract provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/openapi
+          subject-digest: ${{ steps.openapi.outputs.digest }}
+          push-to-registry: true
