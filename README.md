@@ -30,6 +30,7 @@ mise tasks                     # everything below
 |---|---|
 | `test`, `test:verbose` | tests (`mise run test -- --filter-class '*Argon2*'`) |
 | `test:coverage` | tests with coverage, Cobertura reports in `artifacts/coverage` |
+| `coverage:html` | the same as a browsable report: `artifacts/coverage/html/index.html` |
 | `lint` / `format` | check / apply code style |
 | `openapi` | export `artifacts/openapi.json` (skipped while sources are unchanged) |
 | `migrations:add <name>`, `migrations:check`, `migrations:script` | Postgres migrations (EF Core; `dotnet-ef` from `.config/dotnet-tools.json`) |

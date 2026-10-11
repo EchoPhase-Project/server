@@ -13,6 +13,15 @@ dotnet test --solution EchoPhase.slnx --results-directory artifacts/coverage \
     --coverage-settings "$PWD/tests/coverage.runsettings"
 """
 
+["coverage:html"]
+description = "Coverage report to read: artifacts/coverage/html/index.html (also a summary on stdout)"
+depends = ["test:coverage"]
+run = [
+  "dotnet tool restore",
+  "dotnet reportgenerator -reports:'artifacts/coverage/*.cobertura.xml' -targetdir:artifacts/coverage/html -reporttypes:'Html;TextSummary;JsonSummary' -assemblyfilters:'-*.Tests' -classfilters:'-*.Migrations.*'",
+  "cat artifacts/coverage/html/Summary.txt | head -12",
+]
+
 ["test:verbose"]
 description = "Run the .NET tests with detailed output"
 run = "dotnet test --solution EchoPhase.slnx --output Detailed"
