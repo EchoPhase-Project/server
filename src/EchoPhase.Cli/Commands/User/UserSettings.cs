@@ -13,7 +13,7 @@ namespace EchoPhase.Cli.Commands.User
 
         [CommandOption("--continue|-c")]
         [DefaultValue(false)]
-        [Description("Continue execution after migration")]
+        [Description("Start the server after the command")]
         public bool Continue { get; set; } = false;
 
         [CommandOption("--verbose|-v")]

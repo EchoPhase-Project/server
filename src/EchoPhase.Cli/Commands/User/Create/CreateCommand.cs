@@ -30,7 +30,7 @@ namespace EchoPhase.Cli.Commands.User.Create
             {
                 var errors = string.Join(", ", result.Errors.Select(e => e.Description));
                 AnsiConsole.MarkupLine($"[red]Failed to create user: {errors}[/]");
-                return -1;
+                return CliExit.Failure;
             }
 
             if (settings.Verbose)
@@ -39,7 +39,7 @@ namespace EchoPhase.Cli.Commands.User.Create
                         ? $"[green]User '{settings.Username}' created with roles {string.Join(" ", settings.Roles.Select(r => $"'{r}'"))}[/]"
                         : $"[green]User '{settings.Username}' created[/]");
 
-            return settings.Continue ? 0 : 1;
+            return settings.Continue ? CliExit.StartServer : CliExit.Success;
         }
     }
 }

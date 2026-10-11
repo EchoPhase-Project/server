@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.Registrars;
+using Spectre.Console;
 using Spectre.Console.Cli;
 using Commands = EchoPhase.Cli.Commands;
 
@@ -52,7 +53,19 @@ namespace EchoPhase.Extensions
                     .WithExample(new[] { "healthcheck" });
             });
 
-            return args.Count() > 0 ? await app.RunAsync(args) : -1;
+            if (args.Length == 0)
+                return Commands.CliExit.StartServer;
+
+            try
+            {
+                return await app.RunAsync(args);
+            }
+            catch (CommandAppException ex)
+            {
+                // A mistyped command or option: say so instead of crashing.
+                AnsiConsole.MarkupLineInterpolated($"[red]{ex.Message}[/]");
+                return Commands.CliExit.Failure;
+            }
         }
     }
 }

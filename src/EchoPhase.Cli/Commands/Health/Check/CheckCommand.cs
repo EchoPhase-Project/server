@@ -27,16 +27,16 @@ namespace EchoPhase.Cli.Commands.Health.Check
                     if (settings.Verbose)
                         AnsiConsole.MarkupLine("[red]Unhealthy[/]");
 
-                    return 1;
+                    return CliExit.Failure;
                 }
 
                 if (settings.Verbose)
                     AnsiConsole.MarkupLine("[green]Healthy[/]");
-                return 0;
+                return CliExit.Success;
             }
             catch
             {
-                return 1;
+                return CliExit.Failure;
             }
         }
     }

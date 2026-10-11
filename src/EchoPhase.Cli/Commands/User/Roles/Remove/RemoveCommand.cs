@@ -29,17 +29,22 @@ namespace EchoPhase.Cli.Commands.User.Roles.Remove
             if (users is { Count: 0 })
             {
                 AnsiConsole.MarkupLine($"[red]No users found for username '{settings.Username}'[/]");
-                return -1;
+                return CliExit.Failure;
             }
 
             foreach (var user in users)
             {
-                await _roleService.RemoveFromRolesAsync(user, settings.Roles);
+                var result = await _roleService.RemoveFromRolesAsync(user, settings.Roles);
+                if (!result.Successful)
+                {
+                    AnsiConsole.MarkupLineInterpolated($"[red]{result.Error.Message}[/]");
+                    return CliExit.Failure;
+                }
                 if (settings.Verbose)
                     AnsiConsole.MarkupLine($"[green]User '{settings.Username}' revoked role(s) {string.Join(" ", settings.Roles.Select(r => $"'{r}'"))}[/]");
             }
 
-            return settings.Continue ? 0 : 1;
+            return settings.Continue ? CliExit.StartServer : CliExit.Success;
         }
     }
 }

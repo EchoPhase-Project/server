@@ -9,7 +9,7 @@ namespace EchoPhase.Cli.Commands.Database.Migrate
     {
         [CommandOption("--continue|-c")]
         [DefaultValue(false)]
-        [Description("Continue execution after migration")]
+        [Description("Start the server after the command")]
         public bool Continue { get; set; } = false;
 
         [CommandOption("--verbose|-v")]

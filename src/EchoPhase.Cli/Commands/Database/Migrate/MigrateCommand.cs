@@ -40,7 +40,7 @@ namespace EchoPhase.Cli.Commands.Database.Migrate
                     AnsiConsole.MarkupLine("[green]Scylla migrations were applied[/]");
             }
 
-            return settings.Continue ? -1 : 0;
+            return settings.Continue ? CliExit.StartServer : CliExit.Success;
         }
     }
 }
