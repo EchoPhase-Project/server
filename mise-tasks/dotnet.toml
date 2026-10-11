@@ -70,7 +70,7 @@ ASPNETCORE_ENVIRONMENT=Development \
 description = "Pack the Isopoh libraries from a local checkout into src/packages"
 usage = '''
 flag "--isopoh-dir <dir>" help="Local checkout of Isopoh.Cryptography.Argon2 (branch echophase)" env="ISOPOH_DIR" required=#true
-flag "--version <version>" help="Package version" default="2.1.0-echophase.2"
+flag "--version <version>" help="Package version" default="2.1.0-echophase.3"
 '''
 run = '''
 #!/usr/bin/env bash

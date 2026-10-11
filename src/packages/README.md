@@ -6,6 +6,6 @@ backend Dockerfile copies it before `dotnet restore`.
 
 | Package | Version | Built from |
 |---|---|---|
-| Isopoh.Cryptography.Argon2, .Blake2b, .SecureArray | see the `.nupkg` files | `~/Isopoh.Cryptography.Argon2`, branch `echophase` (upstream v2 + patches) |
+| Isopoh.Cryptography.Argon2, .Blake2b, .SecureArray | see the `.nupkg` files | [EchoPhase-Project/Isopoh.Cryptography.Argon2](https://github.com/EchoPhase-Project/Isopoh.Cryptography.Argon2), branch `echophase` (upstream v2 + patches) |
 
 To rebuild: `mise run isopoh:pack` (see mise-tasks/dotnet.toml).
