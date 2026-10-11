@@ -22,5 +22,5 @@
   <Project Path="EchoPhase.Types/EchoPhase.Types.csproj" />
   <Project Path="EchoPhase.WebHooks/EchoPhase.WebHooks.csproj" />
   <Project Path="EchoPhase.WebSockets/EchoPhase.WebSockets.csproj" />
-  <Project Path="EchoPhase/EchoPhase.csproj" />
+  <Project Path="EchoPhase.Server/EchoPhase.Server.csproj" />
 </Solution>

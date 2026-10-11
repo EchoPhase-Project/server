@@ -13,7 +13,7 @@ RUN dotnet restore EchoPhase.slnx
 
 COPY . .
 
-RUN dotnet publish EchoPhase/EchoPhase.csproj -c Release -o /app
+RUN dotnet publish EchoPhase.Server/EchoPhase.Server.csproj -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 # Links the published package to its repository (and its visibility) on GHCR.
@@ -23,4 +23,4 @@ COPY --from=dotnet-build /app .
 # Runs as the image's unprivileged "app" user; file logs go to /app/Logs.
 RUN mkdir -p /app/Logs && chown "$APP_UID:$APP_UID" /app/Logs
 USER $APP_UID
-ENTRYPOINT ["dotnet", "EchoPhase.dll"]
+ENTRYPOINT ["dotnet", "EchoPhase.Server.dll"]

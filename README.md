@@ -50,8 +50,8 @@ changes.
 
 The server binary doubles as an admin tool: with arguments it runs the command
 and exits (`--continue` starts the server afterwards). In a container:
-`docker exec -i <server> dotnet EchoPhase.dll <command>`, or
-`kubectl exec -i deploy/echophase -c server -- dotnet EchoPhase.dll <command>`.
+`docker exec -i <server> dotnet EchoPhase.Server.dll <command>`, or
+`kubectl exec -i deploy/echophase -c server -- dotnet EchoPhase.Server.dll <command>`.
 
 | Command | What |
 |---|---|

@@ -25,7 +25,7 @@
       "src/EchoPhase.Types/EchoPhase.Types.csproj",
       "src/EchoPhase.WebHooks/EchoPhase.WebHooks.csproj",
       "src/EchoPhase.WebSockets/EchoPhase.WebSockets.csproj",
-      "src/EchoPhase/EchoPhase.csproj"
+      "src/EchoPhase.Server/EchoPhase.Server.csproj"
     ]
   }
 }

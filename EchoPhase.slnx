@@ -23,7 +23,7 @@
     <Project Path="src/EchoPhase.Types/EchoPhase.Types.csproj" />
     <Project Path="src/EchoPhase.WebHooks/EchoPhase.WebHooks.csproj" />
     <Project Path="src/EchoPhase.WebSockets/EchoPhase.WebSockets.csproj" />
-    <Project Path="src/EchoPhase/EchoPhase.csproj" />
+    <Project Path="src/EchoPhase.Server/EchoPhase.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/EchoPhase.Security.BitMasks.Tests/EchoPhase.Security.BitMasks.Tests.csproj" />
