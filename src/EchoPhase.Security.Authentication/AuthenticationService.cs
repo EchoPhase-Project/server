@@ -5,7 +5,6 @@ using EchoPhase.Security.Antiforgery;
 using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 
 namespace EchoPhase.Security.Authentication
 {
@@ -14,88 +13,53 @@ namespace EchoPhase.Security.Authentication
         private readonly RefreshSignInManager _signInManager;
         private readonly IAntiforgeryService _antiforgery;
         private readonly IHttpContextAccessor _httpContext;
-        private readonly ILogger<AuthenticationService> _logger;
 
         public AuthenticationService(
             RefreshSignInManager signInManager,
             IAntiforgeryService antiforgery,
-            IHttpContextAccessor httpContext,
-            ILogger<AuthenticationService> logger)
+            IHttpContextAccessor httpContext)
         {
             _signInManager = signInManager;
             _antiforgery = antiforgery;
             _httpContext = httpContext;
-            _logger = logger;
         }
 
         public async Task<IServiceResult> LoginAsync(string username, string password, CancellationToken ct = default)
         {
-            try
-            {
-                await _signInManager.LoginAsync(username, password, ResolveDeviceId(), ct);
+            var result = await _signInManager.LoginAsync(username, password, ResolveDeviceId(), ct);
+            if (result.Successful)
                 _antiforgery.Set();
-                return ServiceResult.Success();
-            }
-            catch (Exception ex)
-            {
-                return Fail(ex);
-            }
+            return result;
         }
 
         public async Task<IServiceResult> LogoutAsync(Guid userId, CancellationToken ct = default)
         {
-            try
-            {
-                var context = _httpContext.HttpContext!;
+            var context = _httpContext.HttpContext!;
 
-                if (context.Request.Cookies.TryGetValue(CookieNames.RefreshToken, out var refreshToken)
-                    && !string.IsNullOrEmpty(refreshToken))
-                {
-                    await _signInManager.LogoutAsync(userId, refreshToken, ct);
-                }
-
-                _antiforgery.Remove();
-                return ServiceResult.Success();
-            }
-            catch (Exception ex)
+            if (context.Request.Cookies.TryGetValue(CookieNames.RefreshToken, out var refreshToken)
+                && !string.IsNullOrEmpty(refreshToken))
             {
-                return Fail(ex);
+                await _signInManager.LogoutAsync(userId, refreshToken, ct);
             }
+
+            _antiforgery.Remove();
+            return ServiceResult.Success();
         }
 
         public async Task<IServiceResult> LogoutAllAsync(Guid userId, CancellationToken ct = default)
         {
-            try
-            {
-                await _signInManager.LogoutAllAsync(userId, ct);
-                _antiforgery.Remove();
-                return ServiceResult.Success();
-            }
-            catch (Exception ex)
-            {
-                return Fail(ex);
-            }
+            await _signInManager.LogoutAllAsync(userId, ct);
+            _antiforgery.Remove();
+            return ServiceResult.Success();
         }
 
         public async Task<IServiceResult> RevokeSessionAsync(Guid userId, Guid sessionId, CancellationToken ct = default)
         {
-            try
-            {
-                await _signInManager.RevokeSessionAsync(userId, sessionId, ct);
-                return ServiceResult.Success();
-            }
-            catch (Exception ex)
-            {
-                return Fail(ex);
-            }
+            await _signInManager.RevokeSessionAsync(userId, sessionId, ct);
+            return ServiceResult.Success();
         }
 
         private string ResolveDeviceId()
             => _httpContext.HttpContext!.Request.Headers.UserAgent.ToString();
-
-        private static IServiceResult Fail(Exception ex)
-            => ServiceResult.Failure(e => e.Set(
-                ex.GetType().Name.Replace("Exception", string.Empty),
-                ex.Message));
     }
 }

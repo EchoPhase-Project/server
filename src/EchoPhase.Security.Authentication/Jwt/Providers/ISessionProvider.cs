@@ -3,6 +3,7 @@
 
 using EchoPhase.DAL.Abstractions.Repository;
 using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.Types.Result;
 
 namespace EchoPhase.Security.Authentication.Jwt.Providers
 {
@@ -14,12 +15,11 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
         /// Rotates the session's refresh token and issues a new access token.
         /// When the token was rotated moments ago by a parallel request, only an
         /// access token is returned (<see cref="TokenPair.RefreshToken"/> is <c>null</c>).
+        /// Fails with <see cref="AuthErrors.InvalidRefreshToken"/> for an unknown token,
+        /// or with a <see cref="RefreshTokenReusedError"/> when an old token was replayed
+        /// outside the grace period (the session is then revoked).
         /// </summary>
-        /// <exception cref="Exceptions.RefreshTokenReusedException">
-        /// An old token was replayed outside the grace period; the session is revoked.
-        /// </exception>
-        /// <exception cref="UnauthorizedAccessException">The token is unknown.</exception>
-        Task<TokenPair> RefreshAsync(string refreshToken, CancellationToken ct = default);
+        Task<IServiceResult<TokenPair>> RefreshAsync(string refreshToken, CancellationToken ct = default);
 
         Task RevokeAsync(Guid userId, Guid sessionId, CancellationToken ct = default);
 

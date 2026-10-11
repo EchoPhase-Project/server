@@ -97,16 +97,8 @@ namespace EchoPhase.Controllers.Api.v1.Roles
             if (targetUser is null)
                 return NotFound($"User '{username}' not found.");
 
-            try
-            {
-                await _roleService.AddToRolesAsync(targetUser, roleName);
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-
-            return NoContent();
+            var result = await _roleService.AddToRolesAsync(targetUser, roleName);
+            return result.Successful ? NoContent() : Failure(result.Error);
         }
 
         /// <summary>Takes one role away from the user.</summary>
@@ -122,16 +114,8 @@ namespace EchoPhase.Controllers.Api.v1.Roles
             if (targetUser is null)
                 return NotFound($"User '{username}' not found.");
 
-            try
-            {
-                await _roleService.RemoveFromRolesAsync(targetUser, new[] { roleName });
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-
-            return NoContent();
+            var result = await _roleService.RemoveFromRolesAsync(targetUser, new[] { roleName });
+            return result.Successful ? NoContent() : Failure(result.Error);
         }
     }
 

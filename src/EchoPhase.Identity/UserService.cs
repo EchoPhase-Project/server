@@ -71,7 +71,13 @@ namespace EchoPhase.Identity
             var result = await _hashing.RunAsync(() => _userManager.CreateAsync(user, password));
 
             if (result.Succeeded)
-                await _roleService.AddToRolesAsync(user, roles);
+            {
+                // The default roles come from configuration: a failure here is a
+                // misconfiguration, not something the caller can fix.
+                var added = await _roleService.AddToRolesAsync(user, roles);
+                if (!added.Successful)
+                    throw new InvalidOperationException($"Default roles: {added.Error}");
+            }
 
             return result;
         }

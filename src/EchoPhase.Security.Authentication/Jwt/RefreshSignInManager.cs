@@ -4,10 +4,10 @@
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Security.Authentication.Jwt.Claims;
-using EchoPhase.Security.Authentication.Jwt.Exceptions;
 using EchoPhase.Security.Authentication.Jwt.Helpers;
 using EchoPhase.Security.Authentication.Jwt.Providers;
 using EchoPhase.Security.Hashers;
+using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
@@ -42,19 +42,25 @@ namespace EchoPhase.Security.Authentication.Jwt
             _userRepository = userRepository;
         }
 
-        public async Task LoginAsync(string username, string password, string deviceId, CancellationToken ct = default)
+        /// <summary>
+        /// Checks the password and starts a session (token cookies). A wrong user name
+        /// or password is a failure (<see cref="AuthErrors.InvalidCredentials"/>,
+        /// <see cref="AuthErrors.LockedOut"/>), not an exception.
+        /// </summary>
+        public async Task<IServiceResult> LoginAsync(string username, string password, string deviceId, CancellationToken ct = default)
         {
-            var user = await _userManager.FindByNameAsync(username)
-                       ?? throw new UnauthorizedAccessException("Invalid credentials.");
+            var user = await _userManager.FindByNameAsync(username);
+            if (user is null)
+                return InvalidCredentials();
 
             if (await _userManager.IsLockedOutAsync(user))
-                throw new UnauthorizedAccessException("Account locked out.");
+                return ServiceResult.Failure(e => e.Set(AuthErrors.LockedOut, "Account locked out."));
 
             var valid = await _hashing.RunAsync(() => _userManager.CheckPasswordAsync(user, password), ct);
             if (!valid)
             {
                 await _userManager.AccessFailedAsync(user);
-                throw new UnauthorizedAccessException("Invalid credentials.");
+                return InvalidCredentials();
             }
 
             await _userManager.ResetAccessFailedCountAsync(user);
@@ -66,7 +72,11 @@ namespace EchoPhase.Security.Authentication.Jwt
             context.User = await _principalFactory.CreateAsync(user);
 
             TokenCookieHelper.WriteInitial(context.Response, context.Request, initial);
+            return ServiceResult.Success();
         }
+
+        private static IServiceResult InvalidCredentials()
+            => ServiceResult.Failure(e => e.Set(AuthErrors.InvalidCredentials, "Invalid credentials."));
 
         public async Task LogoutAsync(Guid userId, string refreshToken, CancellationToken ct = default)
         {
@@ -86,17 +96,16 @@ namespace EchoPhase.Security.Authentication.Jwt
             TokenCookieHelper.Clear(context.Response);
         }
 
-        public async Task<TokenPair> RefreshAsync(string refreshToken, CancellationToken ct = default)
+        /// <summary>
+        /// Rotates the session's tokens (see <see cref="ISessionProvider.RefreshAsync"/>).
+        /// On a replayed token the user's other tokens are invalidated as well.
+        /// </summary>
+        public async Task<IServiceResult<TokenPair>> RefreshAsync(string refreshToken, CancellationToken ct = default)
         {
-            try
-            {
-                return await _refresh.RefreshAsync(refreshToken, ct);
-            }
-            catch (RefreshTokenReusedException ex)
-            {
-                await InvalidateUserAsync(ex.UserId, ct);
-                throw;
-            }
+            var result = await _refresh.RefreshAsync(refreshToken, ct);
+            if (result.Error is RefreshTokenReusedError reused)
+                await InvalidateUserAsync(reused.UserId, ct);
+            return result;
         }
 
         public async Task RevokeSessionAsync(Guid userId, Guid sessionId, CancellationToken ct = default)

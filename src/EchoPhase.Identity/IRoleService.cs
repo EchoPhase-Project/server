@@ -3,6 +3,7 @@
 
 using System.Security.Claims;
 using EchoPhase.DAL.Postgres.Models;
+using EchoPhase.Types.Result;
 
 namespace EchoPhase.Identity
 {
@@ -15,39 +16,37 @@ namespace EchoPhase.Identity
         /// Creates a role asynchronously if it does not already exist.
         /// </summary>
         /// <param name="roleName">The name of the role to create.</param>
-        Task CreateRoleAsync(string roleName);
+        Task<IServiceResult> CreateRoleAsync(string roleName);
 
         /// <summary>
         /// Adds the specified user to multiple roles asynchronously.
         /// </summary>
         /// <param name="user">The user to add roles to.</param>
         /// <param name="roleNames">The roles to add the user to.</param>
-        Task AddToRolesAsync(User user, params IEnumerable<string> roleNames);
+        Task<IServiceResult> AddToRolesAsync(User user, params IEnumerable<string> roleNames);
 
         /// <summary>
         /// Adds the specified user to a single role asynchronously.
         /// </summary>
         /// <param name="user">The user to add to the role.</param>
         /// <param name="roleName">The role name.</param>
-        Task AddToRoleAsync(User user, string roleName);
+        Task<IServiceResult> AddToRoleAsync(User user, string roleName);
 
         /// <summary>
         /// Removes the specified user from multiple roles asynchronously.
         /// </summary>
         /// <param name="user">The user to remove from roles.</param>
         /// <param name="roleNames">One or more collections of role names.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
-        /// <exception cref="Exception">Thrown if removing the user from the role fails.</exception>
-        Task RemoveFromRolesAsync(User user, params IEnumerable<string>[] roleNames);
+        /// <returns>Fails with <see cref="RoleErrors.UnknownRole"/> or <see cref="RoleErrors.Invalid"/>.</returns>
+        Task<IServiceResult> RemoveFromRolesAsync(User user, params IEnumerable<string>[] roleNames);
 
         /// <summary>
         /// Removes the specified user from the given role asynchronously.
         /// </summary>
         /// <param name="user">The user to remove from the role.</param>
         /// <param name="roleName">The name of the role.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
-        /// <exception cref="Exception">Thrown if removing the user from the role fails.</exception>
-        Task RemoveFromRoleAsync(User user, string roleName);
+        /// <returns>Fails with <see cref="RoleErrors.UnknownRole"/> or <see cref="RoleErrors.Invalid"/>.</returns>
+        Task<IServiceResult> RemoveFromRoleAsync(User user, string roleName);
 
         /// <summary>
         /// Checks if the specified user is in all the given roles asynchronously.

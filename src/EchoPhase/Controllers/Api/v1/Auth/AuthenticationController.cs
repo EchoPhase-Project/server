@@ -42,7 +42,7 @@ namespace EchoPhase.Controllers.Api.v1.Auth
 
             var auth = await _authService.LoginAsync(dto.Username, dto.Password, ct);
             if (!auth.Successful)
-                return Unauthorized(ErrorBody.From(auth.Error));
+                return Failure(auth.Error);
 
             return NoContent();
         }
@@ -58,7 +58,7 @@ namespace EchoPhase.Controllers.Api.v1.Auth
         {
             var result = await _authService.LoginAsync(dto.Username, dto.Password, ct);
             if (!result.Successful)
-                return Unauthorized(ErrorBody.From(result.Error));
+                return Failure(result.Error);
 
             return NoContent();
         }

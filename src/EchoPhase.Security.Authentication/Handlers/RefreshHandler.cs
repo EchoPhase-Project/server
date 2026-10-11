@@ -124,17 +124,18 @@ namespace EchoPhase.Security.Authentication.Handlers
 
             try
             {
-                var pair = await _signInManager.RefreshAsync(refreshToken, Context.RequestAborted);
+                var result = await _signInManager.RefreshAsync(refreshToken, Context.RequestAborted);
+                if (!result.Successful)
+                {
+                    // Unknown, reused or revoked token: the session is gone for good.
+                    TokenCookieHelper.Clear(Response);
+                    return null;
+                }
 
+                var pair = result.Value!;
                 TokenCookieHelper.WriteRefreshed(Response, Request, pair);
 
                 return await _jwt.ValidateTokenAsync(pair.AccessToken, Context.RequestAborted);
-            }
-            catch (UnauthorizedAccessException)
-            {
-                // Unknown, reused or revoked token: the session is gone for good.
-                TokenCookieHelper.Clear(Response);
-                return null;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

@@ -28,17 +28,10 @@ namespace EchoPhase.Controllers.Api.v1.Auth
         [EnableRateLimiting(RateLimitPolicies.Auth)]
         public async Task<IActionResult> Refresh([FromBody] RefreshRequest request, CancellationToken ct = default)
         {
-            try
-            {
-                // RefreshToken is null when a parallel call already rotated the
-                // token; keep using the one that call returned.
-                var tokenPair = await _refreshSignInManager.RefreshAsync(request.RefreshToken, ct);
-                return Ok(tokenPair);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
+            // RefreshToken is null when a parallel call already rotated the
+            // token; keep using the one that call returned.
+            var result = await _refreshSignInManager.RefreshAsync(request.RefreshToken, ct);
+            return result.Successful ? Ok(result.Value) : Failure(result.Error);
         }
     }
 }

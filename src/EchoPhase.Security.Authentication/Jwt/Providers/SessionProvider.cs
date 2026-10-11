@@ -9,8 +9,8 @@ using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Security.Authentication.Jwt.Claims;
-using EchoPhase.Security.Authentication.Jwt.Exceptions;
 using EchoPhase.Security.Authentication.Secrets;
+using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -76,7 +76,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             };
         }
 
-        public async Task<TokenPair> RefreshAsync(string refreshToken, CancellationToken ct = default)
+        public async Task<IServiceResult<TokenPair>> RefreshAsync(string refreshToken, CancellationToken ct = default)
         {
             var hash = _hasher.Hash(refreshToken);
 
@@ -88,7 +88,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             {
                 try
                 {
-                    return await RotateAsync(session, hash, ct);
+                    return ServiceResult<TokenPair>.Success(await RotateAsync(session, hash, ct));
                 }
                 catch (DbUpdateException)
                 {
@@ -123,14 +123,15 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             };
         }
 
-        private async Task<TokenPair> HandleRotatedTokenAsync(string hash, CancellationToken ct)
+        private async Task<IServiceResult<TokenPair>> HandleRotatedTokenAsync(string hash, CancellationToken ct)
         {
             var audit = await _db.SessionAudits
                 .AsNoTracking()
                 .Where(a => a.TokenHash == hash)
                 .Select(a => new { a.SessionId, a.CreatedAt })
-                .FirstOrDefaultAsync(ct)
-                ?? throw new UnauthorizedAccessException("Invalid refresh token.");
+                .FirstOrDefaultAsync(ct);
+            if (audit is null)
+                return InvalidToken();
 
             var latestRotation = await _db.SessionAudits
                 .Where(a => a.SessionId == audit.SessionId)
@@ -145,27 +146,32 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
                 var session = await _repository.Query()
                     .WithIds(audit.SessionId)
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(ct)
-                    ?? throw new UnauthorizedAccessException("Invalid refresh token.");
+                    .FirstOrDefaultAsync(ct);
+                if (session is null)
+                    return InvalidToken();
 
-                return new TokenPair
+                return ServiceResult<TokenPair>.Success(new TokenPair
                 {
                     AccessToken = await GenerateJwtAsync(await LoadUserAsync(session.UserId, ct)),
                     RefreshToken = null
-                };
+                });
             }
 
             // An older token replayed: assume it was stolen and kill the session.
             var compromised = await _repository.Query()
                 .WithIds(audit.SessionId)
-                .FirstOrDefaultAsync(ct)
-                ?? throw new UnauthorizedAccessException("Invalid refresh token.");
+                .FirstOrDefaultAsync(ct);
+            if (compromised is null)
+                return InvalidToken();
 
             var userId = compromised.UserId;
             _repository.Remove(compromised);
             await _repository.SaveAsync(ct);
-            throw new RefreshTokenReusedException(userId);
+            return ServiceResult<TokenPair>.Failure(new RefreshTokenReusedError(userId));
         }
+
+        private static IServiceResult<TokenPair> InvalidToken()
+            => ServiceResult<TokenPair>.Failure(e => e.Set(AuthErrors.InvalidRefreshToken, "Invalid refresh token."));
 
         public async Task RevokeAsync(Guid userId, Guid sessionId, CancellationToken ct = default)
         {

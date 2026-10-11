@@ -6,6 +6,7 @@ using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Identity;
 
 namespace EchoPhase.Identity
@@ -39,115 +40,97 @@ namespace EchoPhase.Identity
         }
 
         /// <summary>
-        /// Creates a new role asynchronously if it does not already exist.
+        /// Creates a role if it does not exist yet.
         /// </summary>
         /// <param name="roleName">The name of the role to create.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
-        /// <exception cref="Exception">Thrown when role creation fails.</exception>
-        public async Task CreateRoleAsync(string roleName)
+        /// <returns>Fails with <see cref="RoleErrors.UnknownRole"/> or <see cref="RoleErrors.Invalid"/>.</returns>
+        public async Task<IServiceResult> CreateRoleAsync(string roleName)
         {
-            EnsureKnown([roleName]);
+            if (Unknown([roleName]) is { } unknown)
+                return unknown;
 
             if (await _roleManager.RoleExistsAsync(roleName))
-                return;
+                return ServiceResult.Success();
 
-            var role = new UserRole { Name = roleName };
-            var result = await _roleManager.CreateAsync(role);
-            if (!result.Succeeded)
-                throw new InvalidOperationException($"Failed to create role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+            var result = await _roleManager.CreateAsync(new UserRole { Name = roleName });
+            return result.Succeeded ? ServiceResult.Success() : Refused("create role", roleName, result);
         }
 
         /// <summary>
-        /// Adds the specified user to multiple roles asynchronously.
+        /// Adds the user to the roles, creating a role on first use. Nothing changes
+        /// when one of them is not a role defined in code.
         /// </summary>
         /// <param name="user">The user to add to roles.</param>
-        /// <param name="roleNames">One or more collections of role names.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
-        /// <exception cref="ArgumentException">Thrown when a role is not one of <see cref="Roles"/>.</exception>
-        public async Task AddToRolesAsync(User user, params IEnumerable<string> roleNames)
+        /// <param name="roleNames">The role names.</param>
+        /// <returns>Fails with <see cref="RoleErrors.UnknownRole"/> or <see cref="RoleErrors.Invalid"/>.</returns>
+        public async Task<IServiceResult> AddToRolesAsync(User user, params IEnumerable<string> roleNames)
         {
             var roles = roleNames.ToArray();
-            EnsureKnown(roles);
+            if (Unknown(roles) is { } unknown)
+                return unknown;
 
             var changed = false;
             foreach (var roleName in roles)
-                changed |= await AddToRoleCoreAsync(user, roleName);
+            {
+                var created = await CreateRoleAsync(roleName);
+                if (!created.Successful)
+                    return created;
+
+                if (await IsInRoleAsync(user, roleName))
+                    continue;
+
+                var result = await _userManager.AddToRoleAsync(user, roleName);
+                if (!result.Succeeded)
+                    return Refused("add to role", roleName, result);
+                changed = true;
+            }
 
             if (changed)
                 await InvalidateTokensAsync(user);
+            return ServiceResult.Success();
         }
 
         /// <summary>
-        /// Adds the specified user to the given role asynchronously.
-        /// Ensures the role exists by creating it if it does not.
+        /// Adds the user to one role; see <see cref="AddToRolesAsync"/>.
         /// </summary>
-        /// <param name="user">The user to add to the role.</param>
-        /// <param name="roleName">The name of the role.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
-        /// <exception cref="ArgumentException">Thrown when the role is not one of <see cref="Roles"/>.</exception>
-        /// <exception cref="Exception">Thrown if adding the user to the role fails.</exception>
-        public Task AddToRoleAsync(User user, string roleName)
+        public Task<IServiceResult> AddToRoleAsync(User user, string roleName)
             => AddToRolesAsync(user, roleName);
 
-        private async Task<bool> AddToRoleCoreAsync(User user, string roleName)
-        {
-            if (!await _roleManager.RoleExistsAsync(roleName))
-            {
-                await CreateRoleAsync(roleName);
-            }
-
-            if (await IsInRoleAsync(user, roleName))
-                return false;
-
-            var result = await _userManager.AddToRoleAsync(user, roleName);
-            if (!result.Succeeded)
-                throw new InvalidOperationException($"Failed to add to role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-
-            return true;
-        }
-
         /// <summary>
-        /// Removes the specified user from multiple roles asynchronously.
+        /// Removes the user from the roles. Nothing changes when one of them is not
+        /// a role defined in code.
         /// </summary>
         /// <param name="user">The user to remove from roles.</param>
         /// <param name="roleNames">One or more collections of role names.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
-        public async Task RemoveFromRolesAsync(User user, params IEnumerable<string>[] roleNames)
+        /// <returns>Fails with <see cref="RoleErrors.UnknownRole"/> or <see cref="RoleErrors.Invalid"/>.</returns>
+        public async Task<IServiceResult> RemoveFromRolesAsync(User user, params IEnumerable<string>[] roleNames)
         {
+            var roles = roleNames.SelectMany(r => r).ToArray();
+            if (Unknown(roles) is { } unknown)
+                return unknown;
+
             var changed = false;
-            foreach (var roles in roleNames)
+            foreach (var roleName in roles)
             {
-                foreach (var roleName in roles)
-                {
-                    changed |= await RemoveFromRoleCoreAsync(user, roleName);
-                }
+                if (!await IsInRoleAsync(user, roleName))
+                    continue;
+
+                var result = await _userManager.RemoveFromRoleAsync(user, roleName);
+                if (!result.Succeeded)
+                    return Refused("remove from role", roleName, result);
+                changed = true;
             }
 
             if (changed)
                 await InvalidateTokensAsync(user);
+            return ServiceResult.Success();
         }
 
         /// <summary>
-        /// Removes the specified user from the given role asynchronously.
+        /// Removes the user from one role; see <see cref="RemoveFromRolesAsync"/>.
         /// </summary>
-        /// <param name="user">The user to remove from the role.</param>
-        /// <param name="roleName">The name of the role.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
-        /// <exception cref="Exception">Thrown if removing the user from the role fails.</exception>
-        public Task RemoveFromRoleAsync(User user, string roleName)
+        public Task<IServiceResult> RemoveFromRoleAsync(User user, string roleName)
             => RemoveFromRolesAsync(user, new[] { roleName });
-
-        private async Task<bool> RemoveFromRoleCoreAsync(User user, string roleName)
-        {
-            if (!await IsInRoleAsync(user, roleName))
-                return false;
-
-            var result = await _userManager.RemoveFromRoleAsync(user, roleName);
-            if (!result.Succeeded)
-                throw new InvalidOperationException($"Failed to remove from role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-
-            return true;
-        }
 
         /// <summary>
         /// Access tokens carry permissions derived from roles, so every issued
@@ -158,13 +141,18 @@ namespace EchoPhase.Identity
 
         // Roles are bundles defined in code (RolePermissions); an unknown name
         // would grant nothing and only confuse whoever assigned it.
-        private static void EnsureKnown(IEnumerable<string> roleNames)
+        private static IServiceResult? Unknown(IEnumerable<string> roleNames)
         {
             var unknown = roleNames.Where(r => !RolePermissions.IsKnownRole(r)).ToArray();
-            if (unknown.Length > 0)
-                throw new ArgumentException(
-                    $"Unknown role(s): {string.Join(", ", unknown)}. Known roles: {string.Join(", ", Roles.AsEnumerable())}.");
+            return unknown.Length == 0
+                ? null
+                : ServiceResult.Failure(e => e.Set(RoleErrors.UnknownRole,
+                    $"Unknown role(s): {string.Join(", ", unknown)}. Known roles: {string.Join(", ", Roles.AsEnumerable())}."));
         }
+
+        private static IServiceResult Refused(string action, string roleName, IdentityResult result)
+            => ServiceResult.Failure(e => e.Set(RoleErrors.Invalid,
+                $"Failed to {action} {roleName}: {string.Join(", ", result.Errors.Select(x => x.Description))}"));
 
         /// <summary>
         /// Checks if the specified user is in all of the given roles asynchronously.
