@@ -18,5 +18,6 @@ namespace EchoPhase.Runners.Blocks.Models
         public const string False = "false";
         public const string Body = "body";
         public const string Done = "done";
+        public const string Fallback = "fallback";
     }
 }

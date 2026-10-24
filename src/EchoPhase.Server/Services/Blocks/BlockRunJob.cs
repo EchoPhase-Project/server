@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.DAL.Scylla.Entities;
+using EchoPhase.Runners.Blocks.Contexts;
 using EchoPhase.Runners.Blocks.Models;
 
 namespace EchoPhase.Server.Services.Blocks
@@ -15,5 +16,6 @@ namespace EchoPhase.Server.Services.Blocks
         BlockProgram Program,
         IReadOnlyCollection<int> StartIds,
         object? Input,
-        CancellationToken Cancelled);
+        CancellationToken Cancelled,
+        WebhookReply? Reply = null);
 }

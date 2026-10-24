@@ -15,6 +15,7 @@ using EchoPhase.Identity;
 using EchoPhase.Profilers.Extensions;
 using EchoPhase.Projection.Extensions;
 using EchoPhase.QRCodes.Extensions;
+using EchoPhase.Runners.Blocks;
 using EchoPhase.Runners.Blocks.Observers;
 using EchoPhase.Runners.Blocks.Runs;
 using EchoPhase.Runners.Extensions;
@@ -27,6 +28,7 @@ using EchoPhase.Security.Cryptography.Extensions;
 using EchoPhase.Security.Hashers.Extensions;
 using EchoPhase.Server.Extensions;
 using EchoPhase.Server.Middlewares;
+using EchoPhase.Server.OpenApi;
 using EchoPhase.Server.RouteConstraints;
 using EchoPhase.Server.Services.Blocks;
 using EchoPhase.Server.Services.Connections;
@@ -108,6 +110,8 @@ namespace EchoPhase.Server
                 // not null, so generated client types are not all optional.
                 o.SupportNonNullableReferenceTypes();
                 o.NonNullableReferenceTypesAsRequired();
+                // Enums that grow (block types): a new value is not a breaking change.
+                o.SchemaFilter<ExtensibleEnumSchemaFilter>();
 
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -169,6 +173,7 @@ namespace EchoPhase.Server
             services.AddScoped<BlockRunService>();
             services.AddScoped<BlockRunEventsNotifier>();
             services.AddScoped<WorkflowService>();
+            services.AddScoped<IWorkflowSource, WorkflowProgramSource>();
             services.AddHostedService<WorkflowScheduler>();
             services.AddSingleton<DiscordTriggerService>();
             services.AddHostedService(sp => sp.GetRequiredService<DiscordTriggerService>());

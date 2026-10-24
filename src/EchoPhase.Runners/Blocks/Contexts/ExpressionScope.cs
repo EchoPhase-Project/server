@@ -3,29 +3,46 @@
 
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
+using EchoPhase.Runners.Blocks.Models;
+using EchoPhase.Scripting;
 
 namespace EchoPhase.Runners.Blocks.Contexts
 {
     /// <summary>
     /// What an expression in a block sees: the run's variables, plus
-    /// <c>input</c> (the output of the block that triggered this one) and
-    /// <c>blocks</c> (every block's latest output, as <c>blocks.b3</c>).
-    /// Those two shadow variables of the same name; writes go to the variables.
+    /// <c>input</c> (the output of the block that triggered this one),
+    /// <c>blocks</c> (every block's latest output, as <c>blocks.b3</c>) and
+    /// <c>errors</c> (the run's block failures so far, handled ones included,
+    /// as <c>errors[-1].message</c>). Those shadow variables of the same name;
+    /// writes go to the variables. The date functions also find the
+    /// program's time zone here, under a name programs cannot write.
     /// </summary>
     public sealed class ExpressionScope : IDictionary<string, object>
     {
         public const string InputKey = "input";
         public const string BlocksKey = "blocks";
+        public const string ErrorsKey = "errors";
 
         private readonly IDictionary<string, object> _variables;
         private readonly object? _input;
         private readonly object _blocks;
+        private readonly IList<BlockError> _errors;
+        private readonly string? _timeZone;
 
-        public ExpressionScope(IDictionary<string, object> variables, object? input, IDictionary<string, object?> blocks)
+        // errors as the language sees it, rebuilt only when an error was added:
+        // reading it in a loop must not copy the list every time.
+        private object _errorsValue = Array.Empty<object?>();
+        private int _errorsSeen = -1;
+
+        public ExpressionScope(
+            IDictionary<string, object> variables, object? input, IDictionary<string, object?> blocks,
+            IList<BlockError>? errors = null, string? timeZone = null)
         {
             _variables = variables;
             _input = input;
             _blocks = blocks;
+            _errors = errors ?? [];
+            _timeZone = timeZone;
         }
 
         public bool TryGetValue(string key, [MaybeNullWhen(false)] out object value)
@@ -37,6 +54,19 @@ namespace EchoPhase.Runners.Blocks.Contexts
                     return true;
                 case BlocksKey:
                     value = _blocks;
+                    return true;
+                case ErrorsKey:
+                    if (_errorsSeen != _errors.Count)
+                    {
+                        // Frozen: a Set into it copies instead of changing what later reads see.
+                        var errors = _errors.Select(e => (object?)e.ToValue()).ToList();
+                        _errorsValue = Eval.Freeze(errors) ?? errors;
+                        _errorsSeen = _errors.Count;
+                    }
+                    value = _errorsValue;
+                    return true;
+                case Eval.TimeZoneVariable when _timeZone is not null:
+                    value = _timeZone;
                     return true;
                 default:
                     return _variables.TryGetValue(key, out value);
@@ -51,7 +81,7 @@ namespace EchoPhase.Runners.Blocks.Contexts
 
         public bool ContainsKey(string key) => TryGetValue(key, out _);
 
-        public ICollection<string> Keys => [.. _variables.Keys, InputKey, BlocksKey];
+        public ICollection<string> Keys => [.. _variables.Keys.Except([InputKey, BlocksKey, ErrorsKey]), InputKey, BlocksKey, ErrorsKey];
 
         public ICollection<object> Values => [.. Keys.Select(k => this[k])];
 

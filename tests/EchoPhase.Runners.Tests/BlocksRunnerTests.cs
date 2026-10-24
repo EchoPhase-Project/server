@@ -188,6 +188,103 @@ namespace EchoPhase.Runners.Tests
         }
 
         [Fact]
+        public async Task StopAndError_FailsTheRunWithItsTypeAndMessage()
+        {
+            var recorder = new Blocks.Observers.ExecutionRecorder();
+            await using var harness = new RunnerHarness(recorder);
+
+            var context = await harness.RunAsync("""
+                {
+                  "blocks": [
+                    { "id": 1, "type": "Set", "params": { "name": "order", "value": 42 } },
+                    { "id": 2, "type": "StopAndError", "retry": { "maxTries": 3, "delayMs": 0 },
+                      "params": { "message": "Order @order has no items", "type": "EmptyOrder" } },
+                    { "id": 3, "type": "Print", "params": { "text": "unreachable" } }
+                  ],
+                  "connections": [ { "from": 1, "to": 2 }, { "from": 1, "to": 3 } ]
+                }
+                """);
+
+            var error = Assert.Single(context.Errors);
+            Assert.Equal(2, error.Id);
+            Assert.Equal("EmptyOrder", error.Type);
+            Assert.Equal("Order 42 has no items", error.Message);
+            // A failure on purpose is not retried.
+            Assert.Equal(1, Assert.Single(recorder.Records, r => r.BlockId == 2).Attempts);
+        }
+
+        [Fact]
+        public async Task StopAndError_FollowsOnError()
+        {
+            var context = await _harness.RunAsync("""
+                {
+                  "blocks": [
+                    { "id": 1, "type": "StopAndError", "onError": "ErrorOutput", "params": { "message": "boom" } },
+                    { "id": 2, "type": "Print", "params": { "text": "@(input.error.type): @(input.error.message) in @(input.error.block)" } }
+                  ],
+                  "connections": [ { "from": 1, "output": "error", "to": 2 } ]
+                }
+                """);
+
+            Assert.Empty(context.Errors);
+            Assert.Equal(["StopAndError: boom in 1"], context.Output);
+        }
+
+        [Fact]
+        public void StopAndError_HasNoMainOutput()
+        {
+            var program = RunnerHarness.Parse("""
+                {
+                  "blocks": [
+                    { "id": 1, "type": "StopAndError", "params": { "message": "boom" } },
+                    { "id": 2, "type": "Print", "params": { "text": "x" } }
+                  ],
+                  "connections": [ { "from": 1, "to": 2 } ]
+                }
+                """);
+
+            Assert.Contains(_harness.Validator.Validate(program, 200), i => i.BlockId == 1);
+        }
+
+        [Fact]
+        public async Task Errors_ListsHandledFailuresSoFar()
+        {
+            var context = await _harness.RunAsync("""
+                {
+                  "blocks": [
+                    { "id": 1, "type": "Print", "params": { "text": "@(len(errors))" } },
+                    { "id": 2, "type": "DiscordGetUserGuilds", "onError": "Continue", "params": { "connection": "bot" } },
+                    { "id": 3, "type": "StopAndError", "onError": "Continue", "params": { "message": "second" } },
+                    { "id": 4, "type": "Print", "params": { "text": "@(len(errors)) @(errors[0].block) @(errors[-1].message)" } }
+                  ],
+                  "connections": [ { "from": 1, "to": 2 }, { "from": 2, "to": 3 }, { "from": 3, "to": 4 } ]
+                }
+                """);
+
+            Assert.Empty(context.Errors);
+            Assert.Equal(2, context.Failures.Count);
+            Assert.Equal(["0", "2 2 second"], context.Output);
+        }
+
+        [Fact]
+        public async Task Errors_ReadManyTimes_AreTheSame_AndSetCannotChangeThem()
+        {
+            var context = await _harness.RunAsync("""
+                {
+                  "blocks": [
+                    { "id": 1, "type": "StopAndError", "onError": "Continue", "params": { "message": "first" } },
+                    { "id": 2, "type": "Set", "params": { "name": "errors[0].message", "value": "changed" } },
+                    { "id": 3, "type": "Print", "params": { "text": "@(len([e for e in errors for x in range(100)])) @(errors[0].message)" } }
+                  ],
+                  "connections": [ { "from": 1, "to": 2 }, { "from": 2, "to": 3 } ]
+                }
+                """);
+
+            Assert.Empty(context.Errors);
+            Assert.Equal(["100 first"], context.Output);
+        }
+
+        [Fact]
         public async Task Stop_EndsTheWholeRun_FromInsideALoop()
         {
             var context = await _harness.RunAsync("""

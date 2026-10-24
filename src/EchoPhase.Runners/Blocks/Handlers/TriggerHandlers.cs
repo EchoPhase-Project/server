@@ -29,6 +29,13 @@ namespace EchoPhase.Runners.Blocks.Handlers
             => Task.FromResult(BlockResult.Main(call.Input));
     }
 
+    [BlockType(BlockTypes.ErrorTrigger, IsTrigger = true, Description = "Starts a run when a workflow with this one as its error workflow fails; output: { workflow, run, errors }.")]
+    public class ErrorTriggerHandler : BlockHandlerBase<ErrorTriggerParams>
+    {
+        public override Task<BlockResult> ExecuteAsync(BlockCall call, ErrorTriggerParams param)
+            => Task.FromResult(BlockResult.Main(call.Input));
+    }
+
     [BlockType(BlockTypes.DiscordEventTrigger, IsTrigger = true, Description = "Starts a run on a Discord gateway event; output: { event, connection, data }.")]
     public class DiscordEventTriggerHandler : BlockHandlerBase<DiscordEventTriggerParams>
     {

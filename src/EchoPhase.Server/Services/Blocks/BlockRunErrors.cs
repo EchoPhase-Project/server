@@ -12,5 +12,6 @@ namespace EchoPhase.Server.Services.Blocks
         public const string TooManyActive = "TooManyActive";
         public const string QueueFull = "QueueFull";
         public const string AlreadyFinished = "AlreadyFinished";
+        public const string NotFinished = "NotFinished";
     }
 }

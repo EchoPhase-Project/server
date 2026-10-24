@@ -55,6 +55,7 @@ namespace EchoPhase.Runners.Blocks
             {
                 var error = new BlockError { Id = ex.BlockId, Type = "LimitExceeded", Message = ex.Message };
                 context.Errors.Add(error);
+                context.Failures.Add(error);
                 if (context.Graph.Find(ex.BlockId) is { } block)
                     await NotifyAsync(o => o.OnBlockFailedAsync(
                         new BlockFailedEvent(context, block, [], context.Depth, error, 1, false, false)));
@@ -96,12 +97,14 @@ namespace EchoPhase.Runners.Blocks
                         if (context.Graph.Find(item.Id) is not { } block)
                         {
                             // Validation rejects such programs; keep running the rest.
-                            context.Errors.Add(new BlockError
+                            var unknown = new BlockError
                             {
                                 Id = item.Id,
                                 Type = "UnknownBlock",
                                 Message = $"Block {item.Id} does not exist."
-                            });
+                            };
+                            context.Errors.Add(unknown);
+                            context.Failures.Add(unknown);
                             continue;
                         }
 
@@ -155,6 +158,7 @@ namespace EchoPhase.Runners.Blocks
                 : await InvokeAsync(call, descriptor, depth);
 
             context.BlockOutputs[BlockExecutionContext.OutputKey(block.Id)] = result.Data;
+            context.LastOutput = result.Data;
 
             if (_observers.Length > 0)
             {
@@ -195,10 +199,18 @@ namespace EchoPhase.Runners.Blocks
                                                and not BlockLimitExceededException
                                                and not BlockRunStoppedException)
                 {
-                    var error = new BlockError { Id = block.Id, Type = ex.GetType().Name, Message = ex.Message };
-                    bool retry = attempt < tries;
+                    var error = new BlockError
+                    {
+                        Id = block.Id,
+                        Type = ex is BlockFailedException failed ? failed.ErrorType : ex.GetType().Name,
+                        Message = ex.Message
+                    };
+                    // A failure on purpose fails the same way every time.
+                    bool retry = attempt < tries && ex is not BlockFailedException;
                     bool handled = !retry && block.OnError != BlockErrorPolicy.Stop;
 
+                    if (!retry)
+                        context.Failures.Add(error);
                     if (!retry && !handled)
                         context.Errors.Add(error);
 
@@ -228,11 +240,7 @@ namespace EchoPhase.Runners.Blocks
         // What a handled failure looks like as output: blocks.b3.error.message.
         private static Dictionary<string, object?> ErrorData(BlockError error) => new()
         {
-            ["error"] = new Dictionary<string, object?>
-            {
-                ["type"] = error.Type,
-                ["message"] = error.Message
-            }
+            ["error"] = error.ToValue()
         };
 
         // Observers watch; they never decide the run's outcome.

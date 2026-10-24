@@ -11,5 +11,13 @@ namespace EchoPhase.Runners.Blocks.Models
         }
         public string Type { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
+
+        /// <summary>As expressions see it: { block, type, message }.</summary>
+        public Dictionary<string, object?> ToValue() => new()
+        {
+            ["block"] = Id,
+            ["type"] = Type,
+            ["message"] = Message
+        };
     }
 }

@@ -2,10 +2,13 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Text.Json.Serialization;
+using EchoPhase.Types.Attributes;
 
 namespace EchoPhase.Runners.Blocks
 {
+    /// <summary>The kinds of blocks; more come with new versions, so clients must expect unknown ones.</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
+    [ExtensibleEnum]
     public enum BlockTypes
     {
         Set,
@@ -19,6 +22,12 @@ namespace EchoPhase.Runners.Blocks
         ScheduleTrigger,
         DiscordEventTrigger,
         DiscordGetUserGuilds,
-        TwitchGetVips
+        TwitchGetVips,
+        StopAndError,
+        ErrorTrigger,
+        Switch,
+        ExecuteWorkflow,
+        HttpRequest,
+        RespondToWebhook
     }
 }

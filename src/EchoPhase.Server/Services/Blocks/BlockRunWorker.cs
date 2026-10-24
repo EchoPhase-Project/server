@@ -13,9 +13,11 @@ using EchoPhase.DAL.Scylla.Linq;
 using EchoPhase.DAL.Scylla.Models;
 using EchoPhase.Runners.Blocks;
 using EchoPhase.Runners.Blocks.Contexts;
+using EchoPhase.Runners.Blocks.Handlers;
 using EchoPhase.Runners.Blocks.Models;
 using EchoPhase.Runners.Blocks.Observers;
 using EchoPhase.Runners.Blocks.Runs;
+using EchoPhase.Server.Services.Workflows;
 using Microsoft.Extensions.Options;
 
 namespace EchoPhase.Server.Services.Blocks
@@ -117,7 +119,8 @@ namespace EchoPhase.Server.Services.Blocks
                 context = new BlockExecutionContext(job.Program, scope.ServiceProvider, run.UserId, linked.Token)
                 {
                     Limits = new BlockLimits(_options.MaxSteps, _options.MaxOutputEntries),
-                    RunId = run.RunId
+                    RunId = run.RunId,
+                    Reply = job.Reply
                 };
 
                 stopwatch.Start();
@@ -146,8 +149,42 @@ namespace EchoPhase.Server.Services.Blocks
             }
             finally
             {
-                await FinishAsync(db, events, run, context, recorder, job.Program.Settings, stopwatch.Elapsed);
+                await FinishAsync(db, events, run, context, recorder, job, stopwatch.Elapsed);
                 _registry.Release(run.RunId);
+                // After the result is stored, so the caller can fetch the run at once.
+                job.Reply?.TrySend(DefaultReply(job.Reply.Mode, run, context));
+                await StartErrorWorkflowAsync(scope.ServiceProvider, run, context, job.Program.Settings, stoppingToken);
+            }
+        }
+
+        /// <summary>
+        /// Like n8n: a failed or timed-out automatic run (not a manual one or a
+        /// retry, not one started by an ErrorTrigger, so error workflows never loop) starts
+        /// the workflow's error workflow. Released first, so it counts against
+        /// the owner's active runs like any other.
+        /// </summary>
+        private async Task StartErrorWorkflowAsync(
+            IServiceProvider services, BlockRun run, IBlockExecutionContext? context, BlockProgramSettings settings,
+            CancellationToken ct)
+        {
+            if (settings.ErrorWorkflowId is not { } errorWorkflowId
+                || run.WorkflowId is null
+                || run.Status is not (BlockRunStatus.Failed or BlockRunStatus.TimedOut)
+                || run.Trigger is BlockRunTriggers.Manual or BlockRunTriggers.Error or BlockRunTriggers.Retry)
+                return;
+
+            try
+            {
+                var workflows = services.GetRequiredService<WorkflowService>();
+                var started = await workflows.StartErrorWorkflowAsync(run, errorWorkflowId, context?.Errors.ToList() ?? [], ct);
+                if (!started.Successful)
+                    _logger.LogWarning("Error workflow {ErrorWorkflowId} of failed run {RunId} not started: {Error}",
+                        errorWorkflowId, run.RunId, started.Error.Value);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Error workflow {ErrorWorkflowId} of failed run {RunId} could not be started.",
+                    errorWorkflowId, run.RunId);
             }
         }
 
@@ -157,8 +194,9 @@ namespace EchoPhase.Server.Services.Blocks
         /// </summary>
         private async Task FinishAsync(
             ScyllaContext db, BlockRunEventsNotifier events, BlockRun run, IBlockExecutionContext? context,
-            ExecutionRecorder recorder, BlockProgramSettings settings, TimeSpan elapsed)
+            ExecutionRecorder recorder, BlockRunJob job, TimeSpan elapsed)
         {
+            var settings = job.Program.Settings;
             run.FinishedAt = _time.GetUtcNow();
             run.DurationMs = (long)elapsed.TotalMilliseconds;
             run.Steps = context?.Steps ?? 0;
@@ -170,7 +208,7 @@ namespace EchoPhase.Server.Services.Blocks
                 ExecutionDataPolicy.Errors => run.Status != BlockRunStatus.Succeeded,
                 _ => false
             };
-            var (payload, errorCount, tooLarge) = BuildPayload(context, keepExecution ? recorder : null);
+            var (payload, errorCount, tooLarge) = BuildPayload(context, keepExecution ? recorder : null, Start(job));
             run.ErrorCount = errorCount;
             if (tooLarge && run.Status == BlockRunStatus.Succeeded)
                 run.Status = BlockRunStatus.Failed;
@@ -195,7 +233,50 @@ namespace EchoPhase.Server.Services.Blocks
             await SafeAsync(() => events.CompletedAsync(run, CancellationToken.None), "completed event");
         }
 
-        private (string Payload, int ErrorCount, bool TooLarge) BuildPayload(IBlockExecutionContext? context, ExecutionRecorder? recorder)
+        /// <summary>
+        /// The answer to a waiting webhook caller when no RespondToWebhook gave
+        /// one: the last output (OnFinish) or the run's id and status (ByBlock).
+        /// A failed run is a bare 500: the caller is a third party, and error
+        /// messages may hold what it should not see (URLs, tokens); the owner
+        /// reads them in the run.
+        /// </summary>
+        private static WebhookResponse DefaultReply(WebhookRespondMode mode, BlockRun run, IBlockExecutionContext? context)
+        {
+            var none = new Dictionary<string, string>();
+            if (run.Status != BlockRunStatus.Succeeded)
+                return new WebhookResponse(StatusCodes.Status500InternalServerError,
+                    new { runId = run.RunId, status = run.Status }, none);
+
+            return mode == WebhookRespondMode.OnFinish
+                ? new WebhookResponse(StatusCodes.Status200OK, context?.LastOutput, none)
+                : new WebhookResponse(StatusCodes.Status200OK, new { runId = run.RunId, status = run.Status }, none);
+        }
+
+        /// <summary>
+        /// What started the run, kept with its result for a retry: the program
+        /// as it ran, the start blocks and the input. Dropped when it would
+        /// take more than half the result's room (a retry then says so).
+        /// </summary>
+        private object? Start(BlockRunJob job)
+        {
+            try
+            {
+                var start = JsonSerializer.SerializeToElement(new
+                {
+                    program = JsonSerializer.SerializeToElement(job.Program, BlockParamsBinder.Options),
+                    startIds = job.StartIds,
+                    input = job.Input
+                }, PayloadJson);
+                return Encoding.UTF8.GetByteCount(start.GetRawText()) <= _options.MaxResultBytes / 2 ? start : null;
+            }
+            catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
+            {
+                return null;
+            }
+        }
+
+        private (string Payload, int ErrorCount, bool TooLarge) BuildPayload(
+            IBlockExecutionContext? context, ExecutionRecorder? recorder, object? start)
         {
             var errors = context?.Errors.ToList() ?? [];
 
@@ -208,7 +289,8 @@ namespace EchoPhase.Server.Services.Blocks
                     variables = context?.Variables ?? new Dictionary<string, object>(),
                     errors,
                     execution = recorder?.Records,
-                    executionDropped = recorder?.Dropped
+                    executionDropped = recorder?.Dropped,
+                    start
                 }, PayloadJson);
             }
             catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
@@ -234,7 +316,8 @@ namespace EchoPhase.Server.Services.Blocks
             {
                 output = Array.Empty<string>(),
                 variables = new Dictionary<string, object>(),
-                errors = errors.Take(100)
+                errors = errors.Take(100),
+                start
             }, PayloadJson);
 
             return (trimmed, errors.Count, true);

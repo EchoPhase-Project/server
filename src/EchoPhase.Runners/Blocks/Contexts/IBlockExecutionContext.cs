@@ -23,6 +23,9 @@ namespace EchoPhase.Runners.Blocks.Contexts
         /// <summary>Failures that stopped the run (or a branch); handled ones are block outputs instead.</summary>
         IList<BlockError> Errors { get; }
 
+        /// <summary>Every block failure so far (after its last try), handled or not; expressions read it as errors.</summary>
+        IList<BlockError> Failures { get; }
+
         IServiceProvider Services { get; }
 
         Guid UserId { get; }
@@ -40,5 +43,14 @@ namespace EchoPhase.Runners.Blocks.Contexts
 
         /// <summary>Nesting: 0 for the program, +1 inside each branch a block runs (loop bodies).</summary>
         int Depth { get; set; }
+
+        /// <summary>0 for a run; +1 for each ExecuteWorkflow that led here.</summary>
+        int CallDepth { get; }
+
+        /// <summary>The output of the block that finished last: a run's (or sub-workflow's) result.</summary>
+        object? LastOutput { get; set; }
+
+        /// <summary>The waiting webhook caller, when the run answers one (RespondToWebhook).</summary>
+        WebhookReply? Reply { get; }
     }
 }

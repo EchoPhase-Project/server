@@ -10,6 +10,7 @@
       "tests/EchoPhase.Security.BitMasks.Tests/EchoPhase.Security.BitMasks.Tests.csproj",
       "tests/EchoPhase.Security.Cryptography.Tests/EchoPhase.Security.Cryptography.Tests.csproj",
       "tests/EchoPhase.Security.Hashers.Tests/EchoPhase.Security.Hashers.Tests.csproj",
+      "tests/EchoPhase.Server.Tests/EchoPhase.Server.Tests.csproj",
       "tests/EchoPhase.Types.Tests/EchoPhase.Types.Tests.csproj"
     ]
   }

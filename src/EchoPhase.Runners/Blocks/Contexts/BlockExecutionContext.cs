@@ -22,6 +22,7 @@ namespace EchoPhase.Runners.Blocks.Contexts
         public IDictionary<string, object?> BlockOutputs { get; } = new Dictionary<string, object?>();
         public IList<string> Output { get; } = [];
         public IList<BlockError> Errors { get; } = [];
+        public IList<BlockError> Failures { get; } = [];
         public IServiceProvider Services { get; }
         public Guid UserId { get; }
         public Guid RunId { get; init; }
@@ -29,6 +30,9 @@ namespace EchoPhase.Runners.Blocks.Contexts
         public BlockLimits Limits { get; init; } = BlockLimits.Unlimited;
         public int Steps { get; set; }
         public int Depth { get; set; }
+        public int CallDepth { get; init; }
+        public object? LastOutput { get; set; }
+        public WebhookReply? Reply { get; init; }
 
         public static string OutputKey(int blockId) => $"b{blockId}";
     }

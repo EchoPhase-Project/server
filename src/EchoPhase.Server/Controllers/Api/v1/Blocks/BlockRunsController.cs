@@ -7,6 +7,7 @@ using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
 using EchoPhase.Server.Services.Blocks;
+using EchoPhase.Types.Result.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Blocks
@@ -89,6 +90,29 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
         {
             var result = await _runs.CancelAsync(User.GetUserId(), runId, ct);
             return result.Successful ? Accepted() : Failure(result.Error);
+        }
+
+        /// <summary>
+        /// Starts a run that did not succeed again with the same input. With
+        /// <c>workflow=current</c>, a workflow's run uses the workflow as saved
+        /// now; by default the program as it ran. 202 with the new run's id.
+        /// </summary>
+        [HttpPost("{runId:guid}/retry")]
+        [ValidateAntiForgery]
+        [RequirePermission(Resources.Scripts, Permissions.Execute)]
+        public async Task<IActionResult> Retry(Guid runId, [FromQuery] string workflow = "original", CancellationToken ct = default)
+        {
+            if (workflow is not ("original" or "current"))
+                return Error(BlockRunErrors.Invalid, "workflow must be 'original' or 'current'.", StatusCodes.Status400BadRequest);
+
+            var result = await _runs.RetryAsync(User.GetUserId(), User.GetActorId(), runId, workflow == "current", ct);
+            if (!result.TryGetValue(out var retry))
+                return result.Successful
+                    ? throw new InvalidOperationException($"Retrying run {runId} succeeded without a new run.")
+                    : Failure(result.Error);
+
+            var newRunId = retry.RunId;
+            return AcceptedAtAction(nameof(Get), new { runId = newRunId }, new { runId = newRunId, status = BlockRunStatus.Queued, retryOf = runId });
         }
 
         private static object View(BlockRun run) => new

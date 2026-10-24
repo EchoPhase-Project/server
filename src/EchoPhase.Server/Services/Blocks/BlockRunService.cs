@@ -9,6 +9,9 @@ using EchoPhase.DAL.Scylla;
 using EchoPhase.DAL.Scylla.Entities;
 using EchoPhase.DAL.Scylla.Linq;
 using EchoPhase.DAL.Scylla.Models;
+using EchoPhase.Runners.Blocks;
+using EchoPhase.Runners.Blocks.Handlers;
+using EchoPhase.Runners.Blocks.Models;
 using EchoPhase.Runners.Blocks.Runs;
 using EchoPhase.Runners.Blocks.Validation;
 using EchoPhase.Scripting;
@@ -38,6 +41,7 @@ namespace EchoPhase.Server.Services.Blocks
         private readonly BlocksOptions _options;
         private readonly TimeProvider _time;
         private readonly BlockProgramValidator _validator;
+        private readonly IWorkflowSource _workflows;
 
         public BlockRunService(
             ScyllaContext db,
@@ -45,7 +49,8 @@ namespace EchoPhase.Server.Services.Blocks
             BlockRunRegistry registry,
             IOptions<RunnerOptions> options,
             TimeProvider time,
-            BlockProgramValidator validator)
+            BlockProgramValidator validator,
+            IWorkflowSource workflows)
         {
             _db = db;
             _queue = queue;
@@ -53,6 +58,7 @@ namespace EchoPhase.Server.Services.Blocks
             _options = options.Value.Blocks;
             _time = time;
             _validator = validator;
+            _workflows = workflows;
         }
 
         public async Task<IServiceResult<BlockRun>> StartAsync(
@@ -95,7 +101,7 @@ namespace EchoPhase.Server.Services.Blocks
                 _db.ActiveBlockRuns.Add(new ActiveBlockRun { RunId = run.RunId, UserId = userId });
                 await _db.SaveChangesAsync(ct);
 
-                if (!_queue.TryEnqueue(new BlockRunJob(run, start.Program, startIds, Eval.Plain(start.Input), cancelled)))
+                if (!_queue.TryEnqueue(new BlockRunJob(run, start.Program, startIds, Eval.Plain(start.Input), cancelled, start.Reply)))
                 {
                     await ForgetAsync(run);
                     _registry.Release(run.RunId);
@@ -163,6 +169,55 @@ namespace EchoPhase.Server.Services.Blocks
             }
 
             return ServiceResult<BlockRunDetails>.Success(new BlockRunDetails(run, payload));
+        }
+
+        /// <summary>
+        /// Starts a run that did not succeed again, with the same start blocks
+        /// and input: with the program as it ran, or, for a workflow's run, its
+        /// currently saved version (n8n's "retry with current workflow").
+        /// Possible while the run's result is kept.
+        /// </summary>
+        public async Task<IServiceResult<BlockRun>> RetryAsync(
+            Guid userId, Guid? actorId, Guid runId, bool currentWorkflow, CancellationToken ct = default)
+        {
+            var run = await FindAsync(userId, runId, ct);
+            if (run is null)
+                return Failure<BlockRun>(BlockRunErrors.NotFound, "Run not found.");
+            if (!BlockRunStatus.IsFinished(run.Status))
+                return Failure<BlockRun>(BlockRunErrors.NotFinished, "The run has not finished yet.");
+            if (run.Status == BlockRunStatus.Succeeded)
+                return Failure<BlockRun>(BlockRunErrors.Invalid, "Only runs that did not succeed can be retried.");
+
+            var result = await _db.BlockRunResults
+                .Where(r => r.UserId == userId && r.RunId == runId)
+                .FirstOrDefaultAsync(ct);
+            if (result is null)
+                return Failure<BlockRun>(BlockRunErrors.NotFound, "The run's result has expired; start it again instead.");
+
+            using var payload = JsonDocument.Parse(result.Payload);
+            if (!payload.RootElement.TryGetProperty("start", out var start) || start.ValueKind != JsonValueKind.Object)
+                return Failure<BlockRun>(BlockRunErrors.NotFound, "The run's start was too large to keep; start it again instead.");
+
+            BlockProgram program;
+            if (currentWorkflow)
+            {
+                if (run.WorkflowId is not { } workflowId)
+                    return Failure<BlockRun>(BlockRunErrors.Invalid, "The run is not a workflow's; retry it as it ran.");
+                var current = await _workflows.FindAsync(userId, workflowId, ct);
+                if (current is null)
+                    return Failure<BlockRun>(BlockRunErrors.NotFound, "The run's workflow no longer exists.");
+                program = current;
+            }
+            else
+            {
+                program = start.GetProperty("program").Deserialize<BlockProgram>(BlockParamsBinder.Options) ?? new BlockProgram();
+            }
+
+            var startIds = start.GetProperty("startIds").Deserialize<List<int>>() ?? [];
+            var input = start.TryGetProperty("input", out var stored) ? stored.Clone() : (JsonElement?)null;
+
+            return await StartAsync(userId, actorId,
+                new BlockRunStart(program, startIds, input, run.WorkflowId, BlockRunTriggers.Retry), ct);
         }
 
         public async Task<IServiceResult> CancelAsync(Guid userId, Guid runId, CancellationToken ct = default)

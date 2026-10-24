@@ -36,8 +36,14 @@ namespace EchoPhase.Runners.Blocks.Handlers
         /// <summary>The (first) input's data; a trigger's is the event payload.</summary>
         public object? Input => Inputs.Count > 0 ? Inputs[0].Data : null;
 
-        /// <summary>Variables plus input and blocks, for evaluating this block's expressions.</summary>
-        public IDictionary<string, object> Scope => new ExpressionScope(Context.Variables, Input, Context.BlockOutputs);
+        private ExpressionScope? _scope;
+
+        /// <summary>
+        /// Variables plus input, blocks and errors, for evaluating this block's
+        /// expressions. One per call: it reads the run's live state, so it never goes stale.
+        /// </summary>
+        public IDictionary<string, object> Scope
+            => _scope ??= new ExpressionScope(Context.Variables, Input, Context.BlockOutputs, Context.Failures, Context.Settings.TimeZone);
 
         /// <summary>
         /// Runs the blocks connected to <paramref name="output"/> now, to the

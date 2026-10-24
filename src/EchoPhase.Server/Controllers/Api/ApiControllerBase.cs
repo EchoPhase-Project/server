@@ -42,7 +42,7 @@ namespace EchoPhase.Server.Controllers.Api
                 or AuthErrors.RefreshTokenReused or ApiClientErrors.InvalidClient
                 => StatusCodes.Status401Unauthorized,
             ErrorCodes.Forbidden => StatusCodes.Status403Forbidden,
-            ErrorCodes.Conflict or BlockRunErrors.AlreadyFinished or ConnectionErrors.ReauthRequired
+            ErrorCodes.Conflict or BlockRunErrors.AlreadyFinished or BlockRunErrors.NotFinished or ConnectionErrors.ReauthRequired
                 => StatusCodes.Status409Conflict,
             BlockRunErrors.TooManyActive => StatusCodes.Status429TooManyRequests,
             ConnectionErrors.Upstream => StatusCodes.Status502BadGateway,

@@ -10,16 +10,24 @@ namespace EchoPhase.Server.Services.Blocks
         public const string Webhook = "webhook";
         public const string Schedule = "schedule";
         public const string Discord = "discord";
+
+        /// <summary>An ErrorTrigger: another run failed. Such runs never start error workflows themselves.</summary>
+        public const string Error = "error";
+
+        /// <summary>A failed run started again by its owner.</summary>
+        public const string Retry = "retry";
     }
 
     /// <summary>
     /// What to run: the program, where to start (null: its manual start),
-    /// the first blocks' input, and where it came from.
+    /// the first blocks' input, where it came from, and the webhook caller
+    /// waiting for its answer, if any.
     /// </summary>
     public sealed record BlockRunStart(
         EchoPhase.Runners.Blocks.Models.BlockProgram Program,
         IReadOnlyCollection<int>? StartIds = null,
         object? Input = null,
         Guid? WorkflowId = null,
-        string Trigger = BlockRunTriggers.Manual);
+        string Trigger = BlockRunTriggers.Manual,
+        EchoPhase.Runners.Blocks.Contexts.WebhookReply? Reply = null);
 }

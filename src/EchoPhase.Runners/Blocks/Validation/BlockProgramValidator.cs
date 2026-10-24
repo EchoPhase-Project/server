@@ -43,6 +43,7 @@ namespace EchoPhase.Runners.Blocks.Validation
                 Fail(null, $"A program may have at most {maxBlocks} blocks.");
 
             var types = new Dictionary<int, (Block Block, BlockTypeDescriptor? Type)>();
+            var bound = new Dictionary<int, object>();
             foreach (var block in program.Blocks)
             {
                 if (block.Id < 0)
@@ -63,10 +64,10 @@ namespace EchoPhase.Runners.Blocks.Validation
 
                 try
                 {
-                    var bound = BlockParamsBinder.Bind(descriptor.ParamsType, block.Params);
-                    if (bound is ScheduleTriggerParams schedule && !IsCron(schedule.Cron))
+                    var parameters = bound[block.Id] = BlockParamsBinder.Bind(descriptor.ParamsType, block.Params);
+                    if (parameters is ScheduleTriggerParams schedule && !IsCron(schedule.Cron))
                         Fail(block.Id, $"'{schedule.Cron}' is not a five-field cron expression.");
-                    foreach (var problem in ScriptProblems(bound))
+                    foreach (var problem in ScriptProblems(parameters))
                         Fail(block.Id, problem);
                 }
                 catch (Exception ex) when (ex is InvalidCastException or InvalidOperationException)
@@ -87,8 +88,8 @@ namespace EchoPhase.Runners.Blocks.Validation
 
                 if (!types.TryGetValue(c.From, out var from))
                     Fail(null, $"Connection from block {c.From}, which does not exist.");
-                else if (from.Type is { } type && !HasOutput(from.Block, type, c.Output))
-                    Fail(c.From, $"{from.Block.Type} has no output \"{c.Output}\" (it has {string.Join(", ", Outputs(from.Block, type))}).");
+                else if (from.Type is { } type && !Outputs(from.Block, type, bound.GetValueOrDefault(c.From)).Contains(c.Output))
+                    Fail(c.From, $"{from.Block.Type} has no output \"{c.Output}\" (it has {string.Join(", ", Outputs(from.Block, type, bound.GetValueOrDefault(c.From)))}).");
 
                 if (!types.TryGetValue(c.To, out var to))
                     Fail(null, $"Connection to block {c.To}, which does not exist.");
@@ -143,6 +144,14 @@ namespace EchoPhase.Runners.Blocks.Validation
                 IfParams p => [("condition", Eval.CheckExpression(p.Condition))],
                 WhileParams p => [("condition", Eval.CheckExpression(p.Condition))],
                 PrintParams p => [("text", Eval.CheckTemplate(p.Text))],
+                StopAndErrorParams p => [("message", Eval.CheckTemplate(p.Message))],
+                SwitchParams p => p.Rules.Select((r, i) => ($"rules[{i}].condition", Eval.CheckExpression(r.Condition))).ToArray(),
+                ExecuteWorkflowParams p => [("input", BlockValues.Check(p.Input))],
+                RespondToWebhookParams p => [("body", BlockValues.Check(p.Body)),
+                    .. p.Headers.Select(h => ($"headers.{h.Key}", Eval.CheckTemplate(h.Value)))],
+                HttpRequestParams p => [("url", Eval.CheckTemplate(p.Url)), ("body", BlockValues.Check(p.Body)),
+                    .. p.Headers.Select(h => ($"headers.{h.Key}", Eval.CheckTemplate(h.Value))),
+                    .. p.Query.Select(q => ($"query.{q.Key}", Eval.CheckTemplate(q.Value)))],
                 SetParams p => new (string, string?)[]
                 {
                     ("name", Eval.CheckPath(p.Name)),
@@ -165,11 +174,19 @@ namespace EchoPhase.Runners.Blocks.Validation
         public static bool IsIanaTimeZone(string id)
             => id.Length <= 64 && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone) && zone.HasIanaId;
 
-        private static bool HasOutput(Block block, BlockTypeDescriptor type, string output)
-            => Outputs(block, type).Contains(output);
-
-        private static IEnumerable<string> Outputs(Block block, BlockTypeDescriptor type)
-            => block.OnError == BlockErrorPolicy.ErrorOutput ? [.. type.Outputs, BlockOutputs.Error] : type.Outputs;
+        // The type's outputs, those its params add (Switch rules), and the
+        // error one. Continue goes through the first output, "main" for a type
+        // with none (StopAndError).
+        private static IEnumerable<string> Outputs(Block block, BlockTypeDescriptor type, object? parameters)
+        {
+            IEnumerable<string> outputs = parameters is IHasOutputs extra ? [.. extra.ExtraOutputs, .. type.Outputs] : type.Outputs;
+            return block.OnError switch
+            {
+                BlockErrorPolicy.ErrorOutput => [.. outputs, BlockOutputs.Error],
+                BlockErrorPolicy.Continue when type.Outputs.Count == 0 => [type.FirstOutput],
+                _ => outputs
+            };
+        }
 
         // Iterative DFS (programs may be deep): returns a block on a cycle, or null.
         private static int? FindCycle(BlockProgram program)

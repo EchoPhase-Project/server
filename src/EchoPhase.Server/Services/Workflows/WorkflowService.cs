@@ -10,6 +10,7 @@ using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.DAL.Scylla.Entities;
 using EchoPhase.Runners.Blocks;
+using EchoPhase.Runners.Blocks.Contexts;
 using EchoPhase.Runners.Blocks.Handlers;
 using EchoPhase.Runners.Blocks.Models;
 using EchoPhase.Runners.Blocks.Params;
@@ -17,6 +18,7 @@ using EchoPhase.Runners.Blocks.Triggers;
 using EchoPhase.Runners.Blocks.Validation;
 using EchoPhase.Server.Services.Blocks;
 using EchoPhase.Types.Result;
+using EchoPhase.Types.Result.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -32,6 +34,9 @@ namespace EchoPhase.Server.Services.Workflows
 
     /// <summary>A workflow with its definition parsed.</summary>
     public sealed record WorkflowDetails(Workflow Workflow, BlockProgram Program);
+
+    /// <summary>A run started by a webhook, and its caller's pending answer when the trigger waits.</summary>
+    public sealed record WebhookStarted(BlockRun Run, WebhookReply? Reply);
 
     /// <summary>One saved version with its program.</summary>
     public sealed record WorkflowVersionDetails(WorkflowVersion Version, BlockProgram Program);
@@ -98,6 +103,8 @@ namespace EchoPhase.Server.Services.Workflows
                 Definition = Serialize(program),
                 Active = active
             };
+            if (await CheckErrorWorkflowAsync(workflow, program, ct) is { } badErrorWorkflow)
+                return Failure<WorkflowDetails>(WorkflowErrors.Invalid, badErrorWorkflow);
             _workflows.Add(workflow);
             _workflows.AddVersion(Snapshot(workflow, actorId ?? userId));
             await _workflows.ReplaceSchedulesAsync(workflow.Id, await SchedulesAsync(workflow, program, ct), ct);
@@ -123,6 +130,8 @@ namespace EchoPhase.Server.Services.Workflows
                     $"The workflow changed (version {workflow.Version}, not {expected}); reload it.");
             if (Check(name, program) is { } invalid)
                 return Failure<WorkflowDetails>(WorkflowErrors.Invalid, invalid);
+            if (await CheckErrorWorkflowAsync(workflow, program, ct) is { } badErrorWorkflow)
+                return Failure<WorkflowDetails>(WorkflowErrors.Invalid, badErrorWorkflow);
 
             var definition = Serialize(program);
             bool changed = definition != workflow.Definition;
@@ -221,27 +230,108 @@ namespace EchoPhase.Server.Services.Workflows
         /// WebhookTrigger (indistinguishable on purpose); unauthorized for a
         /// wrong secret. The run belongs to the workflow's owner.
         /// </summary>
-        public async Task<IServiceResult<BlockRun>> TriggerWebhookAsync(
+        public async Task<IServiceResult<WebhookStarted>> TriggerWebhookAsync(
             Guid id, int blockId, string? secret, object? body, CancellationToken ct = default)
         {
             var workflow = await _workflows.Query().WithIds(id).FirstOrDefaultAsync(ct);
             if (workflow is not { Active: true })
-                return Failure<BlockRun>(WorkflowErrors.NotFound, "Webhook not found.");
+                return Failure<WebhookStarted>(WorkflowErrors.NotFound, "Webhook not found.");
 
             var program = Parse(workflow);
             var block = program.Blocks.FirstOrDefault(b => b.Id == blockId && b.Type == BlockTypes.WebhookTrigger && !b.Disabled);
             if (block is null)
-                return Failure<BlockRun>(WorkflowErrors.NotFound, "Webhook not found.");
+                return Failure<WebhookStarted>(WorkflowErrors.NotFound, "Webhook not found.");
 
-            var expected = ((WebhookTriggerParams)BlockParamsBinder.Bind(typeof(WebhookTriggerParams), block.Params)).Secret;
-            if (secret is null || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(expected)))
-                return Failure<BlockRun>(WorkflowErrors.Unauthorized, "Wrong webhook secret.");
+            var trigger = (WebhookTriggerParams)BlockParamsBinder.Bind(typeof(WebhookTriggerParams), block.Params);
+            if (secret is null || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(trigger.Secret)))
+                return Failure<WebhookStarted>(WorkflowErrors.Unauthorized, "Wrong webhook secret.");
 
-            return await _runs.StartAsync(workflow.UserId, null,
-                new BlockRunStart(program, [blockId], body, workflow.Id, BlockRunTriggers.Webhook), ct);
+            var reply = trigger.Respond == WebhookRespondMode.Immediately ? null : new WebhookReply(trigger.Respond);
+            var started = await _runs.StartAsync(workflow.UserId, null,
+                new BlockRunStart(program, [blockId], body, workflow.Id, BlockRunTriggers.Webhook, reply), ct);
+
+            if (started.TryGetValue(out var run))
+                return ServiceResult<WebhookStarted>.Success(new WebhookStarted(run, reply));
+            return started.Successful
+                ? throw new InvalidOperationException($"Starting a run of workflow {id} succeeded without a run.")
+                : ServiceResult<WebhookStarted>.Failure(e => e.Set(started.Error.Code, started.Error.Message));
+        }
+
+        /// <summary>
+        /// After an automatic run of a workflow failed: starts the ErrorTriggers
+        /// of the error workflow it names, owned by the same user, active or
+        /// not. Their input describes the failed run.
+        /// </summary>
+        public async Task<IServiceResult<BlockRun>> StartErrorWorkflowAsync(
+            BlockRun failed, Guid errorWorkflowId, IReadOnlyList<BlockError> errors, CancellationToken ct = default)
+        {
+            if (failed.WorkflowId is not { } failedWorkflowId)
+                return Failure<BlockRun>(WorkflowErrors.Invalid, $"Run {failed.RunId} is not a workflow's; it has no error workflow.");
+
+            var errorWorkflow = await _workflows.Query().WithIds(errorWorkflowId).WithUserIds(failed.UserId).FirstOrDefaultAsync(ct);
+            if (errorWorkflow is null)
+                return Failure<BlockRun>(WorkflowErrors.NotFound, $"Error workflow {errorWorkflowId} not found.");
+
+            var program = Parse(errorWorkflow);
+            var triggers = ErrorTriggerIds(program);
+            if (triggers.Count == 0)
+                return Failure<BlockRun>(WorkflowErrors.Invalid, $"Error workflow {errorWorkflowId} has no enabled ErrorTrigger.");
+
+            var source = failedWorkflowId == errorWorkflow.Id
+                ? errorWorkflow
+                : await _workflows.Query().WithIds(failedWorkflowId).FirstOrDefaultAsync(ct);
+
+            // A timeout or an oversized result fails a run without a block error.
+            var described = errors.Count > 0
+                ? errors.Select(e => (object?)e.ToValue()).ToList()
+                : [new BlockError { Id = -1, Type = failed.Status, Message = $"The run ended as {failed.Status}." }.ToValue()];
+
+            var input = new Dictionary<string, object?>
+            {
+                ["workflow"] = new Dictionary<string, object?>
+                {
+                    ["id"] = failedWorkflowId.ToString(),
+                    ["name"] = source?.Name
+                },
+                ["run"] = new Dictionary<string, object?>
+                {
+                    ["id"] = failed.RunId.ToString(),
+                    ["trigger"] = failed.Trigger,
+                    ["status"] = failed.Status,
+                    ["startedAt"] = failed.StartedAt?.ToString("O"),
+                    ["finishedAt"] = failed.FinishedAt?.ToString("O")
+                },
+                ["errors"] = described
+            };
+
+            return await _runs.StartAsync(failed.UserId, null,
+                new BlockRunStart(program, triggers, input, errorWorkflow.Id, BlockRunTriggers.Error), ct);
         }
 
         public static BlockProgram Parse(Workflow workflow) => Parse(workflow.Definition);
+
+        private static List<int> ErrorTriggerIds(BlockProgram program)
+            => program.Blocks.Where(b => b.Type == BlockTypes.ErrorTrigger && !b.Disabled).Select(b => b.Id).ToList();
+
+        // The error workflow must be the owner's and able to start: caught on
+        // save, not when a run has already failed. It may be the workflow itself.
+        private async Task<string?> CheckErrorWorkflowAsync(Workflow workflow, BlockProgram program, CancellationToken ct)
+        {
+            if (program.Settings.ErrorWorkflowId is not { } id)
+                return null;
+
+            var target = id == workflow.Id
+                ? program
+                : await _workflows.Query().WithIds(id).WithUserIds(workflow.UserId).FirstOrDefaultAsync(ct) is { } other
+                    ? Parse(other)
+                    : null;
+
+            if (target is null)
+                return $"Error workflow {id} not found.";
+            if (ErrorTriggerIds(target).Count == 0)
+                return $"Error workflow {id} has no enabled ErrorTrigger.";
+            return null;
+        }
 
         private static BlockProgram Parse(string definition)
             => JsonSerializer.Deserialize<BlockProgram>(definition, BlockParamsBinder.Options) ?? new BlockProgram();

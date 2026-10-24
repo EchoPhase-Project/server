@@ -24,14 +24,23 @@ namespace EchoPhase.Runners.Tests
         private readonly ServiceProvider _provider;
 
         public RunnerHarness(params IBlockRunObserver[] observers)
+            : this(_ => { }, observers)
+        {
+        }
+
+        /// <summary><paramref name="configure"/> adds or replaces services (fakes for the host's).</summary>
+        public RunnerHarness(Action<IServiceCollection> configure, params IBlockRunObserver[] observers)
         {
             var services = new ServiceCollection()
                 .AddProfiler()
                 .AddRunners();
             foreach (var observer in observers)
                 services.AddSingleton(observer);
+            configure(services);
             _provider = services.BuildServiceProvider();
         }
+
+        public Guid UserId { get; } = Guid.NewGuid();
 
         public BlockProgramValidator Validator => _provider.GetRequiredService<BlockProgramValidator>();
 
@@ -41,16 +50,19 @@ namespace EchoPhase.Runners.Tests
             => JsonSerializer.Deserialize<BlockProgram>(json, BlockParamsBinder.Options)!;
 
         public async Task<IBlockExecutionContext> RunAsync(
-            string programJson, BlockLimits? limits = null, object? input = null, CancellationToken? ct = null)
+            string programJson, BlockLimits? limits = null, object? input = null, CancellationToken? ct = null,
+            WebhookReply? reply = null, string? timeZone = null)
         {
             var program = Parse(programJson);
             var issues = Validator.Validate(program, maxBlocks: 200);
             Assert.True(issues.Count == 0, string.Join(" | ", issues.Select(i => $"{i.BlockId}: {i.Message}")));
 
-            var context = new BlockExecutionContext(program, _provider, Guid.NewGuid(),
+            program.Settings.TimeZone = timeZone;
+            var context = new BlockExecutionContext(program, _provider, UserId,
                 ct ?? TestContext.Current.CancellationToken)
             {
-                Limits = limits ?? new BlockLimits(1_000, 100)
+                Limits = limits ?? new BlockLimits(1_000, 100),
+                Reply = reply
             };
 
             return await _provider.GetRequiredService<BlocksRunner>()

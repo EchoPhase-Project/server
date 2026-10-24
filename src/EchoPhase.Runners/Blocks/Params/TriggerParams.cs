@@ -4,6 +4,7 @@
 using System.Text.Json.Serialization;
 using EchoPhase.Clients.Discord.WebSocket;
 using EchoPhase.Configuration;
+using EchoPhase.Runners.Blocks.Contexts;
 using EchoPhase.Types.Validation;
 
 namespace EchoPhase.Runners.Blocks.Params
@@ -24,6 +25,10 @@ namespace EchoPhase.Runners.Blocks.Params
 
         [JsonPropertyName("secret")]
         public string Secret { get; set; } = string.Empty;
+
+        /// <summary>When the caller gets its answer: at once (202), when the run ends, or from a RespondToWebhook block.</summary>
+        [JsonPropertyName("respond")]
+        public WebhookRespondMode Respond { get; set; } = WebhookRespondMode.Immediately;
 
         public IValidationResult Validate()
         {
@@ -55,6 +60,16 @@ namespace EchoPhase.Runners.Blocks.Params
 
             return ValidationResult.Success();
         }
+    }
+
+    /// <summary>
+    /// Started when an automatic run of a workflow that names this one as its
+    /// error workflow fails. The run's input is
+    /// { workflow: { id, name }, run: { id, trigger, status }, errors: [{ block, type, message }] }.
+    /// </summary>
+    public class ErrorTriggerParams : IValidatable
+    {
+        public IValidationResult Validate() => ValidationResult.Success();
     }
 
     /// <summary>
