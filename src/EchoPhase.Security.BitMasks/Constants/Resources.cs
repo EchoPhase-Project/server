@@ -22,7 +22,7 @@ namespace EchoPhase.Security.BitMasks.Constants
         public const string Discord = "discord";
         public const string Twitch = "twitch";
 
-        /// <summary>Raw WebSocket gateway (<c>/gateway</c>).</summary>
+        /// <summary>Raw WebSocket gateway (<c>api/v1/gateway</c>).</summary>
         public const string Gateway = "gateway";
 
         /// <summary>Maintenance mode (<c>api/v1/maintenance</c>); its holders also use the API while it is on.</summary>

@@ -18,7 +18,7 @@ namespace EchoPhase.Server.Controllers.WebSockets.v1
     /// One receive loop per socket; sends come from anywhere through the
     /// connection (serialized there).
     /// </summary>
-    [Route("/gateway")]
+    [Route("api/v1/gateway")]
     [ApiController]
     public class GatewayController : ControllerBase
     {
