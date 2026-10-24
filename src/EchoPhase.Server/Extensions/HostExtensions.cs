@@ -6,6 +6,7 @@ using Spectre.Console;
 using Spectre.Console.Cli;
 using Commands = EchoPhase.Cli.Commands;
 using WorkflowCommands = EchoPhase.Server.Services.Workflows.Commands;
+using DiagnosticsCommands = EchoPhase.Server.Services.Diagnostics;
 
 namespace EchoPhase.Server.Extensions
 {
@@ -187,6 +188,10 @@ namespace EchoPhase.Server.Extensions
                 config.AddCommand<Commands.Check.CheckCommand>("check")
                     .WithDescription("Validate the settings and check Postgres, Scylla and Redis, and pending migrations")
                     .WithExample(new[] { "check" });
+
+                config.AddCommand<DiagnosticsCommands.ReportTestErrorCommand>("report-test-error")
+                    .WithDescription("Send a test error to GlitchTip (SENTRY_DSN) and wait until it is delivered")
+                    .WithExample(new[] { "report-test-error" });
 
                 config.AddCommand<Commands.Health.Check.CheckCommand>("healthcheck")
                     .WithDescription("Healthcheck")

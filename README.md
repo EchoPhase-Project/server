@@ -74,6 +74,7 @@ and exits (`--continue` starts the server afterwards). In a container:
 | `impersonations [-u user] [--active]` | who acted as whom and why, newest first |
 | `prune [--older-than 90d] [--dry-run]` | delete idle sessions, old rotated refresh tokens, long-ended impersonations and grants, expired storage values (for a CronJob) |
 | `maintenance on [-m message] [--for 30m]`, `off`, `status` | maintenance mode, see below |
+| `report-test-error` | send a test error to GlitchTip (`SENTRY_DSN`) and wait until it is delivered |
 | `healthcheck [--url u]` | exit 0 when the server answers |
 
 Lists (`users`, `workflows`, `impersonations`) show 50 rows (`-n` up to 1000) and
