@@ -87,10 +87,15 @@ namespace EchoPhase.Scripting.Engine
             bool b => b ? "true" : "false",
             double d when d == Math.Floor(d) && Math.Abs(d) < 1e15 => ((long)d).ToString(CultureInfo.InvariantCulture),
             double d => d.ToString("R", CultureInfo.InvariantCulture),
-            IEnumerable e => JsonSerializer.Serialize(e, Json),
+            DateTimeOffset dto => dto.ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture),
+            DateTime dt => dt.ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFFK", CultureInfo.InvariantCulture),
+            // As its runtime type: a dictionary is an object, not a list of pairs.
+            IEnumerable e => JsonSerializer.Serialize<object>(e, Json),
             IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
             var v => v.ToString() ?? string.Empty
         };
+
+        public static string ToJson(object? value) => JsonSerializer.Serialize(Unwrap(value), Json);
 
         /// <summary>
         /// Equality: null only equals null; numbers (and numeric strings or
@@ -112,6 +117,19 @@ namespace EchoPhase.Scripting.Engine
                 return ln == rn;
             return left.Equals(right);
         }
+
+        /// <summary>
+        /// <c>item in container</c>: a substring of text, an element of a list
+        /// (by ==), a key of an object; null contains nothing.
+        /// </summary>
+        public static bool Contains(object? container, object? item) => Unwrap(container) switch
+        {
+            null => false,
+            string s => s.Contains(Format(item), StringComparison.Ordinal),
+            IDictionary<string, object?> dict => dict.ContainsKey(Format(item)),
+            IEnumerable e => e.Cast<object?>().Any(x => AreEqual(x, item)),
+            var v => throw new InvalidOperationException($"{Describe(v)} cannot contain values.")
+        };
 
         /// <summary>Ordering of two numbers or two strings; anything else is an error.</summary>
         public static int Compare(object? left, object? right)

@@ -86,3 +86,4 @@ mise.local.lock
 src/packages/*.snupkg
 # Image tag the Woodpecker release workflow hands between its steps
 .image-tag
+BenchmarkDotNet.Artifacts/

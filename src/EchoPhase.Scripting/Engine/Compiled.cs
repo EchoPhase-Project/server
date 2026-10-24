@@ -2,40 +2,37 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections;
-using System.Collections.Concurrent;
 
 namespace EchoPhase.Scripting.Engine
 {
     /// <summary>
     /// Parse once, evaluate many times: programs evaluate the same
-    /// conditions and texts on every loop iteration and every run. Bounded:
-    /// past <see cref="Capacity"/> entries a cache starts over.
+    /// conditions and texts on every loop iteration and every run. Each cache
+    /// keeps the <see cref="Capacity"/> most recently used sources.
     /// </summary>
     internal static class Compiled
     {
         public const int Capacity = 4096;
 
-        private static readonly ConcurrentDictionary<string, Node> Expressions = new(StringComparer.Ordinal);
-        private static readonly ConcurrentDictionary<string, Template> Templates = new(StringComparer.Ordinal);
-        private static readonly ConcurrentDictionary<string, PathNode> Paths = new(StringComparer.Ordinal);
+        private static readonly ParseCache<Node> Expressions = new(Capacity, source => TieredNode.Wrap(ExpressionParser.Parse(source)));
+        private static readonly ParseCache<Template> Templates = new(Capacity, Engine.Template.Parse);
+        private static readonly ParseCache<PathNode> Paths = new(Capacity, ExpressionParser.ParsePath);
 
-        public static Node Expression(string source) => Get(Expressions, source, ExpressionParser.Parse);
+        public static Node Expression(string source) => Expressions.Get(source);
 
-        public static Template Template(string source) => Get(Templates, source, Engine.Template.Parse);
+        public static Template Template(string source) => Templates.Get(source);
 
-        public static PathNode Path(string source) => Get(Paths, source, ExpressionParser.ParsePath);
+        public static PathNode Path(string source) => Paths.Get(source);
 
-        private static T Get<T>(ConcurrentDictionary<string, T> cache, string source, Func<string, T> parse)
+        /// <summary>A path to assign to: no slices.</summary>
+        public static PathNode Target(string source)
         {
-            if (cache.TryGetValue(source, out var hit))
-                return hit;
-
-            var parsed = parse(source);
-            if (cache.Count >= Capacity)
-                cache.Clear();
-            cache[source] = parsed;
-            return parsed;
+            var path = Path(source);
+            return path.Segments.Any(s => s is SliceSegment)
+                ? throw new ScriptSyntaxException("Cannot assign to a slice", 0)
+                : path;
         }
+
 
         /// <summary>
         /// Assigns <paramref name="value"/> at a path, creating the
@@ -44,7 +41,7 @@ namespace EchoPhase.Scripting.Engine
         /// </summary>
         public static void Assign(PathNode path, IDictionary<string, object> variables, object? value)
         {
-            if (path.Segments.Count == 0)
+            if (path.Segments.Length == 0)
             {
                 variables[path.Root] = value!;
                 return;
@@ -52,14 +49,17 @@ namespace EchoPhase.Scripting.Engine
 
             if (!variables.TryGetValue(path.Root, out var current) || current is null)
                 variables[path.Root] = current = NewContainer(path.Segments[0]);
+            else if (Frozen.Thaw(current) is { } own && !ReferenceEquals(own, current))
+                variables[path.Root] = current = own;
 
-            for (int i = 0; i < path.Segments.Count; i++)
+            for (int i = 0; i < path.Segments.Length; i++)
             {
                 var segment = path.Segments[i];
-                bool last = i == path.Segments.Count - 1;
+                bool last = i == path.Segments.Length - 1;
                 object? key = segment is IndexSegment ix ? Values.Unwrap(ix.Index.Evaluate(variables)) : ((MemberSegment)segment).Name;
 
-                var child = last ? value : Read(current, key) ?? NewContainer(path.Segments[i + 1]);
+                // A shared constant on the way is copied, never written into.
+                var child = last ? value : Frozen.Thaw(Read(current, key)) ?? NewContainer(path.Segments[i + 1]);
                 Write(current, key, child);
                 current = child!;
             }

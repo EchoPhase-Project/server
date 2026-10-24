@@ -8,4 +8,13 @@
     <ProjectReference Include="..\EchoPhase.Types\EchoPhase.Types.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="EchoPhase.Scripting.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Hashing" />
+    <PackageReference Include="UUIDNext" />
+  </ItemGroup>
+
 </Project>

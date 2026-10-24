@@ -71,7 +71,7 @@ namespace EchoPhase.Scripting.Engine
                     int start = i + 2;
                     int end = MatchingParen(source, start, i);
                     Flush();
-                    parts.Add(Compile(() => ExpressionParser.Parse(source[start..end]), start));
+                    parts.Add(TieredNode.Wrap(Compile(() => ExpressionParser.Parse(source[start..end]), start)));
                     i = end + 1;
                 }
                 else if (c == '@' && (char.IsLetter(next) || next == '_'))

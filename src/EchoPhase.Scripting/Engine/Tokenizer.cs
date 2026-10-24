@@ -13,7 +13,7 @@ namespace EchoPhase.Scripting.Engine
         Equal, NotEqual, Less, Greater, LessEq, GreaterEq,
         And, Or, Not,
         Question, Colon, Comma, Dot,
-        LParen, RParen, LBracket, RBracket,
+        LParen, RParen, LBracket, RBracket, LBrace, RBrace, Arrow,
         End
     }
 
@@ -33,6 +33,8 @@ namespace EchoPhase.Scripting.Engine
         public static List<Lexeme> Tokenize(string source)
         {
             var result = new List<Lexeme>();
+            // One instance per name: a parameter and its uses compare by reference.
+            var names = new Dictionary<string, string>(StringComparer.Ordinal);
             int i = 0;
 
             while (true)
@@ -54,6 +56,8 @@ namespace EchoPhase.Scripting.Engine
                     while (i < source.Length && (char.IsLetterOrDigit(source[i]) || source[i] == '_'))
                         i++;
                     var text = source[start..i];
+                    if (!names.TryAdd(text, text))
+                        text = names[text];
                     result.Add(new Lexeme(Keyword(text) ?? Tk.Identifier, text, 0, start));
                 }
                 else if (c is '"' or '\'')
@@ -66,6 +70,7 @@ namespace EchoPhase.Scripting.Engine
                     (Tk kind, int length) = (c, next) switch
                     {
                         ('=', '=') => (Tk.Equal, 2),
+                        ('=', '>') => (Tk.Arrow, 2),
                         ('!', '=') => (Tk.NotEqual, 2),
                         ('<', '=') => (Tk.LessEq, 2),
                         ('>', '=') => (Tk.GreaterEq, 2),
@@ -87,6 +92,8 @@ namespace EchoPhase.Scripting.Engine
                         (')', _) => (Tk.RParen, 1),
                         ('[', _) => (Tk.LBracket, 1),
                         (']', _) => (Tk.RBracket, 1),
+                        ('{', _) => (Tk.LBrace, 1),
+                        ('}', _) => (Tk.RBrace, 1),
                         ('=', _) => throw new ScriptSyntaxException("Single '='; did you mean '=='?", i),
                         _ => throw new ScriptSyntaxException($"Unexpected character '{c}'", i)
                     };

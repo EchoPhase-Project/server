@@ -26,6 +26,13 @@ run = [
 description = "Run the .NET tests with detailed output"
 run = "dotnet test --solution EchoPhase.slnx --output Detailed"
 
+# Timings: BenchmarkDotNet, Release, minutes per group. CI does not run them
+# (shared runners are too noisy to compare times); it guards allocations in
+# EchoPhase.Scripting.Tests instead. Results: BenchmarkDotNet.Artifacts/.
+[bench]
+description = "Benchmark the expression engine (pass --filter '*Lambdas*' for one group)"
+run = "dotnet run -c Release --project tests/EchoPhase.Scripting.Benchmarks -- --filter '*'"
+
 [format]
 description = "Apply code style fixes (style first: its fixes may need re-wrapping)"
 run = [
