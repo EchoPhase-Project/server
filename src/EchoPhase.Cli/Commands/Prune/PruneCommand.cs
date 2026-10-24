@@ -30,7 +30,8 @@ namespace EchoPhase.Cli.Commands.Prune
     /// refresh tokens do not expire on their own, so this is the idle limit;
     /// the user signs in again), rotated refresh token hashes of that age
     /// (replaying one then reads as an unknown token instead of ending the
-    /// session), and impersonations and permission grants that ended that long ago.
+    /// session), impersonations and permission grants that ended that long ago,
+    /// and workflow storage values past their expiry.
     /// Meant for a CronJob.
     /// </summary>
     public class PruneCommand : AsyncCommand<PruneSettings>
@@ -47,7 +48,8 @@ namespace EchoPhase.Cli.Commands.Prune
         public override async Task<int> ExecuteAsync(CommandContext context, PruneSettings settings, CancellationToken cancellationToken)
         {
             Durations.TryParse(settings.OlderThan, out var age);
-            var cutoff = _time.GetUtcNow().UtcDateTime - age;
+            var now = _time.GetUtcNow().UtcDateTime;
+            var cutoff = now - age;
 
             var targets = new (string Name, IQueryable<object> Rows, Func<Task<int>> Delete)[]
             {
@@ -60,6 +62,10 @@ namespace EchoPhase.Cli.Commands.Prune
                 ("Ended impersonations",
                     _db.Impersonations.Where(i => (i.EndedAt ?? i.ExpiresAt) < cutoff),
                     () => _db.Impersonations.Where(i => (i.EndedAt ?? i.ExpiresAt) < cutoff).ExecuteDeleteAsync(cancellationToken)),
+                // Expired storage values read as missing already; any age goes.
+                ("Expired storage values",
+                    _db.StorageEntries.Where(e => e.ExpiresAt < now),
+                    () => _db.StorageEntries.Where(e => e.ExpiresAt < now).ExecuteDeleteAsync(cancellationToken)),
                 ("Expired grants",
                     _db.UserPermissionGrants.Where(g => g.ExpiresAt < cutoff),
                     () => _db.UserPermissionGrants.Where(g => g.ExpiresAt < cutoff).ExecuteDeleteAsync(cancellationToken)),

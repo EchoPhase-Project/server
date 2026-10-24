@@ -58,6 +58,13 @@ namespace EchoPhase.Scripting
         public static object? Plain(object? value) => Values.Unwrap(value);
 
         /// <summary>
+        /// Variables with one more name on top (it shadows an outer one of the
+        /// same name); the rest are read through.
+        /// </summary>
+        public static IDictionary<string, object> With(IDictionary<string, object> variables, string name, object? value)
+            => new Scope1(name, value, variables);
+
+        /// <summary>
         /// A value to share between evaluations, made safe for it: its lists
         /// and objects are copied into frozen ones, which Set copies before
         /// writing into. For hosts that hand the same value to many evaluations.

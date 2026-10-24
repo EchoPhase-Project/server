@@ -49,6 +49,8 @@ namespace EchoPhase.Runners.Blocks.Handlers
             {
                 Limits = context.Limits,
                 RunId = context.RunId,
+                // The sub-workflow keeps its own storage.
+                WorkflowId = param.WorkflowId,
                 CallDepth = context.CallDepth + 1,
                 Steps = context.Steps
             };

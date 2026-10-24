@@ -28,6 +28,7 @@ namespace EchoPhase.Runners.Blocks
         Switch,
         ExecuteWorkflow,
         HttpRequest,
-        RespondToWebhook
+        RespondToWebhook,
+        Storage
     }
 }

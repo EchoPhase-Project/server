@@ -19,7 +19,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("EchoPhase")
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -356,6 +356,57 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .IsUnique();
 
                     b.ToTable("SessionAudits", "EchoPhase");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.StorageEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Size")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid?>("WorkflowId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("WorkflowId");
+
+                    b.HasIndex("UserId", "WorkflowId", "Key")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("UserId", "WorkflowId", "Key"), false);
+
+                    b.ToTable("StorageEntries", "EchoPhase");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.User", b =>
@@ -909,6 +960,24 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .IsRequired();
 
                     b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.StorageEntry", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.Workflow", "Workflow")
+                        .WithMany()
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("User");
+
+                    b.Navigation("Workflow");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.UserPermissionGrant", b =>

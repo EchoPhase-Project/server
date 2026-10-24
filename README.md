@@ -72,7 +72,7 @@ and exits (`--continue` starts the server afterwards). In a container:
 | `workflow <id> export`, `workflows import [file] -u user [--name n]` | a workflow as JSON (`{ name, program }`), and back as a new inactive one |
 | `workflow <id> enable\|disable` | turn its triggers on or off; the server applies it within a minute |
 | `impersonations [-u user] [--active]` | who acted as whom and why, newest first |
-| `prune [--older-than 90d] [--dry-run]` | delete idle sessions, old rotated refresh tokens, long-ended impersonations and grants (for a CronJob) |
+| `prune [--older-than 90d] [--dry-run]` | delete idle sessions, old rotated refresh tokens, long-ended impersonations and grants, expired storage values (for a CronJob) |
 | `maintenance on [-m message] [--for 30m]`, `off`, `status` | maintenance mode, see below |
 | `healthcheck [--url u]` | exit 0 when the server answers |
 

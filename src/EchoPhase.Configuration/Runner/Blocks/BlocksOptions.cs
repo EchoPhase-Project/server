@@ -12,6 +12,18 @@ namespace EchoPhase.Configuration.Runner.Blocks
     /// reach only public addresses (no localhost, private networks or cloud
     /// metadata), checked on every connection, redirects included.
     /// </summary>
+    public class BlocksStorageOptions
+    {
+        /// <summary>One value as JSON; a Bloom filter of 1M bits is about 175 KB.</summary>
+        public int MaxValueBytes { get; set; } = 256 * 1024;
+
+        /// <summary>Keys one user keeps, all workflows and the shared scope together.</summary>
+        public int MaxEntriesPerUser { get; set; } = 10_000;
+
+        /// <summary>Bytes of values one user keeps.</summary>
+        public long MaxBytesPerUser { get; set; } = 50L * 1024 * 1024;
+    }
+
     public class BlocksHttpOptions
     {
         /// <summary>Longest a request may take; a block may ask for less.</summary>
@@ -64,6 +76,9 @@ namespace EchoPhase.Configuration.Runner.Blocks
         /// <summary>The HttpRequest block.</summary>
         public BlocksHttpOptions Http { get; set; } = new();
 
+        /// <summary>The Storage block: values kept between runs.</summary>
+        public BlocksStorageOptions Storage { get; set; } = new();
+
         public IValidationResult Validate()
         {
             return Positive(MaxBlocks, nameof(MaxBlocks))
@@ -79,7 +94,13 @@ namespace EchoPhase.Configuration.Runner.Blocks
                 .Then(() => Within(HistoryTtl, TimeSpan.FromHours(1), TimeSpan.FromDays(365), nameof(HistoryTtl)))
                 .Then(() => Within(Http.Timeout, TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(5), "Http.Timeout"))
                 .Then(() => Positive(Http.MaxResponseBytes, "Http.MaxResponseBytes"))
-                .Then(() => Positive(Http.MaxRequestBytes, "Http.MaxRequestBytes"));
+                .Then(() => Positive(Http.MaxRequestBytes, "Http.MaxRequestBytes"))
+                .Then(() => Positive(Storage.MaxValueBytes, "Storage.MaxValueBytes"))
+                .Then(() => Positive(Storage.MaxEntriesPerUser, "Storage.MaxEntriesPerUser"))
+                .Then(() => Storage.MaxBytesPerUser >= Storage.MaxValueBytes
+                    ? ValidationResult.Success()
+                    : ValidationResult.Failure(error => error.Set("Storage.MaxBytesPerUser",
+                        "Storage.MaxBytesPerUser must hold at least one value of Storage.MaxValueBytes.")));
         }
 
         private static IValidationResult Positive(int value, string name)

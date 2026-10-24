@@ -25,6 +25,7 @@ namespace EchoPhase.Runners.Blocks.Contexts
         public IList<BlockError> Failures { get; } = [];
         public IServiceProvider Services { get; }
         public Guid UserId { get; }
+        public Guid? WorkflowId { get; init; }
         public Guid RunId { get; init; }
         public CancellationToken CancellationToken { get; }
         public BlockLimits Limits { get; init; } = BlockLimits.Unlimited;

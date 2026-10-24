@@ -120,6 +120,7 @@ namespace EchoPhase.Server.Services.Blocks
                 {
                     Limits = new BlockLimits(_options.MaxSteps, _options.MaxOutputEntries),
                     RunId = run.RunId,
+                    WorkflowId = run.WorkflowId,
                     Reply = job.Reply
                 };
 
