@@ -15,7 +15,13 @@ namespace EchoPhase.Server.Extensions
     public static class ErrorReporting
     {
         public static void Configure(SentryAspNetCoreOptions options)
+            => Configure(options, Environment.GetEnvironmentVariable("SENTRY_DSN"));
+
+        public static void Configure(SentryAspNetCoreOptions options, string? dsn)
         {
+            // UseSentry throws on a missing DSN; an empty one turns it off.
+            if (string.IsNullOrWhiteSpace(options.Dsn))
+                options.Dsn = dsn?.Trim() ?? string.Empty;
             options.Release = typeof(ErrorReporting).Assembly
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
             options.TracesSampleRate = 0;
