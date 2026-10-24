@@ -3,7 +3,6 @@
 
 namespace EchoPhase.Server.Controllers.Api.v1.Discord
 {
-    /// <param name="Name">The Discord connection to open the gateway with.</param>
     /// <param name="Name">The Discord bot connection to connect with.</param>
     /// <param name="Intents">Gateway intents bit set; default: guild and direct messages.</param>
     public sealed record GatewayConnectRequest(string Name, int? Intents = null);
