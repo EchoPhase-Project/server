@@ -27,7 +27,7 @@ namespace EchoPhase.Security.Cryptography
         public Crypto25519(IOptions<CryptographyOptions> settings)
         {
             _random = new SecureRandom(new CryptoApiRandomGenerator());
-            _settings = settings.Value.Crypto22519;
+            _settings = settings.Value.Crypto25519;
         }
 
         // ------------------ Key generation ------------------

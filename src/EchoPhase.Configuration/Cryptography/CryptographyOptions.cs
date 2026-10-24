@@ -9,12 +9,12 @@ namespace EchoPhase.Configuration.Cryptography
     {
         public const string SectionName = "Cryptography";
         public Aes.AesOptions Aes { get; set; } = new();
-        public Crypto25519.Crypto25519Options Crypto22519 { get; set; } = new();
+        public Crypto25519.Crypto25519Options Crypto25519 { get; set; } = new();
 
         public IValidationResult Validate()
         {
             return Aes.Validate().WithPrefix(nameof(Aes))
-                .Then(() => Crypto22519.Validate().WithPrefix(nameof(Crypto22519)))
+                .Then(() => Crypto25519.Validate().WithPrefix(nameof(Crypto25519)))
                 .Then(() => ValidateSelf());
         }
 
