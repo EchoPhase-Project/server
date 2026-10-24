@@ -82,6 +82,25 @@ namespace EchoPhase.Server.Extensions
                     .WithDescription("List the roles and what each grants")
                     .WithExample(new[] { "roles" });
 
+                config.AddBranch<Commands.Maintenance.MaintenanceSettings>("maintenance", maintenance =>
+                {
+                    maintenance.SetDescription("Maintenance mode for the whole deployment, without a deploy");
+                    maintenance.SetDefaultCommand<Commands.Maintenance.StatusCommand>();
+
+                    maintenance.AddCommand<Commands.Maintenance.OnCommand>("on")
+                        .WithDescription("Turn maintenance on: the API answers 503 except for admins")
+                        .WithExample(new[] { "maintenance", "on" })
+                        .WithExample(new[] { "maintenance", "on", "--message", "Database upgrade", "--for", "30m" });
+
+                    maintenance.AddCommand<Commands.Maintenance.OffCommand>("off")
+                        .WithDescription("Turn maintenance off")
+                        .WithExample(new[] { "maintenance", "off" });
+
+                    maintenance.AddCommand<Commands.Maintenance.StatusCommand>("status")
+                        .WithDescription("Show whether maintenance is on")
+                        .WithExample(new[] { "maintenance", "status" });
+                });
+
                 config.AddCommand<Commands.Database.Migrate.MigrateCommand>("migrate")
                     .WithDescription("Apply database migrations")
                     .WithExample(new[] { "migrate" })

@@ -53,6 +53,7 @@ namespace EchoPhase.Security.BitMasks
             {
                 [Resources.Roles] = [Permissions.Assign],
                 [Resources.Users] = [Permissions.Impersonate, Permissions.Grant],
+                [Resources.Maintenance] = [Permissions.Update],
             });
 
             return new Dictionary<string, IReadOnlyDictionary<string, string[]>>(StringComparer.Ordinal)
@@ -74,6 +75,7 @@ namespace EchoPhase.Security.BitMasks
             $"{Resources.Users}:{Permissions.Impersonate}",
             $"{Resources.Users}:{Permissions.Grant}",
             $"{Resources.Roles}:{Permissions.Assign}",
+            $"{Resources.Maintenance}:{Permissions.Update}",
         };
 
         public static bool IsGrantable(string resource, string action)

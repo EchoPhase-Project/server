@@ -289,6 +289,9 @@ namespace EchoPhase.Server
             app.UseAuthentication();
             // Tag the rest of the request's logs with the caller (user, API client, actor).
             app.UsePrincipalLogging();
+            // Before rate limits and authorization: during maintenance the API
+            // answers 503 at once (its switchers excepted).
+            app.UseMaintenance();
             // After authentication so limits can be per user / API client.
             app.UseRateLimiter();
             app.UseAuthorization();

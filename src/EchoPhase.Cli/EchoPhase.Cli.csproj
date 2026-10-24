@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\EchoPhase.Identity\EchoPhase.Identity.csproj" />
     <ProjectReference Include="..\EchoPhase.DAL.Postgres\EchoPhase.DAL.Postgres.csproj" />
+    <ProjectReference Include="..\EchoPhase.DAL.Redis\EchoPhase.DAL.Redis.csproj" />
     <ProjectReference Include="..\EchoPhase.DAL.Scylla\EchoPhase.DAL.Scylla.csproj" />
     <ProjectReference Include="..\EchoPhase.Security.Authentication\EchoPhase.Security.Authentication.csproj" />
   </ItemGroup>

@@ -63,9 +63,28 @@ and exits (`--continue` starts the server afterwards). In a container:
 | `user <name> unlock` | lift a lockout after failed sign-ins |
 | `user <name> sessions [--revoke-all]` | list or end a user's sessions |
 | `user <name> apiclients list\|create <client> [-p resource:actions] [--expires-in days]\|delete <id>` | API clients; `create` prints the secret once |
+| `maintenance on [-m message] [--for 30m]`, `off`, `status` | maintenance mode, see below |
 | `healthcheck [--url u]` | exit 0 when the server answers |
 
 Exit codes: 0 done, 1 failed (with the reason).
+
+### Maintenance mode
+
+A switch, not configuration: no commit, no deploy. The state is a Redis key
+that every instance reads (at most every 5 s), so it takes effect everywhere
+within seconds:
+
+```bash
+kubectl exec -i deploy/echophase -c server -- dotnet EchoPhase.Server.dll maintenance on -m "Database upgrade" --for 30m
+kubectl exec -i deploy/echophase -c server -- dotnet EchoPhase.Server.dll maintenance off
+```
+
+While it is on, `/api/*` answers `503` with `Retry-After` and the error code
+`Maintenance`, and the webapp shows its maintenance screen. Still open:
+`GET /api/v1/status` (anyone: whether it is on, until when), signing in, and
+everything for holders of `maintenance:update` (admins), so they can check
+their work first. `--for` ends it by itself; without it, it lasts until `off`.
+Admins can also switch it with `PUT`/`DELETE /api/v1/maintenance`.
 
 ### Breaking API changes
 

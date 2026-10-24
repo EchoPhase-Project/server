@@ -17,6 +17,9 @@ namespace EchoPhase.Security.Authorization.Attributes
         public RequirePermissionAttribute(string[] resources, string[] permissions)
             : base(BuildPolicyName(resources, permissions)) { }
 
+        /// <summary>The policy this attribute names, for checking the same permission outside an action.</summary>
+        public static string PolicyName(string resource, params string[] permissions) => BuildPolicyName([resource], permissions);
+
         internal static string BuildPolicyName(string[] resources, string[] permissions) =>
             $"perm:{string.Join(",", resources.Order())}:{string.Join(",", permissions.Order())}";
     }

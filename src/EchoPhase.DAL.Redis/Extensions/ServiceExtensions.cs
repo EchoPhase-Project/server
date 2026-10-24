@@ -3,6 +3,7 @@
 
 using EchoPhase.Configuration.Database;
 using EchoPhase.DAL.Redis.Interfaces;
+using EchoPhase.DAL.Redis.Maintenance;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.StackExchangeRedis;
@@ -41,6 +42,10 @@ namespace EchoPhase.DAL.Redis.Extensions
                     options.ConnectionMultiplexerFactory =
                         () => Task.FromResult(sp.GetRequiredService<IConnectionMultiplexer>());
                 });
+
+            // Maintenance mode: shared by every instance and the CLI.
+            services.AddSingleton<IMaintenanceStore>(sp => new RedisMaintenanceStore(sp.GetRequiredService<IConnectionMultiplexer>));
+            services.AddSingleton<MaintenanceSwitch>();
 
             string entryAssemblyName = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name ?? "EchoPhase";
 
