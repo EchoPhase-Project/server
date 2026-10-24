@@ -4,12 +4,15 @@ name: Publish
 # self-hosting (the chart in EchoPhase-Project/charts pins them by version):
 #   ghcr.io/echophase-project/server:X.Y.Z   (and latest)
 #   ghcr.io/echophase-project/openapi:X.Y.Z  (and latest; webapp builds against it)
+# and a GitHub release for the tag, its notes from the commits since the last
+# one (scripts/release-notes.sh).
 on:
   push:
     tags: [ "v*" ]
 
 permissions:
-  contents: read
+  # Write: the GitHub release.
+  contents: write
   packages: write
   # Build provenance: signed with the workflow's OIDC identity, stored next to
   # the image in GHCR and listed under the org's linked artifacts.
@@ -27,6 +30,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # The release notes read the commits since the previous tag.
+          fetch-depth: 0
 
       - name: Set up tools
         uses: jdx/mise-action@v5
@@ -85,3 +91,20 @@ jobs:
           subject-name: ${{ env.REGISTRY }}/openapi
           subject-digest: ${{ steps.openapi.outputs.digest }}
           push-to-registry: true
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          {
+            scripts/release-notes.sh "$GITHUB_REF_NAME"
+            echo
+            echo "### Published"
+            echo
+            echo "- Image: \`$REGISTRY/server:$version\`"
+            echo "- API contract: \`$REGISTRY/openapi:$version\` (\`oras pull $REGISTRY/openapi:$version\`)"
+            echo "- To run it: the Helm chart or Docker Compose in [charts](https://github.com/EchoPhase-Project/charts)."
+          } > release-notes.md
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "EchoPhase server $version" --notes-file release-notes.md
