@@ -40,15 +40,15 @@ jobs:
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           echo "$GH_TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 
-      # Same rule as the in-cluster pipeline: no breaking change against the
-      # last published contract.
+      # Same rule as the in-cluster pipeline: no breaking change within the
+      # release's compatibility series (the version is the tag's: the
+      # checkout is shallow, without the history the script would read).
       - name: API contract
+        env:
+          CONTRACT_VERSION: ${{ github.ref_name }}
         run: |
           mise run openapi
-          cd artifacts
-          if oras pull "$REGISTRY/openapi:latest" -o openapi-base >/dev/null 2>&1; then
-            oasdiff breaking openapi-base/openapi.json openapi.json --fail-on ERR
-          fi
+          CONTRACT_VERSION="${CONTRACT_VERSION#v}" scripts/contract-check.sh "$REGISTRY/openapi" artifacts/openapi.json
 
       - name: Server image
         id: server

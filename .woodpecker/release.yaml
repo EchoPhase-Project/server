@@ -63,7 +63,8 @@ steps:
           requests: { cpu: "1", memory: 2Gi }
           limits: { cpu: "4", memory: 6Gi }
 
-  # Fails on breaking changes against the last published contract.
+  # Fails on breaking changes within this version's compatibility series
+  # (scripts/contract-check.sh); a breaking commit starts the next series.
   - name: openapi
     image: *ci-image
     depends_on: [image-tag]

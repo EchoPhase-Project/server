@@ -34,7 +34,7 @@ mise tasks                     # everything below
 | `lint` / `format` | check / apply code style |
 | `openapi` | export `artifacts/openapi.json` (skipped while sources are unchanged) |
 | `migrations:add <name>`, `migrations:check`, `migrations:script` | Postgres migrations (EF Core; `dotnet-ef` from `.config/dotnet-tools.json`) |
-| `openapi:check [--base tag]` | fail on breaking API changes against a published contract |
+| `openapi:check` | fail on breaking API changes within this version's series (below) |
 | `openapi:publish` | push the contract to `$DOCKER_REGISTRY/echophase/openapi:<tag>` and `latest` |
 | `docker:build`, `docker:push [--tag t]`, `docker:publish` | the server image |
 | `image-tag`, `docker:info` | this checkout's image tag (see below) |
@@ -66,6 +66,36 @@ and exits (`--continue` starts the server afterwards). In a container:
 | `healthcheck [--url u]` | exit 0 when the server answers |
 
 Exit codes: 0 done, 1 failed (with the reason).
+
+### Breaking API changes
+
+The contract may not break clients within a compatibility series: a major
+version (`1.x`), or before 1.0 a minor one (`0.2.x`, as semver allows 0.x to
+break with every minor). `openapi:check` and the release pipelines compare it
+with the newest release of its series (`scripts/contract-check.sh`).
+
+To break the API on purpose, the next release must start a new series, and
+the check reads which one from the commits since the last tag, the way
+`cog bump --auto` will:
+
+- from 1.0, a breaking commit (`fix!: …`, or a `BREAKING CHANGE:` footer)
+  makes the next release a new major;
+- before 1.0, cocogitto ignores the `!`: only a `feat` (`feat!: …`) makes the
+  next release a new minor. A breaking `fix!:` or `refactor!:` alone keeps the
+  series, so the check fails; add a `feat!:` or release with `cog bump --minor`.
+
+In a new series breaking changes are allowed; the check lists them against
+the previous series.
+
+An enum whose values grow with the product (block types) is marked
+`[ExtensibleEnum]`: the contract lists it as `x-extensible-enum`, so a new
+value is compatible (a removed one is still breaking) and clients must expect
+values they do not know.
+
+A deliberate break within a series (clients already updated) or a false alarm
+can be accepted instead: add its line from the check's output (method, path,
+message) to `openapi.err-ignore`, with the reason, and empty the file after the
+release.
 
 ## CI and releases
 

@@ -3,22 +3,14 @@
 # "latest". Clients (webapp, a native app) pull the tag they were built against:
 #   oras pull --plain-http localhost:30500/echophase/openapi:<tag>
 
+# Within a compatibility series (1.x, or 0.2.x before 1.0) a breaking change
+# fails; a breaking commit (type!: or BREAKING CHANGE:) since the last release
+# starts the next series, where it is allowed and listed. See the script.
 ["openapi:check"]
-description = "Fail on breaking API changes against a published contract"
+description = "Fail on API changes that break clients of this version's series"
 depends = ["openapi"]
-usage = 'flag "--base <tag>" help="Published contract to compare with" default="latest"'
-dir = "{{config_root}}/artifacts"
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-rm -rf openapi-base
-if ! oras pull --plain-http "$REGISTRY_API/$OPENAPI_REPO:$usage_base" -o openapi-base >/dev/null 2>&1; then
-    echo "no published contract '$usage_base' yet: nothing to compare"
-    exit 0
-fi
-oasdiff breaking openapi-base/openapi.json openapi.json --fail-on ERR
-echo "no breaking changes against $OPENAPI_REPO:$usage_base"
-'''
+dir = "{{config_root}}"
+run = "scripts/contract-check.sh \"$REGISTRY_API/$OPENAPI_REPO\" artifacts/openapi.json --plain-http"
 
 ["openapi:publish"]
 description = "Push artifacts/openapi.json as OPENAPI_REPO:<image tag> and latest"

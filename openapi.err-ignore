@@ -1,0 +1,10 @@
+# Breaking API changes accepted within a compatibility series, for
+# scripts/contract-check.sh (oasdiff --err-ignore). Prefer a new series
+# (see "Breaking API changes" in README.md); use this for a deliberate break
+# that clients are already updated for, or a false alarm.
+#
+# One line per change: method, path and oasdiff's message, e.g.
+#   GET /gateway api path removed without deprecation
+#   GET /api/v1/blocks/types added the new `Switch` enum value to the `items/type` response property for the response status `200`
+# Lines starting with # are comments. Say why next to each entry, and empty
+# the file after the release: the next check compares with that release.
