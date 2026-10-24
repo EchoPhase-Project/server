@@ -93,6 +93,7 @@ namespace EchoPhase.Server.Services.Blocks
 
             IBlockExecutionContext? context = null;
             var stopwatch = new Stopwatch();
+            using var activity = BlockTelemetry.Start(run);
 
             try
             {
@@ -150,6 +151,7 @@ namespace EchoPhase.Server.Services.Blocks
             }
             finally
             {
+                BlockTelemetry.Finished(activity, run, stopwatch.Elapsed, context?.Steps ?? 0);
                 await FinishAsync(db, events, run, context, recorder, job, stopwatch.Elapsed);
                 _registry.Release(run.RunId);
                 // After the result is stored, so the caller can fetch the run at once.

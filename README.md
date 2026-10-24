@@ -137,6 +137,24 @@ can be accepted instead: add its line from the check's output (method, path,
 message) to `openapi.err-ignore`, with the reason, and empty the file after the
 release.
 
+## Telemetry
+
+Traces and metrics go out over OTLP when an endpoint is set with the standard
+OpenTelemetry variables; without one nothing is collected. For example
+(the project's cluster, see EchoPhase-Project/deploy):
+
+```sh
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo.monitoring:4318/v1/traces
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://victoria-metrics.monitoring:8428/opentelemetry/v1/metrics
+```
+
+Traces: requests (health checks left out), outgoing HTTP, Npgsql queries,
+and a span per block run (`EchoPhase.Blocks`) with its calls nested in it.
+Metrics: the same, the .NET runtime, and `echophase.block_runs`,
+`echophase.block_run.duration` and `echophase.block_run.steps` by status
+and trigger.
+
 ## CI and releases
 
 - **GitHub Actions** (`.github/workflows/test.yml`): every push and PR, tests

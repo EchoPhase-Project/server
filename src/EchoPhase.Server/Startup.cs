@@ -206,6 +206,8 @@ namespace EchoPhase.Server
             services.AddScoped<IConnectionEvents, ConnectionEventsNotifier>();
             services.AddScoped<IImpersonationEvents, ImpersonationEventsNotifier>();
 
+            services.AddTelemetry(Configuration);
+
             services.AddSingleton<WarmupState>();
             services.AddHostedService<WarmupService>();
             services.AddHealthChecks()
