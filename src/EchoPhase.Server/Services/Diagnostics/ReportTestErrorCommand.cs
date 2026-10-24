@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.Cli.Commands;
-using Sentry;
 using Spectre.Console;
 using Spectre.Console.Cli;
 

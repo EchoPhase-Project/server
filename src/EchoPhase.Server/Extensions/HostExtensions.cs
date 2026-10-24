@@ -5,8 +5,8 @@ using EchoPhase.Server.Registrars;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using Commands = EchoPhase.Cli.Commands;
-using WorkflowCommands = EchoPhase.Server.Services.Workflows.Commands;
 using DiagnosticsCommands = EchoPhase.Server.Services.Diagnostics;
+using WorkflowCommands = EchoPhase.Server.Services.Workflows.Commands;
 
 namespace EchoPhase.Server.Extensions
 {
