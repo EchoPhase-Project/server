@@ -54,7 +54,7 @@ namespace EchoPhase.Identity
         }
 
         public async Task<IServiceResult<UserPermissionGrant>> GrantAsync(
-            User actor, User target, string resource, string[] permissions,
+            User? actor, User target, string resource, string[] permissions,
             string reason, DateTimeOffset? expiresAt, CancellationToken ct = default)
         {
             reason = reason.Trim();
@@ -82,10 +82,13 @@ namespace EchoPhase.Identity
                     $"Only a role can give: {string.Join(", ", roleOnly.Select(a => $"{resource}:{a}"))}.");
 
             // Granting cannot be a way to exceed one's own access.
-            var exceeding = RolePermissions.Exceeding(await GetCeilingAsync(actor, ct), requested);
-            if (exceeding.Count > 0)
-                return Failure<UserPermissionGrant>(UserPermissionErrors.Forbidden,
-                    $"You do not hold: {string.Join(", ", exceeding)}.");
+            if (actor is not null)
+            {
+                var exceeding = RolePermissions.Exceeding(await GetCeilingAsync(actor, ct), requested);
+                if (exceeding.Count > 0)
+                    return Failure<UserPermissionGrant>(UserPermissionErrors.Forbidden,
+                        $"You do not hold: {string.Join(", ", exceeding)}.");
+            }
 
             var grant = await _grants.Query()
                 .WithUserIds(target.Id)
@@ -102,7 +105,7 @@ namespace EchoPhase.Identity
             grant.Reason = reason;
             grant.ExpiresAt = expiresAt?.UtcDateTime;
             grant.ExpiryApplied = false;
-            grant.GrantedById = actor.Id;
+            grant.GrantedById = actor?.Id;
 
             await RevokeTokensAsync(target);
             return ServiceResult<UserPermissionGrant>.Success(grant);

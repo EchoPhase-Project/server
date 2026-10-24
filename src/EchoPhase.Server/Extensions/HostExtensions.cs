@@ -5,6 +5,7 @@ using EchoPhase.Server.Registrars;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using Commands = EchoPhase.Cli.Commands;
+using WorkflowCommands = EchoPhase.Server.Services.Workflows.Commands;
 
 namespace EchoPhase.Server.Extensions
 {
@@ -23,7 +24,13 @@ namespace EchoPhase.Server.Extensions
                 config.AddBranch<Commands.User.UserSettings>("user", user =>
                 {
                     user.SetDescription("User management commands");
-                    user.SetDefaultCommand<Commands.User.Create.CreateCommand>();
+                    // A bare `user <name>` only looks.
+                    user.SetDefaultCommand<Commands.User.Show.ShowCommand>();
+
+                    user.AddCommand<Commands.User.Show.ShowCommand>("show")
+                        .WithDescription("Account state, roles, grants and what the user owns")
+                        .WithExample(new[] { "user", "admin", "show" })
+                        .WithExample(new[] { "user", "admin", "show", "--json" });
 
                     user.AddBranch<Commands.User.Roles.RolesSettings>("roles", roles =>
                     {
@@ -40,8 +47,8 @@ namespace EchoPhase.Server.Extensions
                     });
 
                     user.AddCommand<Commands.User.Create.CreateCommand>("create")
-                        .WithDescription("Create user")
-                        .WithExample(new[] { "user", "Test", "create", "Test", "Qwerty123456:/", "Dev", "User" });
+                        .WithDescription("Create a user; the password from stdin, or asked for")
+                        .WithExample(new[] { "user", "Test", "create", "Test", "dev" });
 
                     user.AddCommand<Commands.User.Password.PasswordCommand>("password")
                         .WithDescription("Set a new password (from stdin, or asked for) and end the user's sessions")
@@ -50,6 +57,34 @@ namespace EchoPhase.Server.Extensions
                     user.AddCommand<Commands.User.Unlock.UnlockCommand>("unlock")
                         .WithDescription("Lift a lockout after failed sign-ins")
                         .WithExample(new[] { "user", "admin", "unlock" });
+
+                    user.AddCommand<Commands.User.Lock.LockCommand>("lock")
+                        .WithDescription("Lock the account (until unlocked, or --for a while) and end its sessions")
+                        .WithExample(new[] { "user", "probe1234", "lock" })
+                        .WithExample(new[] { "user", "probe1234", "lock", "--for", "7d" });
+
+                    user.AddBranch<Commands.User.Grants.GrantsSettings>("grants", grants =>
+                    {
+                        grants.SetDescription("Permissions given to the user beyond their roles");
+                        grants.SetDefaultCommand<Commands.User.Grants.ListCommand>();
+
+                        grants.AddCommand<Commands.User.Grants.ListCommand>("list")
+                            .WithDescription("List the user's grants, expired ones too")
+                            .WithExample(new[] { "user", "admin", "grants", "list" });
+
+                        grants.AddCommand<Commands.User.Grants.AddCommand>("add")
+                            .WithDescription("Grant actions on a resource (replaces an earlier grant on it)")
+                            .WithExample(new[] { "user", "Test", "grants", "add", "roles", "read", "--reason", "Support rotation", "--for", "30d" });
+
+                        grants.AddCommand<Commands.User.Grants.RemoveCommand>("remove")
+                            .WithDescription("Remove the grant on a resource")
+                            .WithExample(new[] { "user", "Test", "grants", "remove", "roles" });
+                    });
+
+                    user.AddCommand<Commands.User.Delete.DeleteCommand>("delete")
+                        .WithDescription("Delete the user and everything they own, ending their sessions")
+                        .WithExample(new[] { "user", "probe1234", "delete" })
+                        .WithExample(new[] { "user", "probe1234", "delete", "--confirm" });
 
                     user.AddCommand<Commands.User.Sessions.SessionsCommand>("sessions")
                         .WithDescription("List the user's sessions, or end them all")
@@ -75,8 +110,46 @@ namespace EchoPhase.Server.Extensions
                 });
 
                 config.AddCommand<Commands.Users.ListCommand>("users")
-                    .WithDescription("List users with their roles and lockouts")
-                    .WithExample(new[] { "users" });
+                    .WithDescription("List users with their roles and lockouts, a page at a time")
+                    .WithExample(new[] { "users" })
+                    .WithExample(new[] { "users", "--search", "probe", "--role", "admin" })
+                    .WithExample(new[] { "users", "--json", "--all" });
+
+                config.AddBranch("workflows", workflows =>
+                {
+                    workflows.SetDescription("Workflows of all users");
+                    workflows.SetDefaultCommand<Commands.Workflows.ListCommand>();
+
+                    workflows.AddCommand<Commands.Workflows.ListCommand>("list")
+                        .WithDescription("List workflows, a page at a time, with their next scheduled run")
+                        .WithExample(new[] { "workflows", "list", "--user", "admin", "--active" });
+
+                    workflows.AddCommand<WorkflowCommands.ImportCommand>("import")
+                        .WithDescription("Create an inactive workflow from `workflow export` output")
+                        .WithExample(new[] { "workflows", "import", "backup.json", "--user", "admin" });
+                });
+
+                config.AddBranch<Commands.Workflows.WorkflowSettings>("workflow", workflow =>
+                {
+                    workflow.SetDescription("One workflow, by id");
+
+                    workflow.AddCommand<Commands.Workflows.ExportCommand>("export")
+                        .WithDescription("Print the workflow as JSON ({ name, program })")
+                        .WithExample(new[] { "workflow", "0199a0c4-7d2e-7c4b-9f00-000000000000", "export" });
+
+                    workflow.AddCommand<WorkflowCommands.EnableCommand>("enable")
+                        .WithDescription("Turn its triggers on (the server applies it within a minute)")
+                        .WithExample(new[] { "workflow", "0199a0c4-7d2e-7c4b-9f00-000000000000", "enable" });
+
+                    workflow.AddCommand<WorkflowCommands.DisableCommand>("disable")
+                        .WithDescription("Turn its triggers off (the server applies it within a minute)")
+                        .WithExample(new[] { "workflow", "0199a0c4-7d2e-7c4b-9f00-000000000000", "disable" });
+                });
+
+                config.AddCommand<Commands.Impersonations.ListCommand>("impersonations")
+                    .WithDescription("Who acted as whom and why, newest first")
+                    .WithExample(new[] { "impersonations", "--user", "admin" })
+                    .WithExample(new[] { "impersonations", "--active" });
 
                 config.AddCommand<Commands.Roles.ListCommand>("roles")
                     .WithDescription("List the roles and what each grants")
@@ -105,6 +178,15 @@ namespace EchoPhase.Server.Extensions
                     .WithDescription("Apply database migrations")
                     .WithExample(new[] { "migrate" })
                     .WithExample(new[] { "migrate", "--status" });
+
+                config.AddCommand<Commands.Prune.PruneCommand>("prune")
+                    .WithDescription("Delete idle sessions, old rotated tokens and long-ended impersonations and grants")
+                    .WithExample(new[] { "prune", "--dry-run" })
+                    .WithExample(new[] { "prune", "--older-than", "30d" });
+
+                config.AddCommand<Commands.Check.CheckCommand>("check")
+                    .WithDescription("Validate the settings and check Postgres, Scylla and Redis, and pending migrations")
+                    .WithExample(new[] { "check" });
 
                 config.AddCommand<Commands.Health.Check.CheckCommand>("healthcheck")
                     .WithDescription("Healthcheck")

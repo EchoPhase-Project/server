@@ -83,6 +83,12 @@ namespace EchoPhase.Server.Services.Workflows
         /// </summary>
         public async Task ReloadUserAsync(Guid userId, CancellationToken ct = default)
         {
+            // Not running here (a CLI command, before the host starts): opening
+            // gateway connections in a process about to exit helps no one. The
+            // running server picks the change up on its next reload.
+            if (ExecuteTask is null)
+                return;
+
             foreach (var key in _failed.Keys.Where(k => k.UserId == userId).ToList())
                 _failed.TryRemove(key, out _);
 

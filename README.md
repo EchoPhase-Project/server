@@ -51,20 +51,41 @@ changes.
 The server binary doubles as an admin tool: with arguments it runs the command
 and exits (`--continue` starts the server afterwards). In a container:
 `docker exec -i <server> dotnet EchoPhase.Server.dll <command>`, or
-`kubectl exec -i deploy/echophase -c server -- dotnet EchoPhase.Server.dll <command>`.
+`kubectl exec -i deploy/echophase-server -c server -- dotnet EchoPhase.Server.dll <command>`.
 
 | Command | What |
 |---|---|
+| `check` | validate the settings, reach Postgres, Scylla and Redis, no pending migrations; exit 1 otherwise |
 | `migrate [--status]` | apply the Postgres and Scylla migrations, or only list what is pending |
-| `users`, `roles` | list users (roles, lockouts); list roles and what each grants |
-| `user <name> create <full name> <password> [roles]` | create a user |
+| `users [-s text] [-r role] [--locked]` | list users (roles, lockouts, 2FA), a page at a time — see below |
+| `roles` | list roles and what each grants |
+| `user <name> [show] [--json]` | account state, roles, grants, what the user owns |
+| `user <name> create <full name> [roles]` | create a user; the password from stdin, or asked for |
 | `user <name> roles add\|remove <roles>` | change a user's roles |
+| `user <name> grants [list\|add <resource> <actions> --reason r [--for 30d]\|remove <resource>]` | permissions beyond the roles; role-only ones are refused |
 | `user <name> password` | new password from stdin (or asked for); ends their sessions |
-| `user <name> unlock` | lift a lockout after failed sign-ins |
+| `user <name> lock [--for 7d]`, `unlock` | lock the account (ending its sessions), or lift a lockout |
+| `user <name> delete [--confirm]` | delete the user and everything they own; asks to type the name unless `--confirm`, refuses the only admin |
 | `user <name> sessions [--revoke-all]` | list or end a user's sessions |
 | `user <name> apiclients list\|create <client> [-p resource:actions] [--expires-in days]\|delete <id>` | API clients; `create` prints the secret once |
+| `workflows [list] [-u user] [--active]` | list workflows with their next scheduled run, a page at a time |
+| `workflow <id> export`, `workflows import [file] -u user [--name n]` | a workflow as JSON (`{ name, program }`), and back as a new inactive one |
+| `workflow <id> enable\|disable` | turn its triggers on or off; the server applies it within a minute |
+| `impersonations [-u user] [--active]` | who acted as whom and why, newest first |
+| `prune [--older-than 90d] [--dry-run]` | delete idle sessions, old rotated refresh tokens, long-ended impersonations and grants (for a CronJob) |
 | `maintenance on [-m message] [--for 30m]`, `off`, `status` | maintenance mode, see below |
 | `healthcheck [--url u]` | exit 0 when the server answers |
+
+Lists (`users`, `workflows`, `impersonations`) show 50 rows (`-n` up to 1000) and
+how many match; the next page is `--after <cursor>`, the cursor printed under the
+table. `--json` prints one object per line (NDJSON) and the next cursor on stderr;
+`--json --all` streams every row in batches of 500, for `jq` or a file:
+
+```sh
+kubectl exec -i deploy/echophase-server -c server -- dotnet EchoPhase.Server.dll users --json --all | jq -r 'select(.roles | index("admin")) | .userName'
+```
+
+Logs of a command go to stderr (warnings and errors only), so stdout is its output.
 
 Exit codes: 0 done, 1 failed (with the reason).
 
@@ -75,8 +96,8 @@ that every instance reads (at most every 5 s), so it takes effect everywhere
 within seconds:
 
 ```bash
-kubectl exec -i deploy/echophase -c server -- dotnet EchoPhase.Server.dll maintenance on -m "Database upgrade" --for 30m
-kubectl exec -i deploy/echophase -c server -- dotnet EchoPhase.Server.dll maintenance off
+kubectl exec -i deploy/echophase-server -c server -- dotnet EchoPhase.Server.dll maintenance on -m "Database upgrade" --for 30m
+kubectl exec -i deploy/echophase-server -c server -- dotnet EchoPhase.Server.dll maintenance off
 ```
 
 While it is on, `/api/*` answers `503` with `Retry-After` and the error code

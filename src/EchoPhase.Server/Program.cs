@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.Server.Extensions;
+using Microsoft.Extensions.Logging.Console;
 
 namespace EchoPhase.Server
 {
@@ -41,6 +42,17 @@ namespace EchoPhase.Server
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
+                })
+                .ConfigureServices(services =>
+                {
+                    // Any argument is a CLI command (see CheckArgsAsync), whose
+                    // stdout is its output (tables, --json): console logs go to
+                    // stderr, and only warnings and errors.
+                    if (args.Length > 0)
+                    {
+                        services.Configure<ConsoleLoggerOptions>(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
+                        services.Configure<LoggerFilterOptions>(o => o.AddFilter<ConsoleLoggerProvider>(null, LogLevel.Warning));
+                    }
                 })
                 .UseSystemd()
                 .UseConsoleLifetime(options =>

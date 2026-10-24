@@ -25,10 +25,12 @@ namespace EchoPhase.Identity
         /// <summary>
         /// Grants actions on one resource, replacing an earlier grant for it.
         /// The actor can only grant what they hold themselves, never a
-        /// role-only action. Revokes the target's tokens so they pick it up.
+        /// role-only action. A null actor is the server's operator (the CLI):
+        /// no ceiling, but still no role-only action. Revokes the target's
+        /// tokens so they pick it up.
         /// </summary>
         Task<IServiceResult<UserPermissionGrant>> GrantAsync(
-            User actor, User target, string resource, string[] permissions,
+            User? actor, User target, string resource, string[] permissions,
             string reason, DateTimeOffset? expiresAt, CancellationToken ct = default);
 
         /// <summary>Removes the grant on a resource and revokes the target's tokens.</summary>
