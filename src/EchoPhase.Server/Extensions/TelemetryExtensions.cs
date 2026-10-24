@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Diagnostics;
 using System.Reflection;
 using EchoPhase.Server.Services.Blocks;
 using Npgsql;
@@ -41,6 +42,7 @@ namespace EchoPhase.Server.Extensions
             services.AddOpenTelemetry()
                 .ConfigureResource(resource => resource.AddService(ServiceName, serviceVersion: version))
                 .WithTracing(tracing => tracing
+                    .SetSampler(new ParentBasedSampler(new NoClientRootsSampler()))
                     .AddAspNetCoreInstrumentation(options =>
                         options.Filter = http => !http.Request.Path.StartsWithSegments("/health"))
                     .AddHttpClientInstrumentation()
@@ -56,5 +58,19 @@ namespace EchoPhase.Server.Extensions
 
             return services;
         }
+    }
+
+    /// <summary>
+    /// Keeps traces that start with a request or a block run (and all they
+    /// call); drops those that start with a client call: queries and HTTP
+    /// calls of background loops (the scheduler queries every 30 s), each of
+    /// which would otherwise be a trace of its own.
+    /// </summary>
+    public sealed class NoClientRootsSampler : Sampler
+    {
+        public override SamplingResult ShouldSample(in SamplingParameters samplingParameters)
+            => new(samplingParameters.Kind == ActivityKind.Client
+                ? SamplingDecision.Drop
+                : SamplingDecision.RecordAndSample);
     }
 }
