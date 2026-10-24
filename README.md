@@ -155,6 +155,11 @@ Metrics: the same, the .NET runtime, and `echophase.block_runs`,
 `echophase.block_run.duration` and `echophase.block_run.steps` by status
 and trigger.
 
+Errors go to a Sentry-compatible service (the project runs GlitchTip) when
+`SENTRY_DSN` is set: unhandled exceptions and error logs, with the logs before
+them as breadcrumbs; no traces and no personal data (user, IP, cookies,
+request bodies).
+
 ## CI and releases
 
 - **GitHub Actions** (`.github/workflows/test.yml`): every push and PR, tests

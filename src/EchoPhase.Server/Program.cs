@@ -42,6 +42,7 @@ namespace EchoPhase.Server
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
+                    webBuilder.UseSentry(ErrorReporting.Configure);
                 })
                 .ConfigureServices(services =>
                 {
