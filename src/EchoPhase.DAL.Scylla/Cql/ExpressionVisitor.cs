@@ -81,6 +81,23 @@ namespace EchoPhase.DAL.Scylla.Cql
             return sb.ToString();
         }
 
+        /// <summary>
+        /// The table and WHERE clause of a query's Where calls, for an UPDATE
+        /// (ExecuteUpdate): no Select, OrderBy or Take; Scylla checks that the
+        /// whole primary key is given.
+        /// </summary>
+        public (string Table, string Where) VisitUpdateTarget(Expression expression)
+        {
+            Visit(expression);
+            if (_selector is not null || _orderBy.Count > 0 || Limit is not null || _filteringAllowed)
+                throw new NotSupportedException("ExecuteUpdate takes only Where calls that give the row's primary key.");
+            if (_where.Count == 0)
+                throw new NotSupportedException("ExecuteUpdate needs a Where that gives the row's primary key.");
+            return (Builder.GetFullTableName(), string.Join(" AND ", _where));
+        }
+
+        internal IEntityBuilder EntityBuilder => Builder;
+
         public string VisitCount(Expression expression)
         {
             Visit(expression);

@@ -31,7 +31,7 @@ namespace EchoPhase.DAL.Scylla.Database
                 {
                     value = builder.GetConverter(prop.Name) is { } converter
                         ? converter.FromProvider(row.GetValue(converter.ProviderType, columnName))
-                        : row.GetValue(prop.PropertyType, columnName);
+                        : Coerce(row.GetValue(prop.PropertyType, columnName), prop.PropertyType);
                 }
                 catch (Exception ex)
                 {
@@ -46,6 +46,44 @@ namespace EchoPhase.DAL.Scylla.Database
             }
 
             return entity;
+        }
+
+        // The driver hands collections back in its own types (a SortedDictionary
+        // for a map, an array for a list): make them the property's.
+        private static object? Coerce(object? value, Type target)
+        {
+            if (value is null || target.IsInstanceOfType(value) || value is string)
+                return value;
+
+            if (value is System.Collections.IDictionary map && target.IsGenericType)
+            {
+                var concrete = target.IsInterface
+                    ? typeof(Dictionary<,>).MakeGenericType(target.GetGenericArguments())
+                    : target;
+                var result = (System.Collections.IDictionary)Activator.CreateInstance(concrete)!;
+                foreach (var key in map.Keys)
+                    result[key] = map[key];
+                return result;
+            }
+
+            if (value is System.Collections.IEnumerable items)
+            {
+                var element = target.IsArray ? target.GetElementType()! : target.IsGenericType ? target.GetGenericArguments()[0] : typeof(object);
+                var list = (System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(element))!;
+                foreach (var item in items)
+                    list.Add(item);
+                if (target.IsArray)
+                {
+                    var array = Array.CreateInstance(element, list.Count);
+                    list.CopyTo(array, 0);
+                    return array;
+                }
+                if (target.IsInstanceOfType(list))
+                    return list;
+                return Activator.CreateInstance(target.IsInterface ? typeof(HashSet<>).MakeGenericType(element) : target, list);
+            }
+
+            return value;
         }
 
         public static TEntity Map<TEntity>(Row row, IEntityBuilder builder) =>

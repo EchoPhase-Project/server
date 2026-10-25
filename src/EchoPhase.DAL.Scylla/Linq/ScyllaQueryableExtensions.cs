@@ -128,6 +128,16 @@ namespace EchoPhase.DAL.Scylla.Linq
             this IQueryable<T> source, int pageSize, byte[]? pagingState = null, CancellationToken ct = default)
             => Provider(source).ExecutePageAsync<T>(source.Expression, pageSize, pagingState, ct);
 
+        /// <summary>
+        /// Updates the row the Where calls give (its whole primary key, or
+        /// several by IN) without reading it, like EF's ExecuteUpdate: counters,
+        /// collection appends and removals, map entries and plain values are
+        /// computed by Scylla. Tracked entities are not refreshed.
+        /// </summary>
+        public static Task ExecuteUpdateAsync<T>(this IQueryable<T> source, Action<UpdateSetters<T>> setters,
+            Models.WriteOptions? options = null, CancellationToken ct = default)
+            => Provider(source).ExecuteUpdateAsync(source.Expression, setters, options, ct);
+
         private static QueryProvider Provider<T>(IQueryable<T> source)
             => source.Provider as QueryProvider
                ?? throw new InvalidOperationException(

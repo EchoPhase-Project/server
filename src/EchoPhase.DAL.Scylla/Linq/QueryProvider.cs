@@ -161,6 +161,38 @@ namespace EchoPhase.DAL.Scylla.Linq
             return visitor.ReturnsTrackedEntities ? page with { Items = Database.AttachAll(page.Items.ToList()) } : page;
         }
 
+        internal async Task ExecuteUpdateAsync<T>(Expression expression, Action<UpdateSetters<T>> configure,
+            Models.WriteOptions? options, CancellationToken ct)
+        {
+            var visitor = new ExpressionVisitor<T>(Database.GetBuilder);
+            var (table, where) = visitor.VisitUpdateTarget(expression);
+            var setters = new UpdateSetters<T>(visitor.EntityBuilder);
+            configure(setters);
+            if (setters.Assignments.Count == 0)
+                throw new ArgumentException("Nothing to update: call Set, Increment, Append ...", nameof(configure));
+
+            options?.Validate();
+            var usingParts = new List<string>();
+            var values = new List<object?>();
+            if (options?.TtlSeconds is { } ttl)
+            {
+                usingParts.Add("TTL ?");
+                values.Add(ttl);
+            }
+            if (options?.TimestampMicros is { } timestamp)
+            {
+                usingParts.Add("TIMESTAMP ?");
+                values.Add(timestamp);
+            }
+            values.AddRange(setters.Assignments.SelectMany(a => a.Values));
+            values.AddRange(visitor.Parameters);
+
+            var usingClause = usingParts.Count > 0 ? $" USING {string.Join(" AND ", usingParts)}" : string.Empty;
+            var cql = $"UPDATE {table}{usingClause} SET {string.Join(", ", setters.Assignments.Select(a => a.Clause))} WHERE {where}";
+            await Database.Executor.RunAsync(
+                new CqlStatement(cql, values.ToArray(), Idempotent: setters.Assignments.All(a => a.Idempotent)), null, ct);
+        }
+
         private static Type GetElementType(Type sequenceType)
         {
             if (sequenceType.IsGenericType && sequenceType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
