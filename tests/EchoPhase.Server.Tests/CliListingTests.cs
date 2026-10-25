@@ -3,7 +3,7 @@
 
 using EchoPhase.Cli.Commands;
 using EchoPhase.Cli.Commands.Workflows;
-using EchoPhase.Server.Services.Workflows.Commands;
+using EchoPhase.Runners.Blocks.Models;
 
 namespace EchoPhase.Server.Tests
 {
@@ -91,10 +91,12 @@ namespace EchoPhase.Server.Tests
         [Fact]
         public void WorkflowFileReadsAnExport()
         {
-            var (name, program) = WorkflowFile.Parse(
+            // A file from before the format: { name, program } only.
+            var file = WorkflowFile.Parse(
                 """{"name":"Nightly","program":{"blocks":[{"id":1,"type":"ScheduleTrigger","params":{"cron":"0 3 * * *"}}],"connections":[]}}""");
-            Assert.Equal("Nightly", name);
-            Assert.Single(program.Blocks);
+            Assert.Equal("Nightly", file.Name);
+            Assert.Single(file.Program.Blocks);
+            Assert.True(file.Intact);
         }
 
         [Theory]
@@ -102,6 +104,8 @@ namespace EchoPhase.Server.Tests
         [InlineData("""{"name":"x"}""")]
         [InlineData("""{"name":1,"program":{}}""")]
         [InlineData("""[]""")]
+        [InlineData("""{"format":99,"name":"x","program":{}}""")]
+        [InlineData("not json")]
         public void WorkflowFileRejectsOtherShapes(string json)
             => Assert.Throws<FormatException>(() => WorkflowFile.Parse(json));
     }

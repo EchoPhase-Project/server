@@ -165,6 +165,59 @@ namespace EchoPhase.Server.Tests
             Assert.Equal(BlockProgramHash.Of(program), run.ProgramHash);
         }
 
+        [Fact]
+        public async Task ExportThenImport_GivesTheSameProgram_Inactive()
+        {
+            var id = (await Workflows().CreateAsync(_owner.Id, null, "Nightly sync / v2", Program("a"), true, Ct)).Ok().Workflow.Id;
+
+            var export = (await Workflows().ExportAsync(_owner.Id, id, null, Ct)).Ok();
+            var imported = (await Workflows().ImportAsync(_owner.Id, null, export.Json, null, Ct)).Ok();
+
+            Assert.Equal("Nightly-sync---v2-v1.json", export.FileName);
+            Assert.Equal(BlockProgramHash.Of(Program("a")), export.ContentHash);
+            Assert.True(imported.Intact);
+            Assert.Equal("Nightly sync / v2", imported.Details.Workflow.Name);
+            Assert.False(imported.Details.Workflow.Active);
+            Assert.Equal(export.ContentHash, imported.Details.Workflow.ContentHash);
+            Assert.NotEqual(id, imported.Details.Workflow.Id);
+        }
+
+        [Fact]
+        public async Task AFileEditedAfterExport_ImportsButIsNotIntact()
+        {
+            var id = (await Workflows().CreateAsync(_owner.Id, null, "flow", Program("a"), false, Ct)).Ok().Workflow.Id;
+            var json = (await Workflows().ExportAsync(_owner.Id, id, null, Ct)).Ok().Json.Replace("\"a\"", "\"edited\"");
+
+            var imported = (await Workflows().ImportAsync(_owner.Id, null, json, "copy", Ct)).Ok();
+
+            Assert.False(imported.Intact);
+            Assert.Equal("copy", imported.Details.Workflow.Name);
+        }
+
+        [Fact]
+        public async Task AnOldVersion_Exports()
+        {
+            var id = (await Workflows().CreateAsync(_owner.Id, null, "flow", Program("a"), false, Ct)).Ok().Workflow.Id;
+            await Workflows().UpdateAsync(_owner.Id, null, id, "flow", Program("b"), false, null, Ct);
+
+            var export = (await Workflows().ExportAsync(_owner.Id, id, 1, Ct)).Ok();
+
+            Assert.Equal(BlockProgramHash.Of(Program("a")), export.ContentHash);
+            Assert.EndsWith("-v1.json", export.FileName);
+            Assert.False((await Workflows().ExportAsync(Guid.NewGuid(), id, null, Ct)).Successful);
+        }
+
+        [Theory]
+        [InlineData("not json")]
+        [InlineData("""{"format":2,"name":"x","program":{}}""")]
+        [InlineData("""{"name":"x"}""")]
+        public async Task ABadFile_IsRefused(string json)
+        {
+            var result = await Workflows().ImportAsync(_owner.Id, null, json, null, Ct);
+
+            Assert.Equal(WorkflowErrors.Invalid, result.Error.Code);
+        }
+
         private sealed class NoWorkflows : EchoPhase.Runners.Blocks.IWorkflowSource
         {
             public Task<BlockProgram?> FindAsync(Guid userId, Guid workflowId, CancellationToken ct)

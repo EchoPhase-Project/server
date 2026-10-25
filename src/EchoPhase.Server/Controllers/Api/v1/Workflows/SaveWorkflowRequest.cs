@@ -22,4 +22,14 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
 
     /// <param name="CurrentVersion">The version you are looking at; a newer one on the server is a 409.</param>
     public sealed record RestoreWorkflowRequest(int? CurrentVersion = null);
+
+    public sealed class ImportWorkflowFileRequest
+    {
+        /// <summary>The export file (JSON).</summary>
+        public required IFormFile File { get; set; }
+
+        /// <summary>Instead of the name in the file.</summary>
+        [MaxLength(100)]
+        public string? Name { get; set; }
+    }
 }

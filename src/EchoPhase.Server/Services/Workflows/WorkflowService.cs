@@ -41,6 +41,15 @@ namespace EchoPhase.Server.Services.Workflows
     /// <summary>One saved version with its program.</summary>
     public sealed record WorkflowVersionDetails(WorkflowVersion Version, BlockProgram Program);
 
+    /// <summary>A workflow's export file and what names it.</summary>
+    /// <param name="FileName">workflow name and version, safe as a file name.</param>
+    /// <param name="ContentHash">The program's hash: the file's ETag.</param>
+    public sealed record WorkflowExport(string FileName, string Json, string ContentHash);
+
+    /// <summary>A workflow made from an export file.</summary>
+    /// <param name="Intact">The program matches the hash the file states (false: it was edited by hand).</param>
+    public sealed record WorkflowImport(WorkflowDetails Details, bool Intact);
+
     /// <summary>
     /// Saved block programs: storing them (validated), keeping their
     /// schedules in step with their ScheduleTriggers, and starting runs of
@@ -209,6 +218,66 @@ namespace EchoPhase.Server.Services.Workflows
                 return ServiceResult<WorkflowDetails>.Failure(e => e.Set(WorkflowErrors.NotFound, "Workflow not found."));
             return await SaveAsync(userId, actorId, id, saved.Value.Version.Name, saved.Value.Program,
                 workflow.Active, expectedVersion, restoredFrom: version, ct);
+        }
+
+        /// <summary>
+        /// The workflow (or one of its saved versions) as an export file, the
+        /// same as `workflow export` writes; it imports on any server.
+        /// </summary>
+        public async Task<IServiceResult<WorkflowExport>> ExportAsync(Guid userId, Guid id, int? version, CancellationToken ct = default)
+        {
+            string name;
+            BlockProgram program;
+            int number;
+            if (version is { } wanted)
+            {
+                var saved = await VersionAsync(userId, id, wanted, ct);
+                if (!saved.Successful)
+                    return ServiceResult<WorkflowExport>.Failure(saved.Error);
+                (name, program, number) = (saved.Value.Version.Name, saved.Value.Program, saved.Value.Version.Version);
+            }
+            else
+            {
+                if (await FindAsync(userId, id, ct) is not { } workflow)
+                    return Failure<WorkflowExport>(WorkflowErrors.NotFound, "Workflow not found.");
+                (name, program, number) = (workflow.Name, Parse(workflow), workflow.Version);
+            }
+
+            var json = WorkflowFile.Write(name, program, number, _time.GetUtcNow());
+            return ServiceResult<WorkflowExport>.Success(
+                new WorkflowExport($"{FileNameOf(name)}-v{number}.json", json, BlockProgramHash.Of(program)));
+        }
+
+        /// <summary>
+        /// A new workflow from an export file, inactive: its triggers start once
+        /// it is turned on. Validated like any save.
+        /// </summary>
+        /// <param name="name">Instead of the file's name.</param>
+        public async Task<IServiceResult<WorkflowImport>> ImportAsync(Guid userId, Guid? actorId, string json, string? name,
+            CancellationToken ct = default)
+        {
+            WorkflowFileContent file;
+            try
+            {
+                file = WorkflowFile.Parse(json);
+            }
+            catch (FormatException e)
+            {
+                return Failure<WorkflowImport>(WorkflowErrors.Invalid, e.Message);
+            }
+
+            var created = await CreateAsync(userId, actorId, string.IsNullOrWhiteSpace(name) ? file.Name : name, file.Program,
+                active: false, ct);
+            return created.Successful
+                ? ServiceResult<WorkflowImport>.Success(new WorkflowImport(created.Value, file.Intact))
+                : ServiceResult<WorkflowImport>.Failure(created.Error);
+        }
+
+        // Letters, digits, - and _: a name any system takes as a file name.
+        private static string FileNameOf(string name)
+        {
+            var safe = new string(name.Trim().Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '-').ToArray()).Trim('-');
+            return safe.Length == 0 ? "workflow" : safe.Length > 60 ? safe[..60] : safe;
         }
 
         public async Task<IServiceResult> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default)

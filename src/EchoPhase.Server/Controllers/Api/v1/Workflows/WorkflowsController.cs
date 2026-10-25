@@ -1,6 +1,9 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.ComponentModel.DataAnnotations;
+using System.Text;
+using System.Text.Json;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Scylla.Entities;
 using EchoPhase.Runners.Blocks;
@@ -9,8 +12,10 @@ using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using EchoPhase.Server.Services.Workflows;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Workflows
 {
@@ -54,6 +59,77 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
                 ? CreatedAtAction(nameof(Get), new { id = result.Value.Workflow.Id }, View(result.Value))
                 : Failure(result.Error);
         }
+
+        /// <summary>
+        /// The workflow as an export file ({ format, name, version, contentHash,
+        /// exportedAt, program }), or one saved version with ?version=N. The
+        /// ETag is the program's hash: If-None-Match answers 304 while it is
+        /// unchanged.
+        /// </summary>
+        [HttpGet("{id:guid}/export")]
+        [RequirePermission(Resources.Workflows, Permissions.Read)]
+        [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/json")]
+        [ProducesResponseType(StatusCodes.Status304NotModified)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Export(Guid id, int? version, CancellationToken ct = default)
+        {
+            var result = await _workflows.ExportAsync(User.GetUserId(), id, version, ct);
+            if (!result.Successful)
+                return Failure(result.Error);
+
+            var export = result.Value;
+            var etag = new EntityTagHeaderValue($"\"{export.ContentHash}\"");
+            var headers = Response.GetTypedHeaders();
+            headers.ETag = etag;
+            // Revalidated every time: the name and version in the file may change with the same program.
+            headers.CacheControl = new CacheControlHeaderValue { Private = true, NoCache = true };
+            if (Request.GetTypedHeaders().IfNoneMatch.Any(tag => tag.Compare(etag, useStrongComparison: false)))
+                return StatusCode(StatusCodes.Status304NotModified);
+
+            return File(Encoding.UTF8.GetBytes(export.Json), "application/json", export.FileName);
+        }
+
+        /// <summary>
+        /// A new workflow from an export file sent as the body; inactive until
+        /// turned on. `intact` is false when the program does not match the
+        /// file's contentHash (it was edited after export).
+        /// </summary>
+        /// <param name="name">Instead of the name in the file.</param>
+        [HttpPost("import")]
+        [ValidateAntiForgery]
+        [RequirePermission(Resources.Workflows, Permissions.Create)]
+        [RequestSizeLimit(MaxImportBytes)]
+        [Consumes("application/json")]
+        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> Import([FromBody] JsonElement file, [MaxLength(100)] string? name, CancellationToken ct = default)
+            => Imported(await _workflows.ImportAsync(User.GetUserId(), User.GetActorId(), file.GetRawText(), name, ct));
+
+        /// <summary>The same, from an uploaded file (multipart/form-data: file, name).</summary>
+        [HttpPost("import/file")]
+        [ValidateAntiForgery]
+        [RequirePermission(Resources.Workflows, Permissions.Create)]
+        [RequestSizeLimit(MaxImportBytes)]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ImportFile([FromForm] ImportWorkflowFileRequest dto, CancellationToken ct = default)
+        {
+            if (dto.File.Length > MaxImportBytes)
+                return Error(WorkflowErrors.Invalid, $"An export file is at most {MaxImportBytes} bytes.", StatusCodes.Status400BadRequest);
+            using var reader = new StreamReader(dto.File.OpenReadStream(), Encoding.UTF8);
+            var json = await reader.ReadToEndAsync(ct);
+            return Imported(await _workflows.ImportAsync(User.GetUserId(), User.GetActorId(), json, dto.Name, ct));
+        }
+
+        /// <summary>An export file is a program of at most a few hundred blocks: far below this.</summary>
+        public const int MaxImportBytes = 1 << 20;
+
+        private IActionResult Imported(Types.Result.IServiceResult<WorkflowImport> result)
+            => result.Successful
+                ? CreatedAtAction(nameof(Get), new { id = result.Value.Details.Workflow.Id },
+                    new { workflow = View(result.Value.Details), intact = result.Value.Intact })
+                : Failure(result.Error);
 
         /// <summary>Replaces name, program and active flag; send the version you edited to avoid lost updates.</summary>
         [HttpPut("{id:guid}")]

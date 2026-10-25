@@ -3,7 +3,6 @@
 
 using System.ComponentModel;
 using System.Globalization;
-using System.Text.Json;
 using EchoPhase.DAL.Postgres;
 using Microsoft.EntityFrameworkCore;
 
@@ -104,33 +103,6 @@ namespace EchoPhase.Cli.Commands.Workflows
     /// The workflow as JSON on stdout: { name, program }, the body the API's
     /// create takes, and what `workflow import` reads.
     /// </summary>
-    public class ExportCommand : AsyncCommand<WorkflowSettings>
-    {
-        private readonly PostgresContext _db;
-
-        public ExportCommand(PostgresContext db)
-        {
-            _db = db;
-        }
-
-        public override async Task<int> ExecuteAsync(CommandContext context, WorkflowSettings settings, CancellationToken cancellationToken)
-        {
-            var workflow = await _db.Workflows.AsNoTracking()
-                .Where(w => w.Id == settings.Id)
-                .Select(w => new { w.Name, w.Definition })
-                .FirstOrDefaultAsync(cancellationToken);
-            if (workflow is null)
-            {
-                AnsiConsole.MarkupLineInterpolated($"[red]No workflow {settings.Id}.[/]");
-                return CliExit.Failure;
-            }
-
-            using var program = JsonDocument.Parse(workflow.Definition);
-            Listing.WriteJsonDocument(new { name = workflow.Name, program = program.RootElement });
-            return CliExit.Success;
-        }
-    }
-
     /// <summary>Cursors over creation times: exact to the tick, so no row is skipped or repeated.</summary>
     public static class Cursors
     {

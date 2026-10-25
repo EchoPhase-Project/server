@@ -2,11 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.ComponentModel;
-using System.Text.Json;
 using EchoPhase.Cli.Commands;
 using EchoPhase.Cli.Commands.Workflows;
 using EchoPhase.DAL.Postgres.Repositories;
-using EchoPhase.Runners.Blocks.Handlers;
 using EchoPhase.Runners.Blocks.Models;
 using Microsoft.EntityFrameworkCore;
 using Spectre.Console;
@@ -67,9 +65,12 @@ namespace EchoPhase.Server.Services.Workflows.Commands
                 var json = string.IsNullOrEmpty(settings.File)
                     ? await Console.In.ReadToEndAsync(cancellationToken)
                     : await File.ReadAllTextAsync(settings.File, cancellationToken);
-                (name, program) = WorkflowFile.Parse(json);
+                var file = WorkflowFile.Parse(json);
+                (name, program) = (file.Name, file.Program);
+                if (!file.Intact)
+                    AnsiConsole.MarkupLine("[yellow]The program does not match the file's contentHash: it was edited after export.[/]");
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or FormatException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
             {
                 AnsiConsole.MarkupLineInterpolated($"[red]{ex.Message}[/]");
                 return CliExit.Failure;
@@ -141,19 +142,29 @@ namespace EchoPhase.Server.Services.Workflows.Commands
         protected override bool Active => false;
     }
 
-    /// <summary>The file `workflow export` writes: { "name": ..., "program": ... }.</summary>
-    public static class WorkflowFile
+    /// <summary>Prints a workflow as an export file (the API's format); `workflows import` reads it back.</summary>
+    public class ExportCommand : AsyncCommand<WorkflowSettings>
     {
-        public static (string Name, BlockProgram Program) Parse(string json)
-        {
-            using var document = JsonDocument.Parse(json);
-            var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object
-                || !root.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String
-                || !root.TryGetProperty("program", out var program) || program.ValueKind != JsonValueKind.Object)
-                throw new FormatException("Expected { \"name\": \"...\", \"program\": { ... } }, as `workflow export` writes.");
+        private readonly WorkflowRepository _repository;
+        private readonly TimeProvider _time;
 
-            return (name.GetString() ?? throw new FormatException("The workflow's name is null."), program.Deserialize<BlockProgram>(BlockParamsBinder.Options) ?? new BlockProgram());
+        public ExportCommand(WorkflowRepository repository, TimeProvider time)
+        {
+            _repository = repository;
+            _time = time;
+        }
+
+        public override async Task<int> ExecuteAsync(CommandContext context, WorkflowSettings settings, CancellationToken cancellationToken)
+        {
+            var workflow = await _repository.Query().WithIds(settings.Id).AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+            if (workflow is null)
+            {
+                AnsiConsole.MarkupLineInterpolated($"[red]No workflow {settings.Id}.[/]");
+                return CliExit.Failure;
+            }
+
+            Console.Out.WriteLine(WorkflowFile.Write(workflow.Name, WorkflowService.Parse(workflow), workflow.Version, _time.GetUtcNow()));
+            return CliExit.Success;
         }
     }
 }

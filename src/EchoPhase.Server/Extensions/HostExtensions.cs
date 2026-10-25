@@ -134,8 +134,8 @@ namespace EchoPhase.Server.Extensions
                 {
                     workflow.SetDescription("One workflow, by id");
 
-                    workflow.AddCommand<Commands.Workflows.ExportCommand>("export")
-                        .WithDescription("Print the workflow as JSON ({ name, program })")
+                    workflow.AddCommand<WorkflowCommands.ExportCommand>("export")
+                        .WithDescription("Print the workflow as an export file (as the API's export)")
                         .WithExample(new[] { "workflow", "0199a0c4-7d2e-7c4b-9f00-000000000000", "export" });
 
                     workflow.AddCommand<WorkflowCommands.EnableCommand>("enable")
