@@ -161,6 +161,7 @@ namespace EchoPhase.Server.Services.Workflows
             _db.WorkflowPackages.Add(package);
             AddVersion(package, content.Value, publish.Changelog, actorId ?? userId, now);
             await _db.SaveChangesAsync(ct);
+            package.Owner = await _db.Users.FindAsync([userId], ct);
             return ServiceResult<PackageView>.Success(new PackageView(package, PackageAccess.Owner));
         }
 

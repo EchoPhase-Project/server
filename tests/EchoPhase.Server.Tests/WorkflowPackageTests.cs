@@ -142,8 +142,10 @@ namespace EchoPhase.Server.Tests
         private async Task<Guid> PublishPairAsync(PackageVisibility visibility = PackageVisibility.Private, params string[] tags)
         {
             var (main, onError) = await PairAsync();
-            return (await Packages().CreateAsync(_ann.Id, null, Input(visibility, tags), new PackagePublish([main, onError], null, "First."), Ct))
-                .Ok().Package.Id;
+            var created = (await Packages().CreateAsync(_ann.Id, null, Input(visibility, tags),
+                new PackagePublish([main, onError], null, "First."), Ct)).Ok();
+            Assert.Equal("ann", created.Package.Owner?.UserName);
+            return created.Package.Id;
         }
 
         [Fact]
@@ -162,6 +164,7 @@ namespace EchoPhase.Server.Tests
         {
             var id = await PublishPairAsync();
 
+            Assert.Equal("ann", Must.Present((await Packages().GetAsync(_ann.Id, id, Ct)).Ok().Package.Owner).UserName);
             var version = (await Packages().VersionAsync(_ann.Id, id, null, Ct)).Ok();
             Assert.Equal(1, version.Version.Version);
             Assert.Equal(version.Content.Hash, version.Version.ContentHash);
