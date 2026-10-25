@@ -29,17 +29,18 @@ namespace EchoPhase.Server.Controllers.Api.v1.Notes
     /// <param name="RemindAt">When its owner is reminded (a notification), or null.</param>
     /// <param name="Access">What the caller may do with it: Owner, Edit or Read.</param>
     /// <param name="Owner">Whose it is.</param>
+    /// <param name="Stamp">Changes on every save: send it back as expectedStamp to save only over this version.</param>
     /// <param name="CreatedAt">When it was created.</param>
     /// <param name="UpdatedAt">When it last changed.</param>
     public sealed record NoteResponse(Guid Id, string Title, string Body, bool Pinned, DateTime? RemindAt,
-        NoteAccess Access, NoteUserResponse Owner, DateTime CreatedAt, DateTime UpdatedAt)
+        NoteAccess Access, NoteUserResponse Owner, Guid Stamp, DateTime CreatedAt, DateTime UpdatedAt)
     {
         public static NoteResponse From(NoteView view)
         {
             var note = view.Note;
             var mine = view.Access == NoteAccess.Owner;
             return new(note.Id, note.Title, note.Body, mine && note.Pinned, mine ? note.RemindAt : null, view.Access,
-                NoteUserResponse.From(note.Owner, note.OwnerId), note.CreatedAt, note.UpdatedAt);
+                NoteUserResponse.From(note.Owner, note.OwnerId), note.ConcurrencyStamp, note.CreatedAt, note.UpdatedAt);
         }
     }
 
@@ -47,13 +48,15 @@ namespace EchoPhase.Server.Controllers.Api.v1.Notes
     /// <param name="Body">Markdown.</param>
     /// <param name="Pinned">Keep it on top of the list (the owner's choice).</param>
     /// <param name="RemindAt">When to be reminded, with Z or an offset; null: no reminder (the owner's choice).</param>
+    /// <param name="ExpectedStamp">On update: the stamp it was read with; 409 when someone saved since.</param>
     public sealed record NoteRequest(
         [MaxLength(NoteConfiguration.MaxTitleLength)] string? Title,
         [MaxLength(NoteConfiguration.MaxBodyLength)] string? Body,
         bool Pinned = false,
-        DateTimeOffset? RemindAt = null)
+        DateTimeOffset? RemindAt = null,
+        Guid? ExpectedStamp = null)
     {
-        public NoteInput ToInput() => new(Title, Body, Pinned, RemindAt);
+        public NoteInput ToInput() => new(Title, Body, Pinned, RemindAt, ExpectedStamp);
     }
 
     /// <param name="UserName">Whom to share it with.</param>
@@ -125,6 +128,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Notes
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status403Forbidden)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> Update(Guid id, [FromBody] NoteRequest dto, CancellationToken ct)
         {
             var result = await _notes.UpdateAsync(User.GetUserId(), id, dto.ToInput(), ct);

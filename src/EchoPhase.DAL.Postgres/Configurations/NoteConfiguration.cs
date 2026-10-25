@@ -25,9 +25,6 @@ namespace EchoPhase.DAL.Postgres.Configurations
 
             builder.Property(n => n.Title).HasMaxLength(MaxTitleLength).IsRequired();
             builder.Property(n => n.Body).HasMaxLength(MaxBodyLength).IsRequired();
-            // A reminder is claimed by clearing it only where it still holds the
-            // time it was read with: of several servers, one sends it.
-            builder.Property(n => n.RemindAt).IsConcurrencyToken();
 
             builder.HasOne(n => n.Owner)
                 .WithMany()

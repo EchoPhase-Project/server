@@ -242,8 +242,22 @@ namespace EchoPhase.Server.Tests
             await other.SaveChangesAsync(Ct);
             mine.RemindAt = null;
 
-            // The clearing is conditional on the time it was read with.
+            // The save checks the stamp it read, which the other save renewed.
             await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => _db.SaveChangesAsync(Ct));
+        }
+
+        [Fact]
+        public async Task Update_OverAnOlderStamp_IsAConflict()
+        {
+            var created = (await Notes().CreateAsync(_alice.Id, new NoteInput("plan", "v1"), Ct)).Value!.Note;
+            var stamp = created.ConcurrencyStamp;
+            var first = await Notes().UpdateAsync(_alice.Id, created.Id, new NoteInput("plan", "v2", ExpectedStamp: stamp), Ct);
+
+            var second = await Notes().UpdateAsync(_alice.Id, created.Id, new NoteInput("plan", "v2b", ExpectedStamp: stamp), Ct);
+
+            Assert.True(first.Successful);
+            Assert.NotEqual(stamp, first.Value!.Note.ConcurrencyStamp);
+            Assert.Equal(NoteErrors.Conflict, second.Error.Code);
         }
 
         private sealed class RecordingEvents : INoteEvents

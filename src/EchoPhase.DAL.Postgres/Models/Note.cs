@@ -10,7 +10,7 @@ namespace EchoPhase.DAL.Postgres.Models
     /// A user's note: a title and Markdown text, readable or editable by the
     /// users it is shared with (<see cref="NoteShare"/>). Goes with its owner.
     /// </summary>
-    public class Note : ITrackingEntity, IIdentifiable
+    public class Note : ITrackingEntity, IConcurrentEntity, IIdentifiable
     {
         public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
 
@@ -29,6 +29,9 @@ namespace EchoPhase.DAL.Postgres.Models
         public DateTime? RemindAt { get; set; }
 
         public List<NoteShare> Shares { get; set; } = [];
+
+        /// <summary>New on every save; a save that read an older one fails (two editors, a reminder sent).</summary>
+        public Guid ConcurrencyStamp { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

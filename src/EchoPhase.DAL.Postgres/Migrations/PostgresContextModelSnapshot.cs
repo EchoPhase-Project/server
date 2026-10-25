@@ -114,6 +114,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasColumnType("character varying(16)");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -242,6 +243,10 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasMaxLength(100000)
                         .HasColumnType("character varying(100000)");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -312,6 +317,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasColumnType("bytea");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -794,6 +800,7 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")

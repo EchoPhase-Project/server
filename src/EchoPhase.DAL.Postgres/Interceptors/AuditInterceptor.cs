@@ -4,7 +4,6 @@
 using EchoPhase.DAL.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using UUIDNext;
 
 namespace EchoPhase.DAL.Postgres.Interceptors
 {
@@ -52,12 +51,6 @@ namespace EchoPhase.DAL.Postgres.Interceptors
                         entry.Entity.UpdatedAt = now;
                         break;
                 }
-            }
-
-            foreach (var entry in context.ChangeTracker.Entries<IConcurrentEntity>()
-                .Where(e => e.State is EntityState.Added or EntityState.Modified))
-            {
-                entry.Entity.ConcurrencyStamp = Uuid.NewDatabaseFriendly(Database.PostgreSql);
             }
 
             foreach (var entry in context.ChangeTracker.Entries<ISoftDeletable>()

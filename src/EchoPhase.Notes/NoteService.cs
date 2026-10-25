@@ -108,6 +108,8 @@ namespace EchoPhase.Notes
                 return Fail<NoteView>(NoteErrors.Forbidden, "This note is shared with you to read only.");
 
             var note = view.Note;
+            if (input.ExpectedStamp is { } expected && expected != note.ConcurrencyStamp)
+                return Fail<NoteView>(NoteErrors.Conflict, ChangedMeanwhile);
             note.Title = TitleOf(input);
             note.Body = input.Body ?? string.Empty;
             if (view.Access == NoteAccess.Owner)
@@ -117,7 +119,7 @@ namespace EchoPhase.Notes
             }
             note.UpdatedAt = Now();
             if (!await TrySaveAsync(ct))
-                return Fail<NoteView>(NoteErrors.Conflict, "Its reminder was just sent; open the note again and save.");
+                return Fail<NoteView>(NoteErrors.Conflict, ChangedMeanwhile);
             return ServiceResult<NoteView>.Success(view);
         }
 
@@ -136,7 +138,8 @@ namespace EchoPhase.Notes
                 return Fail<NoteView>(NoteErrors.Invalid, TooLong, "body");
             note.Body = body;
             note.UpdatedAt = Now();
-            await _db.SaveChangesAsync(ct);
+            if (!await TrySaveAsync(ct))
+                return Fail<NoteView>(NoteErrors.Conflict, ChangedMeanwhile);
             return ServiceResult<NoteView>.Success(view);
         }
 
@@ -323,6 +326,7 @@ namespace EchoPhase.Notes
             : NoteAccess.Read;
 
         private const string TooLong = "The note is too long.";
+        private const string ChangedMeanwhile = "The note changed meanwhile; open it again to see the change.";
 
         // Which input cannot be a note's and why, or null.
         private static (string Field, string Message)? Check(NoteInput input)

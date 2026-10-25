@@ -8,11 +8,38 @@ using EchoPhase.DAL.Postgres.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
+using UUIDNext;
 
 namespace EchoPhase.DAL.Postgres
 {
     public class PostgresContext : IdentityDbContext<User, UserRole, Guid>
     {
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            RenewConcurrencyStamps();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            RenewConcurrencyStamps();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        /// <summary>
+        /// A new stamp for every entity being written; the one it was read with
+        /// stays the original value, which the UPDATE checks (a concurrency token).
+        /// Here rather than in an interceptor, so every context does it, tests' too.
+        /// </summary>
+        private void RenewConcurrencyStamps()
+        {
+            foreach (var entry in ChangeTracker.Entries<IConcurrentEntity>())
+            {
+                if (entry.State is EntityState.Added or EntityState.Modified)
+                    entry.Entity.ConcurrencyStamp = Uuid.NewDatabaseFriendly(UUIDNext.Database.PostgreSql);
+            }
+        }
+
         public const string DefaultSchema = "EchoPhase";
 
         /// <summary>
@@ -74,9 +101,13 @@ namespace EchoPhase.DAL.Postgres
                 if (!typeof(IConcurrentEntity).IsAssignableFrom(entityType.ClrType))
                     continue;
 
+                // Every save writes a new stamp and checks the one it read: a
+                // concurrent change makes the later save fail instead of
+                // silently overwriting the earlier one.
                 builder.Entity(entityType.ClrType)
                     .Property(nameof(IConcurrentEntity.ConcurrencyStamp))
-                    .IsRequired();
+                    .IsRequired()
+                    .IsConcurrencyToken();
             }
 
             foreach (var entityType in builder.Model.GetEntityTypes())

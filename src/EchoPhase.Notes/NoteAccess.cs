@@ -25,5 +25,7 @@ namespace EchoPhase.Notes
     }
 
     /// <summary>A note's content as given; the title may be empty (taken from the text then).</summary>
-    public sealed record NoteInput(string? Title, string? Body, bool Pinned = false, DateTimeOffset? RemindAt = null);
+    /// <param name="ExpectedStamp">The stamp the change was made on: a newer one fails it (someone saved meanwhile).</param>
+    public sealed record NoteInput(string? Title, string? Body, bool Pinned = false, DateTimeOffset? RemindAt = null,
+        Guid? ExpectedStamp = null);
 }
