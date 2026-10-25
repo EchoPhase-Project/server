@@ -199,7 +199,7 @@ namespace EchoPhase.Server.Tests
             var id = await PublishPairAsync(PackageVisibility.Unlisted);
 
             (await Packages().GetAsync(_bob.Id, id, Ct)).Ok();
-            Assert.Empty(await Packages().ExploreAsync(_bob.Id, null, null, 50, Ct));
+            Assert.Empty((await Packages().ExploreAsync(_bob.Id, null, null, null, 50, Ct)).Ok().Items);
         }
 
         [Fact]
@@ -284,11 +284,38 @@ namespace EchoPhase.Server.Tests
             var id = await PublishPairAsync(PackageVisibility.Public, "Discord Bot", "guilds");
             await PublishPairAsync(PackageVisibility.Private, "discord-bot");
 
-            var all = await Packages().ExploreAsync(_bob.Id, null, null, 50, Ct);
+            var all = (await Packages().ExploreAsync(_bob.Id, null, null, null, 50, Ct)).Ok().Items;
             Assert.Equal([id], all.Select(v => v.Package.Id));
             Assert.Equal(["discord-bot", "guilds"], all[0].Package.Tags);
-            Assert.Single(await Packages().ExploreAsync(_bob.Id, null, "discord-bot", 50, Ct));
-            Assert.Empty(await Packages().ExploreAsync(_bob.Id, null, "twitch", 50, Ct));
+            Assert.Single((await Packages().ExploreAsync(_bob.Id, null, "discord-bot", null, 50, Ct)).Ok().Items);
+            Assert.Empty((await Packages().ExploreAsync(_bob.Id, null, "twitch", null, 50, Ct)).Ok().Items);
+        }
+
+        [Fact]
+        public async Task Explore_PagesThroughEveryPackageOnce_MostInstalledFirst()
+        {
+            var ids = new List<Guid>();
+            for (int i = 0; i < 5; i++)
+            {
+                ids.Add(await PublishPairAsync(PackageVisibility.Public));
+                _time.Advance(TimeSpan.FromMinutes(1));
+            }
+            // The oldest is the only one installed: it leads.
+            await Packages().InstallAsync(_bob.Id, null, ids[0], null, null, Ct);
+
+            var seen = new List<Guid>();
+            string? cursor = null;
+            do
+            {
+                var page = (await Packages().ExploreAsync(_bob.Id, null, null, cursor, 2, Ct)).Ok();
+                Assert.True(page.Items.Count <= 2);
+                seen.AddRange(page.Items.Select(v => v.Package.Id));
+                cursor = page.NextCursor;
+            }
+            while (cursor is not null);
+
+            Assert.Equal([ids[0], ids[4], ids[3], ids[2], ids[1]], seen);
+            Assert.Equal(ErrorCodes.Invalid, (await Packages().ExploreAsync(_bob.Id, null, null, "not-a-cursor", 2, Ct)).Error.Code);
         }
 
         [Fact]

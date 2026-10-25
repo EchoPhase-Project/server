@@ -1,7 +1,10 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Buffers.Text;
+using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Serialization;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Configurations;
@@ -26,6 +29,9 @@ namespace EchoPhase.Server.Services.Workflows
     /// <summary>A package as one user sees it.</summary>
     /// <param name="Installs">How many users (its owner aside) installed it.</param>
     public sealed record PackageView(WorkflowPackage Package, PackageAccess Access, int Installs = 0);
+
+    /// <summary>A page of packages and where the next one starts (null: this is the last).</summary>
+    public sealed record PackagePage(IReadOnlyList<PackageView> Items, string? NextCursor);
 
     /// <summary>One version of a package with what it holds.</summary>
     /// <param name="OwnerId">The package's owner.</param>
@@ -77,12 +83,13 @@ namespace EchoPhase.Server.Services.Workflows
         }
 
         /// <summary>
-        /// Public packages with at least one version, most installed first.
-        /// <paramref name="query"/> matches the name or summary, ignoring case;
-        /// <paramref name="tag"/> keeps those with that tag.
+        /// Public packages with at least one version, most installed first,
+        /// a page at a time: <paramref name="cursor"/> is the previous page's
+        /// next cursor. <paramref name="query"/> matches the name or summary,
+        /// ignoring case; <paramref name="tag"/> keeps those with that tag.
         /// </summary>
-        public async Task<IReadOnlyList<PackageView>> ExploreAsync(Guid userId, string? query, string? tag, int limit,
-            CancellationToken ct = default)
+        public async Task<IServiceResult<PackagePage>> ExploreAsync(Guid userId, string? query, string? tag, string? cursor,
+            int limit, CancellationToken ct = default)
         {
             var packages = _db.WorkflowPackages.AsNoTracking()
                 .Where(p => p.Visibility == PackageVisibility.Public && p.LatestVersion > 0);
@@ -94,8 +101,53 @@ namespace EchoPhase.Server.Services.Workflows
             if (TagOf(tag) is { } wanted)
                 packages = packages.Where(p => p.Tags.Contains(wanted));
 
-            return await ViewsAsync(userId,
-                packages.OrderByDescending(p => p.Installs.Count).ThenByDescending(p => p.UpdatedAt).Take(limit), ct);
+            if (cursor is not null)
+            {
+                if (ExploreCursor.Parse(cursor) is not { } after)
+                    return Fail<PackagePage>(ErrorCodes.Invalid, "The cursor is not one this list gave.", "cursor");
+                // After the last one seen in (installs, updated, id) order, all descending.
+                packages = packages.Where(p => p.Installs.Count < after.Installs
+                    || (p.Installs.Count == after.Installs
+                        && (p.UpdatedAt < after.UpdatedAt || (p.UpdatedAt == after.UpdatedAt && p.Id.CompareTo(after.Id) < 0))));
+            }
+
+            // One more than asked: whether there is a next page.
+            var views = await ViewsAsync(userId, packages
+                .OrderByDescending(p => p.Installs.Count)
+                .ThenByDescending(p => p.UpdatedAt)
+                .ThenByDescending(p => p.Id)
+                .Take(limit + 1), ct);
+            var page = views.Take(limit).ToList();
+            var next = views.Count > limit && page.Count > 0
+                ? new ExploreCursor(page[^1].Installs, page[^1].Package.UpdatedAt, page[^1].Package.Id).ToString()
+                : null;
+            return ServiceResult<PackagePage>.Success(new PackagePage(page, next));
+        }
+
+        // Where an Explore page ended, opaque to clients.
+        private sealed record ExploreCursor(int Installs, DateTime UpdatedAt, Guid Id)
+        {
+            public override string ToString()
+                => Base64Url.EncodeToString(Encoding.UTF8.GetBytes($"{Installs}|{UpdatedAt.Ticks}|{Id:N}"));
+
+            public static ExploreCursor? Parse(string cursor)
+            {
+                try
+                {
+                    var parts = Encoding.UTF8.GetString(Base64Url.DecodeFromChars(cursor)).Split('|');
+                    return parts.Length == 3
+                        && int.TryParse(parts[0], CultureInfo.InvariantCulture, out var installs)
+                        && long.TryParse(parts[1], CultureInfo.InvariantCulture, out var ticks)
+                        && ticks is >= 0 and <= 3155378975999999999
+                        && Guid.TryParseExact(parts[2], "N", out var id)
+                        ? new ExploreCursor(installs, new DateTime(ticks, DateTimeKind.Utc), id)
+                        : null;
+                }
+                catch (FormatException)
+                {
+                    return null;
+                }
+            }
         }
 
         public async Task<IServiceResult<PackageView>> GetAsync(Guid userId, Guid id, CancellationToken ct = default)

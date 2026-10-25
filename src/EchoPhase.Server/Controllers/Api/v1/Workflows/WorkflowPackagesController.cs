@@ -149,13 +149,22 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         public async Task<IActionResult> List(CancellationToken ct)
             => Ok((await _packages.ListAsync(User.GetUserId(), ct)).Select(PackageResponse.From));
 
-        /// <summary>Public packages, most installed first; `q` searches name and summary, `tag` filters.</summary>
+        /// <summary>
+        /// Public packages, most installed first, a page at a time (pass the
+        /// answer's nextCursor as `cursor`); `q` searches name and summary, `tag` filters.
+        /// </summary>
         [HttpGet("explore")]
         [RequirePermission(Resources.Workflows, Permissions.Read)]
-        [ProducesResponseType<PackageResponse[]>(StatusCodes.Status200OK)]
+        [ProducesResponseType<CursorPageResponse<PackageResponse>>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Explore([MaxLength(100)] string? q, [MaxLength(WorkflowPackageConfiguration.MaxTagLength)] string? tag,
-            [Range(1, 200)] int limit = 50, CancellationToken ct = default)
-            => Ok((await _packages.ExploreAsync(User.GetUserId(), q, tag, limit, ct)).Select(PackageResponse.From));
+            [MaxLength(200)] string? cursor, [Range(1, 100)] int limit = 30, CancellationToken ct = default)
+        {
+            var result = await _packages.ExploreAsync(User.GetUserId(), q, tag, cursor, limit, ct);
+            return result.Successful
+                ? Ok(new CursorPageResponse<PackageResponse>(result.Value.Items.Select(PackageResponse.From).ToList(), result.Value.NextCursor))
+                : Failure(result.Error);
+        }
 
         [HttpGet("{id:guid}")]
         [RequirePermission(Resources.Workflows, Permissions.Read)]
