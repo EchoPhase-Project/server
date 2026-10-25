@@ -4,6 +4,7 @@
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Scylla.Entities;
 using EchoPhase.Runners.Blocks;
+using EchoPhase.Runners.Blocks.Models;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
@@ -94,7 +95,16 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         {
             var result = await _workflows.VersionsAsync(User.GetUserId(), id, ct);
             return result.Successful
-                ? Ok(result.Value.Select(v => new { version = v.Version, name = v.Name, savedBy = v.SavedBy, createdAt = v.CreatedAt }))
+                ? Ok(result.Value.Select(v => new
+                {
+                    version = v.Version,
+                    name = v.Name,
+                    contentHash = v.ContentHash,
+                    parentVersion = v.ParentVersion,
+                    restoredFrom = v.RestoredFrom,
+                    savedBy = v.SavedBy,
+                    createdAt = v.CreatedAt,
+                }))
                 : Failure(result.Error);
         }
 
@@ -107,7 +117,17 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
                 return Failure(result.Error);
 
             var v = result.Value.Version;
-            return Ok(new { version = v.Version, name = v.Name, savedBy = v.SavedBy, createdAt = v.CreatedAt, program = result.Value.Program });
+            return Ok(new
+            {
+                version = v.Version,
+                name = v.Name,
+                contentHash = v.ContentHash ?? BlockProgramHash.Of(result.Value.Program),
+                parentVersion = v.ParentVersion,
+                restoredFrom = v.RestoredFrom,
+                savedBy = v.SavedBy,
+                createdAt = v.CreatedAt,
+                program = result.Value.Program,
+            });
         }
 
         /// <summary>
@@ -129,6 +149,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             name = w.Name,
             active = w.Active,
             version = w.Version,
+            contentHash = w.ContentHash,
             createdAt = w.CreatedAt,
             updatedAt = w.UpdatedAt
         };
@@ -139,6 +160,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             name = details.Workflow.Name,
             active = details.Workflow.Active,
             version = details.Workflow.Version,
+            contentHash = details.Workflow.ContentHash ?? BlockProgramHash.Of(details.Program),
             createdAt = details.Workflow.CreatedAt,
             updatedAt = details.Workflow.UpdatedAt,
             program = details.Program,

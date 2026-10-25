@@ -85,6 +85,7 @@ namespace EchoPhase.Server.Services.Blocks
                 Status = BlockRunStatus.Queued,
                 ActorId = actorId,
                 WorkflowId = start.WorkflowId,
+                ProgramHash = BlockProgramHash.Of(start.Program),
                 Trigger = start.Trigger,
                 BlockCount = start.Program.Blocks.Count,
                 CreatedAt = _time.GetUtcNow()

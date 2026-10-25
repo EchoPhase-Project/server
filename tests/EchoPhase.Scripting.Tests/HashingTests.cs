@@ -78,5 +78,24 @@ namespace EchoPhase.Scripting.Tests
         [InlineData("fromBase64('***')")]
         public void Bloom_AndBase64_RejectBadInput(string expression)
             => Assert.Throws<InvalidOperationException>(() => Run(expression));
+
+        [Fact]
+        public void BloomFilters_HaveTheirOwnSeed_AndOldOnesStillWork()
+        {
+            var vars = new Dictionary<string, object?> { ["xs"] = new List<object?> { "a", "b" } };
+            var first = Assert.IsType<Dictionary<string, object?>>(Value("bloomFrom(xs)", vars));
+            var second = Assert.IsType<Dictionary<string, object?>>(Value("bloomFrom(xs)", vars));
+            Assert.NotEqual(first["seed"], second["seed"]);
+
+            // A filter made before seeds: no seed, read as 0.
+            var old = new Dictionary<string, object?>(first);
+            old.Remove("seed");
+            vars["old"] = Value("bloomAdd(f, 'z')", new Dictionary<string, object?> { ["f"] = old });
+            Assert.Equal(true, Run("bloomHas(old, 'z')", vars));
+
+            var damaged = new Dictionary<string, object?>(first) { ["seed"] = "not hex" };
+            vars["bad"] = damaged;
+            Assert.ThrowsAny<Exception>(() => Run("bloomHas(bad, 'a')", vars));
+        }
     }
 }

@@ -40,6 +40,7 @@ namespace EchoPhase.DAL.Scylla
                 [nameof(BlockRun.ActorId)] = "actor_id",
                 [nameof(BlockRun.WorkflowId)] = "workflow_id",
                 [nameof(BlockRun.Trigger)] = "trigger",
+                [nameof(BlockRun.ProgramHash)] = "program_hash",
                 [nameof(BlockRun.BlockCount)] = "block_count",
                 [nameof(BlockRun.CreatedAt)] = "created_at",
                 [nameof(BlockRun.StartedAt)] = "started_at",

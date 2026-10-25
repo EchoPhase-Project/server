@@ -23,6 +23,12 @@ namespace EchoPhase.DAL.Scylla.Entities
         /// <summary>The saved workflow it ran; null for a program sent to run directly.</summary>
         public Guid? WorkflowId { get; set; }
 
+        /// <summary>
+        /// SHA-256 (hex) of the program it ran, canonical JSON: the same as its
+        /// workflow version's ContentHash when it ran one. Null for older runs.
+        /// </summary>
+        public string? ProgramHash { get; set; }
+
         /// <summary>What started it: manual, webhook or schedule.</summary>
         public string Trigger { get; set; } = "manual";
 

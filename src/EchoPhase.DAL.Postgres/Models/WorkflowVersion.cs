@@ -22,6 +22,15 @@ namespace EchoPhase.DAL.Postgres.Models
         /// <summary>The program as JSON (jsonb), as in <see cref="Workflow.Definition"/>.</summary>
         public string Definition { get; set; } = "{}";
 
+        /// <summary>SHA-256 (hex) of the program's canonical JSON; null for versions saved before hashes.</summary>
+        public string? ContentHash { get; set; }
+
+        /// <summary>The version it was made from (the one current when it was saved); null for the first.</summary>
+        public int? ParentVersion { get; set; }
+
+        /// <summary>When it brought back an earlier version: that version.</summary>
+        public int? RestoredFrom { get; set; }
+
         /// <summary>Who saved it; differs from the owner under impersonation.</summary>
         public Guid? SavedBy { get; set; }
 

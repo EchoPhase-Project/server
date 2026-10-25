@@ -121,6 +121,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
             status = run.Status,
             actorId = run.ActorId,
             workflowId = run.WorkflowId,
+            programHash = run.ProgramHash,
             trigger = run.Trigger,
             blockCount = run.BlockCount,
             createdAt = run.CreatedAt,

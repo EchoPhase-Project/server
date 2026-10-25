@@ -53,7 +53,7 @@ namespace EchoPhase.Scripting.Engine
             {
                 var filter = Bloom(a[0], "bloomHas");
                 var bits = BitsOf(filter);
-                foreach (var bit in Positions(a[1], filter.Bits, filter.Hashes))
+                foreach (var bit in Positions(a[1], filter))
                     if ((bits[bit >> 3] & (1 << (bit & 7))) == 0)
                         return false;
                 return true;
@@ -78,7 +78,10 @@ namespace EchoPhase.Scripting.Engine
             }
         }
 
-        private readonly record struct BloomFilter(int Bits, int Hashes, long Count, string Data);
+        // Seed: random per filter, so that whoever sends the values cannot work out
+        // which bits they set (and make a value it never held look present).
+        // Filters made before seeds read as 0.
+        private readonly record struct BloomFilter(int Bits, int Hashes, long Count, string Data, long Seed);
 
         // Optimal size for n items at error rate p: m = -n ln p / (ln 2)^2, k = (m / n) ln 2.
         private static Dictionary<string, object?> NewBloom(double capacity, double errorRate)
@@ -96,7 +99,8 @@ namespace EchoPhase.Scripting.Engine
             int m = Math.Max(64, (int)bits + 7 & ~7);
             int k = Math.Clamp((int)Math.Round(m / capacity * Math.Log(2)), 1, 30);
             Budget.Spend(m / 64);
-            return Shape(new BloomFilter(m, k, 0, Convert.ToBase64String(new byte[m / 8])));
+            return Shape(new BloomFilter(m, k, 0, Convert.ToBase64String(new byte[m / 8]),
+                BinaryPrimitives.ReadInt64LittleEndian(RandomNumberGenerator.GetBytes(8))));
         }
 
         private static Dictionary<string, object?> Shape(BloomFilter filter) => new()
@@ -105,6 +109,8 @@ namespace EchoPhase.Scripting.Engine
             ["bits"] = filter.Bits,
             ["hashes"] = filter.Hashes,
             ["count"] = filter.Count,
+            // Hex: the engine's numbers are doubles and would round a 64-bit seed.
+            ["seed"] = filter.Seed.ToString("x16", System.Globalization.CultureInfo.InvariantCulture),
             ["data"] = filter.Data
         };
 
@@ -119,7 +125,12 @@ namespace EchoPhase.Scripting.Engine
                 && text.Length == (int)(4 * Math.Ceiling(m / 8 / 3.0)))
             {
                 var count = d.TryGetValue("count", out var c) && Values.TryNumber(c, out var n) ? (long)n : 0;
-                return new BloomFilter((int)m, (int)k, count, text);
+                long seed = 0;
+                if (d.TryGetValue("seed", out var s) && s is not null
+                    && !(s is string hex && long.TryParse(hex, System.Globalization.NumberStyles.HexNumber,
+                        System.Globalization.CultureInfo.InvariantCulture, out seed)))
+                    throw new InvalidOperationException($"'{name}': the Bloom filter's seed is damaged.");
+                return new BloomFilter((int)m, (int)k, count, text, seed);
             }
 
             throw new InvalidOperationException($"'{name}' needs a Bloom filter made by bloom() or bloomFrom().");
@@ -145,7 +156,7 @@ namespace EchoPhase.Scripting.Engine
             foreach (var item in items)
             {
                 Budget.Spend(filter.Hashes);
-                foreach (var bit in Positions(item, filter.Bits, filter.Hashes))
+                foreach (var bit in Positions(item, filter))
                     bits[bit >> 3] |= (byte)(1 << (bit & 7));
             }
 
@@ -155,16 +166,15 @@ namespace EchoPhase.Scripting.Engine
         }
 
         // Kirsch–Mitzenmacher: the halves of one 64-bit XXH3 give every probe, h1 + i * h2 (mod m).
-        private static IEnumerable<int> Positions(object? value, int bits, int hashes)
+        private static int[] Positions(object? value, BloomFilter filter)
         {
-            Span<byte> hash = stackalloc byte[8];
-            BinaryPrimitives.WriteUInt64LittleEndian(hash, XxHash3.HashToUInt64(Utf8(value)));
-            ulong h1 = BinaryPrimitives.ReadUInt32LittleEndian(hash);
-            ulong h2 = BinaryPrimitives.ReadUInt32LittleEndian(hash[4..]) | 1;
+            var hash = XxHash3.HashToUInt64(Utf8(value), filter.Seed);
+            ulong h1 = (uint)hash;
+            ulong h2 = (hash >> 32) | 1;
 
-            var positions = new int[hashes];
-            for (int i = 0; i < hashes; i++)
-                positions[i] = (int)((h1 + (ulong)i * h2) % (ulong)bits);
+            var positions = new int[filter.Hashes];
+            for (int i = 0; i < filter.Hashes; i++)
+                positions[i] = (int)((h1 + (ulong)i * h2) % (ulong)filter.Bits);
             return positions;
         }
     }

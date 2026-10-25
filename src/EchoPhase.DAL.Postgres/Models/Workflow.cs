@@ -26,6 +26,12 @@ namespace EchoPhase.DAL.Postgres.Models
         /// <summary>Bumped on every change of the definition.</summary>
         public int Version { get; set; } = 1;
 
+        /// <summary>
+        /// SHA-256 (hex) of the program's canonical JSON (BlockProgramHash); null
+        /// for workflows saved before hashes, until their next save.
+        /// </summary>
+        public string? ContentHash { get; set; }
+
         public ICollection<WorkflowSchedule> Schedules { get; set; } = new List<WorkflowSchedule>();
         public ICollection<WorkflowVersion> Versions { get; set; } = new List<WorkflowVersion>();
 

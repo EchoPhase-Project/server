@@ -803,6 +803,10 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -876,6 +880,10 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -888,6 +896,12 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int?>("ParentVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RestoredFrom")
+                        .HasColumnType("integer");
+
                     b.Property<Guid?>("SavedBy")
                         .HasColumnType("uuid");
 
@@ -898,6 +912,8 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("WorkflowId", "ContentHash");
 
                     b.HasIndex("WorkflowId", "Version")
                         .IsUnique();

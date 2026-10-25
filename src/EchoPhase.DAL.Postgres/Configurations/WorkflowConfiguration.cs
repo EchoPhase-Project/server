@@ -17,6 +17,7 @@ namespace EchoPhase.DAL.Postgres.Configurations
 
             builder.Property(e => e.Name).HasMaxLength(100).IsRequired();
             builder.Property(e => e.Definition).HasColumnType("jsonb").IsRequired();
+            builder.Property(e => e.ContentHash).HasMaxLength(64);
 
             builder.HasOne(e => e.User)
                 .WithMany(u => u.Workflows)
@@ -52,9 +53,12 @@ namespace EchoPhase.DAL.Postgres.Configurations
             builder.ToTable("WorkflowVersions", PostgresContext.DefaultSchema);
             builder.HasKey(e => e.Id);
             builder.HasIndex(e => new { e.WorkflowId, e.Version }).IsUnique();
+            // Which versions hold a program: "this is the same as version 7".
+            builder.HasIndex(e => new { e.WorkflowId, e.ContentHash });
 
             builder.Property(e => e.Name).HasMaxLength(100).IsRequired();
             builder.Property(e => e.Definition).HasColumnType("jsonb").IsRequired();
+            builder.Property(e => e.ContentHash).HasMaxLength(64);
 
             builder.HasOne(e => e.Workflow)
                 .WithMany(w => w.Versions)

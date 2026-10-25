@@ -200,6 +200,7 @@ namespace EchoPhase.Server
             services.AddHostedService<WorkflowScheduler>();
             services.AddSingleton<DiscordTriggerService>();
             services.AddHostedService(sp => sp.GetRequiredService<DiscordTriggerService>());
+            services.AddSingleton<IWorkflowTriggerReloader>(sp => sp.GetRequiredService<DiscordTriggerService>());
             services.AddHostedService<DiscordGatewayErrorHandler>();
             services.AddScoped<IBlockRunObserver, BlockRunProgressObserver>();
             // One recorder per run, read by the worker for the run's execution data.

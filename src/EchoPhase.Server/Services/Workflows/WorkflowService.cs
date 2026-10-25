@@ -59,7 +59,7 @@ namespace EchoPhase.Server.Services.Workflows
         private readonly BlockProgramValidator _validator;
         private readonly BlocksOptions _options;
         private readonly TimeProvider _time;
-        private readonly DiscordTriggerService _discordTriggers;
+        private readonly IWorkflowTriggerReloader _discordTriggers;
 
         public WorkflowService(
             WorkflowRepository workflows,
@@ -68,7 +68,7 @@ namespace EchoPhase.Server.Services.Workflows
             BlockProgramValidator validator,
             IOptions<RunnerOptions> options,
             TimeProvider time,
-            DiscordTriggerService discordTriggers)
+            IWorkflowTriggerReloader discordTriggers)
         {
             _workflows = workflows;
             _users = users;
@@ -101,12 +101,13 @@ namespace EchoPhase.Server.Services.Workflows
                 UserId = userId,
                 Name = name.Trim(),
                 Definition = Serialize(program),
+                ContentHash = BlockProgramHash.Of(program),
                 Active = active
             };
             if (await CheckErrorWorkflowAsync(workflow, program, ct) is { } badErrorWorkflow)
                 return Failure<WorkflowDetails>(WorkflowErrors.Invalid, badErrorWorkflow);
             _workflows.Add(workflow);
-            _workflows.AddVersion(Snapshot(workflow, actorId ?? userId));
+            _workflows.AddVersion(Snapshot(workflow, actorId ?? userId, parent: null, restoredFrom: null));
             await _workflows.ReplaceSchedulesAsync(workflow.Id, await SchedulesAsync(workflow, program, ct), ct);
             await _workflows.SaveAsync(ct);
             await _discordTriggers.ReloadUserAsync(userId, ct);
@@ -118,9 +119,15 @@ namespace EchoPhase.Server.Services.Workflows
         /// Replaces the workflow. <paramref name="expectedVersion"/> guards
         /// against overwriting an edit made elsewhere (409 when it differs).
         /// </summary>
-        public async Task<IServiceResult<WorkflowDetails>> UpdateAsync(
+        public Task<IServiceResult<WorkflowDetails>> UpdateAsync(
             Guid userId, Guid? actorId, Guid id, string name, BlockProgram program, bool active, int? expectedVersion,
             CancellationToken ct = default)
+            => SaveAsync(userId, actorId, id, name, program, active, expectedVersion, restoredFrom: null, ct);
+
+        // A new version when the program changed (by its hash), linked to the one before it.
+        private async Task<IServiceResult<WorkflowDetails>> SaveAsync(
+            Guid userId, Guid? actorId, Guid id, string name, BlockProgram program, bool active, int? expectedVersion,
+            int? restoredFrom, CancellationToken ct)
         {
             var workflow = await FindAsync(userId, id, ct);
             if (workflow is null)
@@ -133,15 +140,19 @@ namespace EchoPhase.Server.Services.Workflows
             if (await CheckErrorWorkflowAsync(workflow, program, ct) is { } badErrorWorkflow)
                 return Failure<WorkflowDetails>(WorkflowErrors.Invalid, badErrorWorkflow);
 
-            var definition = Serialize(program);
-            bool changed = definition != workflow.Definition;
+            var hash = BlockProgramHash.Of(program);
+            // Saved before hashes: its hash, from the stored program.
+            var currentHash = workflow.ContentHash ?? BlockProgramHash.OfJson(workflow.Definition);
+            bool changed = hash != currentHash;
+            var parent = workflow.Version;
             if (changed)
                 workflow.Version++;
             workflow.Name = name.Trim();
-            workflow.Definition = definition;
+            workflow.Definition = Serialize(program);
+            workflow.ContentHash = hash;
             workflow.Active = active;
             if (changed)
-                _workflows.AddVersion(Snapshot(workflow, actorId ?? userId));
+                _workflows.AddVersion(Snapshot(workflow, actorId ?? userId, parent, restoredFrom));
 
             await _workflows.ReplaceSchedulesAsync(workflow.Id, await SchedulesAsync(workflow, program, ct), ct);
             try
@@ -196,8 +207,8 @@ namespace EchoPhase.Server.Services.Workflows
 
             if (await FindAsync(userId, id, ct) is not { } workflow)
                 return ServiceResult<WorkflowDetails>.Failure(e => e.Set(WorkflowErrors.NotFound, "Workflow not found."));
-            return await UpdateAsync(userId, actorId, id, saved.Value.Version.Name, saved.Value.Program,
-                workflow.Active, expectedVersion, ct);
+            return await SaveAsync(userId, actorId, id, saved.Value.Version.Name, saved.Value.Program,
+                workflow.Active, expectedVersion, restoredFrom: version, ct);
         }
 
         public async Task<IServiceResult> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default)
@@ -337,12 +348,15 @@ namespace EchoPhase.Server.Services.Workflows
         private static BlockProgram Parse(string definition)
             => JsonSerializer.Deserialize<BlockProgram>(definition, BlockParamsBinder.Options) ?? new BlockProgram();
 
-        private WorkflowVersion Snapshot(Workflow workflow, Guid savedBy) => new()
+        private WorkflowVersion Snapshot(Workflow workflow, Guid savedBy, int? parent, int? restoredFrom) => new()
         {
             WorkflowId = workflow.Id,
             Version = workflow.Version,
             Name = workflow.Name,
             Definition = workflow.Definition,
+            ContentHash = workflow.ContentHash,
+            ParentVersion = parent,
+            RestoredFrom = restoredFrom,
             SavedBy = savedBy,
             CreatedAt = _time.GetUtcNow().UtcDateTime
         };

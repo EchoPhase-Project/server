@@ -27,7 +27,8 @@ namespace EchoPhase.Server.Services.Workflows
     /// them. Every <see cref="Interval"/> it reloads triggers and reopens
     /// dropped connections. Single instance, like the scheduler.
     /// </summary>
-    public sealed class DiscordTriggerService : BackgroundService, IDiscordWebSocketSubscriber, IDiscordGatewayObserver
+    public sealed class DiscordTriggerService : BackgroundService, IDiscordWebSocketSubscriber, IDiscordGatewayObserver,
+        IWorkflowTriggerReloader
     {
         public static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
 

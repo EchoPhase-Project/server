@@ -52,6 +52,9 @@ namespace EchoPhase.DAL.Postgres.Repositories
                     WorkflowId = v.WorkflowId,
                     Version = v.Version,
                     Name = v.Name,
+                    ContentHash = v.ContentHash,
+                    ParentVersion = v.ParentVersion,
+                    RestoredFrom = v.RestoredFrom,
                     SavedBy = v.SavedBy,
                     CreatedAt = v.CreatedAt
                 })
@@ -61,12 +64,18 @@ namespace EchoPhase.DAL.Postgres.Repositories
             => _context.WorkflowVersions.FirstOrDefaultAsync(v => v.WorkflowId == workflowId && v.Version == version, ct);
 
         /// <summary>Deletes all but the newest <paramref name="keep"/> versions.</summary>
-        public Task<int> PruneVersionsAsync(Guid workflowId, int keep, CancellationToken ct = default)
-            => _context.WorkflowVersions
+        public async Task<int> PruneVersionsAsync(Guid workflowId, int keep, CancellationToken ct = default)
+        {
+            // A save adds one version, so there are a few at most to delete.
+            var old = await _context.WorkflowVersions
                 .Where(v => v.WorkflowId == workflowId)
                 .OrderByDescending(v => v.Version)
                 .Skip(keep)
-                .ExecuteDeleteAsync(ct);
+                .ToListAsync(ct);
+            _context.WorkflowVersions.RemoveRange(old);
+            await _context.SaveChangesAsync(ct);
+            return old.Count;
+        }
 
         public void RemoveSchedule(WorkflowSchedule schedule) => _context.WorkflowSchedules.Remove(schedule);
 
