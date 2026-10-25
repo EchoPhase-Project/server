@@ -209,7 +209,7 @@ namespace EchoPhase.Server.Extensions
                     .WithExample(new[] { "migrate", "--status" });
 
                 config.AddCommand<Commands.Prune.PruneCommand>("prune")
-                    .WithDescription("Delete idle sessions, old rotated tokens and long-ended impersonations and grants")
+                    .WithDescription("Delete idle sessions, old rotated tokens, long-ended impersonations and grants, unfinished uploads and stored objects without a file")
                     .WithExample(new[] { "prune", "--dry-run" })
                     .WithExample(new[] { "prune", "--older-than", "30d" });
 
