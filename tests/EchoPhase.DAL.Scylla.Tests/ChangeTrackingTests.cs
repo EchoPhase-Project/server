@@ -144,5 +144,28 @@ namespace EchoPhase.DAL.Scylla.Tests
             profile.Name = "ignored";
             Assert.Equal(0, await db.SaveChangesAsync(Ct));
         }
+
+        [Fact]
+        public async Task SavingChanges_SeesTheEntities_AndItsChangesAreSaved()
+        {
+            using var db = Context();
+            var seen = new List<EntityState>();
+            db.Database.SavingChanges += entries =>
+            {
+                foreach (var (entity, state) in entries)
+                {
+                    seen.Add(state);
+                    ((Profile)entity).Bio = "audited";
+                }
+            };
+            var profile = await db.Profiles.Where(p => p.Id == _id).FirstAsync(Ct);
+
+            profile.Name = "Anna";
+            await db.SaveChangesAsync(Ct);
+
+            Assert.Equal([EntityState.Modified], seen);
+            using var other = Context();
+            Assert.Equal("audited", (await other.Profiles.Where(p => p.Id == _id).FirstAsync(Ct)).Bio);
+        }
     }
 }

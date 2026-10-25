@@ -201,7 +201,10 @@ namespace EchoPhase.DAL.Scylla.Database
         {
             foreach (var tracked in _changeTracker.Values)
             {
-                if (tracked.State != EntityState.Unchanged || tracked.Original is null)
+                // Unchanged, or found changed before (its set may have grown since).
+                var detected = tracked.State == EntityState.Unchanged
+                               || (tracked.State == EntityState.Modified && tracked.Changed is not null);
+                if (!detected || tracked.Original is null)
                     continue;
                 var builder = GetBuilder(tracked.EntityType);
                 var changed = tracked.Original
@@ -403,16 +406,35 @@ namespace EchoPhase.DAL.Scylla.Database
         private ISaveStrategy StrategyFor(Batch? batch)
             => batch != null ? _batchStrategy : _directStrategy;
 
+        /// <summary>
+        /// Raised by SaveChanges before anything is written, with the entities
+        /// about to be (like EF's SavingChanges / SaveChangesInterceptor): set
+        /// audit fields, check invariants. Changes made to the entities here are
+        /// saved; throwing cancels the save.
+        /// </summary>
+        public event Action<IReadOnlyList<(object Entity, EntityState State)>>? SavingChanges;
+
         private List<(TrackedEntity Entity, int Version)> TakeSnapshot()
         {
+            List<TrackedEntity> pending;
             lock (_sync)
             {
                 DetectChanges();
+                pending = _changeTracker.Values.Where(t => t.State != EntityState.Unchanged).ToList();
+            }
+
+            if (pending.Count > 0 && SavingChanges is { } saving)
+            {
+                saving(pending.Select(t => (t.Entity, t.State)).ToList());
+                lock (_sync)
+                    DetectChanges(); // what the handlers changed on loaded entities
+            }
+
+            lock (_sync)
                 return _changeTracker.Values
                     .Where(t => t.State != EntityState.Unchanged)
                     .Select(t => (t, t.Version))
                     .ToList();
-            }
         }
 
         /// <summary>
