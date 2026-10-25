@@ -48,6 +48,16 @@ namespace EchoPhase.DAL.Scylla.Builders
             return this;
         }
 
+        /// <summary>Stores the property through <paramref name="converter"/> (see <see cref="Models.ValueConverters"/>).</summary>
+        public PropertyBuilder<TEntity, TProp> HasConversion(Models.ValueConverter converter)
+        {
+            if (converter.ModelType != Nullable.GetUnderlyingType(typeof(TProp)) && converter.ModelType != typeof(TProp))
+                throw new InvalidOperationException(
+                    $"A converter of {converter.ModelType.Name} cannot store {typeof(TEntity).Name}.{_propertyName} ({typeof(TProp).Name}).");
+            _entityBuilder.SetConverter(_propertyName, converter);
+            return this;
+        }
+
         public EntityBuilder<TEntity> And() => _entityBuilder;
     }
 }

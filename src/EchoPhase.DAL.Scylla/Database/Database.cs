@@ -233,8 +233,8 @@ namespace EchoPhase.DAL.Scylla.Database
         private static object? Copy(object? value) => value switch
         {
             null or string => value,
-            System.Collections.IDictionary map => map.Cast<System.Collections.DictionaryEntry>()
-                .Select(e => new KeyValuePair<object, object?>(e.Key, e.Value)).ToList(),
+            System.Collections.IDictionary map => map.Keys.Cast<object>()
+                .Select(key => new KeyValuePair<object, object?>(key, map[key])).ToList(),
             System.Collections.IEnumerable items => items.Cast<object?>().ToList(),
             _ => value,
         };

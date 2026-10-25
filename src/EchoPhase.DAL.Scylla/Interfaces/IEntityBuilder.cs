@@ -40,6 +40,12 @@ namespace EchoPhase.DAL.Scylla.Interfaces
         /// and renewed by it; null when the entity has none.
         /// </summary>
         string? ConcurrencyToken { get; }
+
+        /// <summary>How the property is stored, when not as itself (HasConversion); null otherwise.</summary>
+        Models.ValueConverter? GetConverter(string propertyName);
+
+        /// <summary>A property's value as its column holds it (through its converter, if any).</summary>
+        object? ToProvider(string propertyName, object? value) => GetConverter(propertyName) is { } c ? c.ToProvider(value) : value;
         void Validate();
     }
 }

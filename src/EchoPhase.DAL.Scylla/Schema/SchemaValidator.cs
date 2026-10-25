@@ -82,6 +82,7 @@ namespace EchoPhase.DAL.Scylla.Schema
                 }
 
                 var clrType = builder.GetColumnType(property)
+                              ?? builder.GetConverter(property)?.ProviderType
                               ?? builder.EntityType.GetProperty(property, BindingFlags.Public | BindingFlags.Instance)?.PropertyType;
 
                 if (clrType is not null && !CqlTypeMap.IsCompatible(clrType, liveColumn.Type))

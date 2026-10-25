@@ -60,6 +60,14 @@ namespace EchoPhase.DAL.Scylla.Builders
 
         public string? ConcurrencyToken { get; private set; }
 
+        private readonly Dictionary<string, Models.ValueConverter> _converters = new(StringComparer.Ordinal);
+
+        public Models.ValueConverter? GetConverter(string propertyName)
+            => _converters.TryGetValue(propertyName, out var converter) ? converter : null;
+
+        internal void SetConverter(string propertyName, Models.ValueConverter converter)
+            => _converters[propertyName] = converter;
+
         internal void SetConcurrencyToken(string propertyName, Type type)
         {
             if (type != typeof(Guid) && type != typeof(int) && type != typeof(long))

@@ -29,7 +29,9 @@ namespace EchoPhase.DAL.Scylla.Database
                 object? value;
                 try
                 {
-                    value = row.GetValue(prop.PropertyType, columnName);
+                    value = builder.GetConverter(prop.Name) is { } converter
+                        ? converter.FromProvider(row.GetValue(converter.ProviderType, columnName))
+                        : row.GetValue(prop.PropertyType, columnName);
                 }
                 catch (Exception ex)
                 {

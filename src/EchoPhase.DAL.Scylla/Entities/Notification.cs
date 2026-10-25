@@ -26,8 +26,8 @@ namespace EchoPhase.DAL.Scylla.Entities
         /// <summary>A path in the app to open (/notes/…), or empty.</summary>
         public string Link { get; set; } = string.Empty;
 
-        /// <summary>The kind's values (JSON object of strings), for the client's wording.</summary>
-        public string Params { get; set; } = "{}";
+        /// <summary>The kind's values, for the client's wording (stored as JSON).</summary>
+        public Dictionary<string, string> Params { get; set; } = [];
 
         public bool Read { get; set; }
 

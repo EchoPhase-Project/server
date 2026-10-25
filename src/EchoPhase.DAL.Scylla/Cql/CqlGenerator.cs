@@ -89,7 +89,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             IReadOnlyDictionary<string, object?>? overrides, WriteCondition? condition)
         {
             var pkNames = ValidatePrimaryKey(builder, entity.GetType());
-            GetPrimaryKeyValues(entity, pkNames);
+            GetPrimaryKeyValues(entity, pkNames, builder);
             if (condition is { IfExists: true } or { Checks.Count: > 0 })
                 throw new InvalidOperationException("An INSERT can only be conditional on the row not existing (IF NOT EXISTS).");
 
@@ -97,7 +97,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             var columns = props.Select(p => builder.GetColumn(p.Name)).ToList();
             var placeholders = Enumerable.Repeat("?", columns.Count);
 
-            var values = new List<object>(props.Select(p => ValueOf(p, entity, overrides)));
+            var values = new List<object>(props.Select(p => ValueOf(p, entity, overrides, builder)));
             var (usingClause, usingValues) = BuildUsing(options, allowTtl: true, conditional: condition is not null);
             values.AddRange(usingValues);
 
@@ -139,8 +139,8 @@ namespace EchoPhase.DAL.Scylla.Cql
 
             // Bind markers are positional: USING comes before SET in the text.
             var values = new List<object>(usingValues);
-            values.AddRange(props.Select(p => cleared?.Contains(p.Name) == true ? null! : ValueOf(p, entity, overrides)));
-            values.AddRange(GetPrimaryKeyValues(entity, pkNames));
+            values.AddRange(props.Select(p => cleared?.Contains(p.Name) == true ? null! : ValueOf(p, entity, overrides, builder)));
+            values.AddRange(GetPrimaryKeyValues(entity, pkNames, builder));
 
             var setClauses = props.Select(p => $"{builder.GetColumn(p.Name)} = ?");
             var cql = $"UPDATE {builder.GetFullTableName()}{usingClause} " +
@@ -163,7 +163,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             var (usingClause, usingValues) = BuildUsing(options, allowTtl: false, conditional: condition is not null);
 
             var values = new List<object>(usingValues);
-            values.AddRange(GetPrimaryKeyValues(entity, pkNames));
+            values.AddRange(GetPrimaryKeyValues(entity, pkNames, builder));
 
             var cql = $"DELETE FROM {builder.GetFullTableName()}{usingClause} WHERE {BuildWhereClause(builder, pkNames)}" +
                       IfClause(condition, builder, values);
@@ -186,7 +186,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             {
                 if (!ConditionOperators.Contains(check.Operator))
                     throw new InvalidOperationException($"Unsupported condition operator '{check.Operator}'.");
-                values.Add(check.Value!);
+                values.Add(builder.ToProvider(check.Property, check.Value)!);
                 return $"{builder.GetColumn(check.Property)} {check.Operator} ?";
             });
             return $" IF {string.Join(" AND ", parts)}";
@@ -208,7 +208,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             var (usingClause, usingValues) = BuildUsing(options, allowTtl: false, conditional: false);
 
             var values = new List<object>(usingValues);
-            values.AddRange(GetPrimaryKeyValues(entity, pkNames));
+            values.AddRange(GetPrimaryKeyValues(entity, pkNames, builder));
 
             var columns = properties.Select(builder.GetColumn);
             var cql = $"DELETE {string.Join(", ", columns)} FROM {builder.GetFullTableName()}{usingClause} " +
@@ -258,8 +258,10 @@ namespace EchoPhase.DAL.Scylla.Cql
         }
 
         // Unset leaves null columns untouched instead of writing tombstones.
-        private static object ValueOf(PropertyInfo property, object entity, IReadOnlyDictionary<string, object?>? overrides)
-            => (overrides is not null && overrides.TryGetValue(property.Name, out var value) ? value : property.GetValue(entity))
+        private static object ValueOf(PropertyInfo property, object entity, IReadOnlyDictionary<string, object?>? overrides,
+            IEntityBuilder builder)
+            => builder.ToProvider(property.Name,
+                   overrides is not null && overrides.TryGetValue(property.Name, out var value) ? value : property.GetValue(entity))
                ?? Unset.Value;
 
         private static List<PropertyInfo> GetMappedProperties(Type type, IEntityBuilder builder) =>
@@ -280,7 +282,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             return pkNames;
         }
 
-        private static object[] GetPrimaryKeyValues(object entity, IReadOnlyList<string> pkNames)
+        private static object[] GetPrimaryKeyValues(object entity, IReadOnlyList<string> pkNames, IEntityBuilder builder)
         {
             var type = entity.GetType();
 
@@ -289,7 +291,7 @@ namespace EchoPhase.DAL.Scylla.Cql
                 var prop = type.GetProperty(pk, BindingFlags.Public | BindingFlags.Instance)
                     ?? throw new InvalidOperationException($"Primary key property {pk} not found");
 
-                return prop.GetValue(entity)
+                return builder.ToProvider(pk, prop.GetValue(entity))
                     ?? throw new InvalidOperationException($"Primary key property {pk} of {type.Name} is null");
             }).ToArray();
         }

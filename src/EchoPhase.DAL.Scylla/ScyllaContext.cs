@@ -4,6 +4,7 @@
 using EchoPhase.DAL.Scylla.Builders;
 using EchoPhase.DAL.Scylla.Database;
 using EchoPhase.DAL.Scylla.Entities;
+using EchoPhase.DAL.Scylla.Models;
 
 namespace EchoPhase.DAL.Scylla
 {
@@ -84,6 +85,8 @@ namespace EchoPhase.DAL.Scylla
                 [nameof(Notification.Read)] = "read",
                 [nameof(Notification.CreatedAt)] = "created_at",
             });
+            builder.Entity<Notification>().Property(x => x.Params)
+                .HasConversion(ValueConverters.Json<Dictionary<string, string>>());
         }
 
         private static void Columns<TEntity>(EntityBuilder<TEntity> entity, Dictionary<string, string> columns)

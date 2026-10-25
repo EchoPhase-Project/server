@@ -1,7 +1,6 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Text.Json;
 using EchoPhase.Configuration.Notifications;
 using EchoPhase.DAL.Scylla.Entities;
 using EchoPhase.Types.Result;
@@ -51,7 +50,7 @@ namespace EchoPhase.Notifications
                 Title = Cut(message.Title, NotificationMessage.MaxTitleLength),
                 Body = Cut(message.Body, NotificationMessage.MaxBodyLength),
                 Link = SafeLink(message.Link),
-                Params = JsonSerializer.Serialize(message.Params ?? new Dictionary<string, string>()),
+                Params = new Dictionary<string, string>(message.Params ?? new Dictionary<string, string>()),
                 CreatedAt = now,
             };
             await _store.SaveAsync(notification, _options.Ttl, ct);

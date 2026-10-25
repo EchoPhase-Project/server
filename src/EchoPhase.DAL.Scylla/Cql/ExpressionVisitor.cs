@@ -339,10 +339,31 @@ namespace EchoPhase.DAL.Scylla.Cql
         private void AddClause(string column, string op, object value, Restriction restriction)
         {
             _where.Add($"{column} {op} ?");
-            _parameters.Add(value);
+            _parameters.Add(value is IList list && op == "IN" ? ConvertList(column, list) : Provider(column, value)!);
 
             if (!_restrictions.TryGetValue(column, out var existing) || existing == Restriction.Range)
                 _restrictions[column] = restriction;
+        }
+
+        // A value compared with a column, as the column holds it (its property's converter).
+        private object? Provider(string column, object? value)
+        {
+            var property = PropertyOf(column);
+            return property is null ? value : Builder.ToProvider(property, value);
+        }
+
+        private string? PropertyOf(string column)
+            => Builder.GetMappedProperties().FirstOrDefault(p => Builder.GetColumn(p) == column);
+
+        private IList ConvertList(string column, IList values)
+        {
+            var property = PropertyOf(column);
+            if (property is null || Builder.GetConverter(property) is not { } converter)
+                return values;
+            var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(converter.ProviderType))!;
+            foreach (var value in values)
+                list.Add(converter.ToProvider(value));
+            return list;
         }
 
         private static string? ToCqlOperator(ExpressionType type) =>
