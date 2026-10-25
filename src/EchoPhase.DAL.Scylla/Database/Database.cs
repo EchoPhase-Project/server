@@ -31,6 +31,7 @@ namespace EchoPhase.DAL.Scylla.Database
 
         private readonly object _sync = new();
         private readonly Dictionary<object, TrackedEntity> _changeTracker = new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<(Type, string), object> _identities = new();
         private readonly Dictionary<Type, IEntityBuilder> _builderCache = new();
         private readonly Stack<Batch> _activeBatches = new();
 
@@ -138,6 +139,8 @@ namespace EchoPhase.DAL.Scylla.Database
                 {
                     tracked.State = state;
                     tracked.Options = options ?? tracked.Options;
+                    // An explicit Update writes the whole entity.
+                    tracked.Changed = null;
                 }
                 else
                 {
@@ -146,13 +149,140 @@ namespace EchoPhase.DAL.Scylla.Database
             }
         }
 
+        #region Tracking
+
+        /// <summary>
+        /// Loaded entities, identity-resolved: a row already tracked by this
+        /// context comes back as the instance it has (its values kept, as EF
+        /// does); a new one is tracked with a snapshot, so changes to it are
+        /// found and saved by the next SaveChanges.
+        /// </summary>
+        internal List<T> AttachAll<T>(List<T> loaded)
+        {
+            var builder = ModelBuilder.GetBuilder(typeof(T));
+            if (builder is null)
+                return loaded;
+
+            lock (_sync)
+            {
+                for (var i = 0; i < loaded.Count; i++)
+                {
+                    var entity = loaded[i];
+                    if (entity is null)
+                        continue;
+                    var identity = (typeof(T), KeyOf(entity, builder));
+                    if (_identities.TryGetValue(identity, out var existing))
+                    {
+                        loaded[i] = (T)existing;
+                        continue;
+                    }
+                    _identities[identity] = entity;
+                    _changeTracker[entity] = new TrackedEntity(typeof(T), entity, EntityState.Unchanged)
+                    {
+                        Original = Snapshot(entity, builder),
+                    };
+                }
+            }
+            return loaded;
+        }
+
+        /// <summary>Entities tracked now and their state (Added, Modified, Deleted, Unchanged).</summary>
+        public IReadOnlyList<(object Entity, EntityState State)> Entries()
+        {
+            lock (_sync)
+            {
+                DetectChanges();
+                return _changeTracker.Values.Select(t => (t.Entity, t.State)).ToList();
+            }
+        }
+
+        // Loaded entities changed since their snapshot become Modified, with only those properties.
+        private void DetectChanges()
+        {
+            foreach (var tracked in _changeTracker.Values)
+            {
+                if (tracked.State != EntityState.Unchanged || tracked.Original is null)
+                    continue;
+                var builder = GetBuilder(tracked.EntityType);
+                var changed = tracked.Original
+                    .Where(o => !builder.GetPrimaryKey().Contains(o.Key)
+                                && !Same(o.Value, tracked.EntityType.GetProperty(o.Key)!.GetValue(tracked.Entity)))
+                    .Select(o => o.Key)
+                    .ToHashSet(StringComparer.Ordinal);
+                if (changed.Count == 0)
+                    continue;
+                tracked.State = EntityState.Modified;
+                tracked.Changed = changed;
+            }
+        }
+
+        private static Dictionary<string, object?> Snapshot(object entity, IEntityBuilder builder)
+        {
+            var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var name in builder.GetMappedProperties().Concat(builder.GetPrimaryKey()).Distinct())
+            {
+                var property = entity.GetType().GetProperty(name);
+                if (property is not { CanRead: true })
+                    continue;
+                values[name] = Copy(property.GetValue(entity));
+            }
+            return values;
+        }
+
+        // Collections are copied, so changing one in place is seen as a change.
+        private static object? Copy(object? value) => value switch
+        {
+            null or string => value,
+            System.Collections.IDictionary map => map.Cast<System.Collections.DictionaryEntry>()
+                .Select(e => new KeyValuePair<object, object?>(e.Key, e.Value)).ToList(),
+            System.Collections.IEnumerable items => items.Cast<object?>().ToList(),
+            _ => value,
+        };
+
+        private static bool Same(object? original, object? current)
+        {
+            var copy = Copy(current);
+            return (original, copy) switch
+            {
+                (null, null) => true,
+                (null, _) or (_, null) => false,
+                (List<KeyValuePair<object, object?>> a, List<KeyValuePair<object, object?>> b) => a.SequenceEqual(b),
+                (List<object?> a, List<object?> b) => a.SequenceEqual(b),
+                _ => original.Equals(copy),
+            };
+        }
+
+        private static string KeyOf(object entity, IEntityBuilder builder)
+            => string.Join('\u001f', builder.GetPrimaryKey().Select(name => entity.GetType().GetProperty(name)!.GetValue(entity) switch
+            {
+                null => "\u0000",
+                DateTimeOffset moment => moment.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+                var value => value.ToString(),
+            }));
+
+        #endregion
+
         /// <summary>Stops tracking the entity: its pending change is dropped (e.g. after a conflict).</summary>
         public void Detach<T>(T entity)
         {
             if (entity is null)
                 throw new ArgumentNullException(nameof(entity));
             lock (_sync)
-                _changeTracker.Remove(entity);
+            {
+                if (_changeTracker.Remove(entity, out var tracked))
+                    ForgetIdentity(tracked);
+            }
+        }
+
+        private void ForgetIdentity(TrackedEntity tracked)
+        {
+            var builder = ModelBuilder.GetBuilder(tracked.EntityType);
+            if (builder is null)
+                return;
+            var key = (tracked.EntityType, KeyOf(tracked.Entity, builder));
+            if (_identities.TryGetValue(key, out var known) && ReferenceEquals(known, tracked.Entity))
+                _identities.Remove(key);
         }
 
         /// <summary>
@@ -276,10 +406,13 @@ namespace EchoPhase.DAL.Scylla.Database
         private List<(TrackedEntity Entity, int Version)> TakeSnapshot()
         {
             lock (_sync)
+            {
+                DetectChanges();
                 return _changeTracker.Values
                     .Where(t => t.State != EntityState.Unchanged)
                     .Select(t => (t, t.Version))
                     .ToList();
+            }
         }
 
         /// <summary>
@@ -293,8 +426,24 @@ namespace EchoPhase.DAL.Scylla.Database
             {
                 foreach (var (tracked, version) in snapshot)
                 {
-                    if (tracked.Version == version && !tracked.Conflicted)
+                    if (tracked.Version != version || tracked.Conflicted)
+                        continue;
+                    if (tracked.State == EntityState.Deleted)
+                    {
                         _changeTracker.Remove(tracked.Entity);
+                        ForgetIdentity(tracked);
+                        continue;
+                    }
+
+                    // Saved: tracked on as unchanged, from the values just written.
+                    var builder = GetBuilder(tracked.EntityType);
+                    tracked.State = EntityState.Unchanged;
+                    tracked.Original = Snapshot(tracked.Entity, builder);
+                    tracked.Changed = null;
+                    tracked.Options = null;
+                    tracked.Condition = null;
+                    tracked.ClearedColumns.Clear();
+                    _identities[(tracked.EntityType, KeyOf(tracked.Entity, builder))] = tracked.Entity;
                 }
             }
         }

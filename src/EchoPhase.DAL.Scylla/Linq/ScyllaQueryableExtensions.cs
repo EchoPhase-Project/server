@@ -17,6 +17,23 @@ namespace EchoPhase.DAL.Scylla.Linq
         internal static readonly MethodInfo AllowFilteringMethod =
             typeof(ScyllaQueryableExtensions).GetMethod(nameof(AllowFiltering))!;
 
+        internal static readonly MethodInfo AsNoTrackingMethod =
+            typeof(ScyllaQueryableExtensions).GetMethod(nameof(AsNoTracking))!;
+
+        /// <summary>
+        /// Returns fresh, untracked entities: changes to them are not saved
+        /// unless passed to Update. For reads only (lists, exports): no
+        /// snapshot is kept, and repeated reads are not identity-resolved.
+        /// </summary>
+        public static IQueryable<T> AsNoTracking<T>(this IQueryable<T> source)
+        {
+            if (source.Provider is not QueryProvider)
+                return source;
+
+            return source.Provider.CreateQuery<T>(
+                Expression.Call(null, AsNoTrackingMethod.MakeGenericMethod(typeof(T)), source.Expression));
+        }
+
         /// <summary>
         /// Lets the query use <c>ALLOW FILTERING</c>, i.e. scan rows that the key
         /// does not narrow down. Without it such queries are rejected, so a full

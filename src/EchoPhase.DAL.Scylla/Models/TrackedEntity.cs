@@ -45,6 +45,16 @@ namespace EchoPhase.DAL.Scylla.Models
         /// <summary>The save's conditional write did not apply.</summary>
         internal bool Conflicted { get; set; }
 
+        /// <summary>The values it was read (or last saved) with; null for an entity never loaded or saved.</summary>
+        internal Dictionary<string, object?>? Original { get; set; }
+
+        /// <summary>
+        /// The properties found changed since <see cref="Original"/>: only these
+        /// are written, and null among them clears the stored value. Null when
+        /// the whole entity is written (Add, Update).
+        /// </summary>
+        internal HashSet<string>? Changed { get; set; }
+
         /// <summary>
         /// Properties whose stored values should be deleted. Separate from null
         /// values, which mean "leave unchanged" on both insert and update.

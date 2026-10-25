@@ -51,6 +51,9 @@ namespace EchoPhase.DAL.Scylla.Cql
             get; private set;
         }
 
+        /// <summary>Whole entities, to be tracked: no Select, no AsNoTracking.</summary>
+        public bool ReturnsTrackedEntities { get => _selector == null && !field; private set; }
+
         private IEntityBuilder Builder
         {
             get => field ?? throw new InvalidOperationException("Query root must be a DbSet");
@@ -105,6 +108,14 @@ namespace EchoPhase.DAL.Scylla.Cql
             {
                 Visit(node.Arguments[0]);
                 _filteringAllowed = true;
+                return node;
+            }
+
+            if (node.Method.IsGenericMethod
+                && node.Method.GetGenericMethodDefinition() == Linq.ScyllaQueryableExtensions.AsNoTrackingMethod)
+            {
+                Visit(node.Arguments[0]);
+                ReturnsTrackedEntities = true;
                 return node;
             }
 

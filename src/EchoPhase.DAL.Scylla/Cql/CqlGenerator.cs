@@ -30,6 +30,15 @@ namespace EchoPhase.DAL.Scylla.Cql
                 case EntityState.Added:
                     statements.Add(GenerateInsert(tracked.Entity, builder, tracked.Options, overrides, condition));
                     break;
+                case EntityState.Modified when tracked.Changed is { Count: > 0 } changed:
+                    // Found changed: only those properties; null among them clears.
+                    var unchanged = builder.GetMappedProperties()
+                        .Where(p => !changed.Contains(p) && p != builder.ConcurrencyToken).ToHashSet();
+                    var nulls = changed.Where(p => tracked.EntityType.GetProperty(p)?.GetValue(tracked.Entity) is null)
+                        .Concat(tracked.ClearedColumns).ToHashSet();
+                    statements.Add(GenerateUpdate(tracked.Entity, builder, tracked.Options, excluded: unchanged,
+                        cleared: nulls, overrides, condition));
+                    return statements;
                 case EntityState.Modified when condition is not null:
                     // One conditional statement: cleared columns are set to null in it.
                     statements.Add(GenerateUpdate(tracked.Entity, builder, tracked.Options, excluded: null,

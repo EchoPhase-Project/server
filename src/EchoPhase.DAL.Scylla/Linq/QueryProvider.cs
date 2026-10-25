@@ -120,7 +120,8 @@ namespace EchoPhase.DAL.Scylla.Linq
                 return new List<T>();
 
             // LINQ produces plain SELECTs, which are always safe to retry.
-            return Database.Executor.Execute(cql, visitor.Projector, visitor.Parameters, idempotent: true).ToList();
+            var rows = Database.Executor.Execute(cql, visitor.Projector, visitor.Parameters, idempotent: true).ToList();
+            return visitor.ReturnsTrackedEntities ? Database.AttachAll(rows) : rows;
         }
 
         internal async Task<List<T>> ExecuteSequenceAsync<T>(Expression expression, CancellationToken ct)
@@ -131,8 +132,8 @@ namespace EchoPhase.DAL.Scylla.Linq
             if (visitor.Limit == 0)
                 return new List<T>();
 
-            var rows = await Database.Executor.ExecuteAsync(cql, visitor.Projector, visitor.Parameters, idempotent: true, ct);
-            return rows.ToList();
+            var rows = (await Database.Executor.ExecuteAsync(cql, visitor.Projector, visitor.Parameters, idempotent: true, ct)).ToList();
+            return visitor.ReturnsTrackedEntities ? Database.AttachAll(rows) : rows;
         }
 
         internal async Task<long> CountAsync<T>(Expression expression, CancellationToken ct)
@@ -147,7 +148,7 @@ namespace EchoPhase.DAL.Scylla.Linq
             return visitor.Limit.HasValue ? Math.Min(count, visitor.Limit.Value) : count;
         }
 
-        internal Task<ScyllaPage<T>> ExecutePageAsync<T>(
+        internal async Task<ScyllaPage<T>> ExecutePageAsync<T>(
             Expression expression, int pageSize, byte[]? pagingState, CancellationToken ct)
         {
             var visitor = new ExpressionVisitor<T>(Database.GetBuilder);
@@ -156,7 +157,8 @@ namespace EchoPhase.DAL.Scylla.Linq
             if (visitor.Limit.HasValue)
                 throw new NotSupportedException("ToPageAsync() pages through all matching rows; remove Take() and use pageSize.");
 
-            return Database.Executor.ExecutePageAsync(cql, visitor.Projector, visitor.Parameters, pageSize, pagingState, idempotent: true, ct);
+            var page = await Database.Executor.ExecutePageAsync(cql, visitor.Projector, visitor.Parameters, pageSize, pagingState, idempotent: true, ct);
+            return visitor.ReturnsTrackedEntities ? page with { Items = Database.AttachAll(page.Items.ToList()) } : page;
         }
 
         private static Type GetElementType(Type sequenceType)
