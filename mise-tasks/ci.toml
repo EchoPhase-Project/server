@@ -56,3 +56,27 @@ fi
 echo "$out"
 echo "$WOODPECKER_SERVER/repos"
 '''
+
+# GitOps release: commit the image tag to EchoPhase-Project/deploy, from which
+# Flux upgrades the release. Used by the release step of .woodpecker/release.yaml.
+["release:push"]
+description = "Release the image: commit its tag to EchoPhase-Project/deploy (needs DEPLOY_KEY)"
+usage = 'flag "--tag <tag>" help="Image tag (default: the one in .image-tag)"'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+: "${DEPLOY_KEY:?DEPLOY_KEY (the write deploy key of EchoPhase-Project/deploy) is not set}"
+tag=${usage_tag:-$(cat .image-tag)}
+# The key lives in a temporary directory, gone when this ends; ~/.ssh is untouched.
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+printf '%s\n' "$DEPLOY_KEY" > "$work/key"
+chmod 600 "$work/key"
+# GitHub's published host key (api.github.com/meta), not ssh-keyscan.
+echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > "$work/known_hosts"
+export GIT_SSH_COMMAND="ssh -i $work/key -o IdentitiesOnly=yes -o UserKnownHostsFile=$work/known_hosts"
+git clone -q --depth 1 git@github.com:EchoPhase-Project/deploy.git "$work/deploy"
+cd "$work/deploy"
+mise run release:bump --component server --tag "$tag" --push
+'''
+

@@ -95,10 +95,4 @@ steps:
       GIT_COMMITTER_NAME: Woodpecker CI
       GIT_COMMITTER_EMAIL: ci@echophase.invalid
     commands:
-      - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-      - printf '%s\n' "$${DEPLOY_KEY}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
-      # GitHub's published host key (api.github.com/meta), not ssh-keyscan.
-      - echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > ~/.ssh/known_hosts
-      - git clone -q --depth 1 git@github.com:EchoPhase-Project/deploy.git /tmp/deploy
-      - TAG=$(cat .image-tag)
-      - cd /tmp/deploy && mise run release:bump --component server --tag "$${TAG}" --push
+      - mise run release:push
