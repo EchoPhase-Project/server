@@ -40,6 +40,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Connections
 
         [HttpGet]
         [RequirePermission(Resources.Connections, Permissions.Read)]
+        [ProducesResponseType<ConnectionSummary[]>(StatusCodes.Status200OK)]
         public async Task<IActionResult> List([FromQuery] string? provider, CancellationToken ct = default)
             => Ok(await _connections.ListAsync(User.GetUserId(), provider, ct));
 

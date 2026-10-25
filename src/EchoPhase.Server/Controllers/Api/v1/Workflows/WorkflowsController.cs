@@ -19,6 +19,27 @@ using Microsoft.Net.Http.Headers;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Workflows
 {
+    /// <param name="PackageId">The package it was installed from (it may be gone since).</param>
+    /// <param name="Version">That package's version.</param>
+    /// <param name="Key">Which of the package's workflows it is a copy of.</param>
+    public sealed record WorkflowSourceResponse(Guid PackageId, int? Version, Guid? Key);
+
+    /// <param name="Id">The workflow's id.</param>
+    /// <param name="Name">Its name.</param>
+    /// <param name="Active">Its triggers start runs.</param>
+    /// <param name="Version">Bumped on every change of its program.</param>
+    /// <param name="ContentHash">SHA-256 of its program; null until a workflow saved before hashes is saved again.</param>
+    /// <param name="Source">Where it was installed from; null: made here.</param>
+    /// <param name="CreatedAt">When it was created.</param>
+    /// <param name="UpdatedAt">When it last changed.</param>
+    public sealed record WorkflowSummaryResponse(Guid Id, string Name, bool Active, int Version, string? ContentHash,
+        WorkflowSourceResponse? Source, DateTime CreatedAt, DateTime UpdatedAt)
+    {
+        public static WorkflowSummaryResponse From(Workflow w) => new(w.Id, w.Name, w.Active, w.Version, w.ContentHash,
+            w.SourcePackageId is { } package ? new WorkflowSourceResponse(package, w.SourcePackageVersion, w.SourceKey) : null,
+            w.CreatedAt, w.UpdatedAt);
+    }
+
     /// <summary>
     /// Saved block programs. Runs of them are listed and fetched with the
     /// other runs (api/v1/blocks/runs); their webhooks are api/v1/hooks.
@@ -35,10 +56,11 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
 
         [HttpGet]
         [RequirePermission(Resources.Workflows, Permissions.Read)]
+        [ProducesResponseType<WorkflowSummaryResponse[]>(StatusCodes.Status200OK)]
         public async Task<IActionResult> List(CancellationToken ct = default)
         {
             var workflows = await _workflows.ListAsync(User.GetUserId(), ct);
-            return Ok(workflows.Select(Summary));
+            return Ok(workflows.Select(WorkflowSummaryResponse.From));
         }
 
         [HttpGet("{id:guid}")]
@@ -218,20 +240,6 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             var result = await _workflows.RestoreAsync(User.GetUserId(), User.GetActorId(), id, version, dto?.CurrentVersion, ct);
             return result.Successful ? Ok(View(result.Value)) : Failure(result.Error);
         }
-
-        private static object Summary(Workflow w) => new
-        {
-            id = w.Id,
-            name = w.Name,
-            active = w.Active,
-            version = w.Version,
-            contentHash = w.ContentHash,
-            source = w.SourcePackageId is { } package
-                ? new { packageId = package, version = w.SourcePackageVersion, key = w.SourceKey }
-                : null,
-            createdAt = w.CreatedAt,
-            updatedAt = w.UpdatedAt
-        };
 
         private static object View(WorkflowDetails details) => new
         {
