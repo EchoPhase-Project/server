@@ -67,6 +67,15 @@ namespace EchoPhase.Configuration.Extensions
 
             services.AddSingleton<IValidateOptions<Database.DatabaseOptions>, Database.DatabaseValidator>();
 
+            // Object storage: optional; S3_* variables win over the files
+            // (PostConfigure runs after the configuration is bound).
+            services.AddOptions<Storage.S3.S3Options>()
+                .BindConfiguration(Storage.S3.S3Options.SectionName)
+                .PostConfigure(options => Storage.S3.S3Environment.Apply(options, Environment.GetEnvironmentVariable))
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<Storage.S3.S3Options>, Storage.S3.S3Validator>();
+
             services.AddOptions<Configuration.Authentication.AuthenticationOptions>()
                 .BindConfiguration(Configuration.Authentication.AuthenticationOptions.SectionName)
                 .ValidateDataAnnotations()

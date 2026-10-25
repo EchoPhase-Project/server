@@ -138,7 +138,7 @@ can be accepted instead: add its line from the check's output (method, path,
 message) to `openapi.err-ignore`, with the reason, and empty the file after the
 release.
 
-## Databases
+## Databases and object storage
 
 The server needs PostgreSQL, ScyllaDB and Valkey (or Redis). Besides
 `Database:*` in `Configurations/appsettings*.json`, it reads them from the
@@ -154,6 +154,16 @@ environment, as containers and the Helm chart set them:
 
 An unknown `POSTGRES_SSL_MODE` stops the server at start with the accepted
 values.
+
+Object storage for files is optional: any S3-compatible service (SeaweedFS,
+AWS S3, Cloudflare R2, Garage, Ceph RGW), from `Storage:S3` or:
+
+| Variables | What |
+|---|---|
+| `S3_ENDPOINT` | the service's URL; empty: no object storage |
+| `S3_BUCKET`, `S3_REGION` | the bucket (must exist) and the region requests are signed for (default `us-east-1`) |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | the keys, both or neither |
+| `S3_FORCE_PATH_STYLE` | `true` (default, most self-hosted servers) or `false` (bucket in the host name, as AWS prefers) |
 
 ## Telemetry
 
