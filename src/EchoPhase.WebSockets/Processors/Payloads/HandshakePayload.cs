@@ -16,6 +16,18 @@ namespace EchoPhase.WebSockets.Processors.Payloads
             get; set;
         }
 
+        /// <summary>
+        /// A shard pool to join (letters, digits, '.', '_', '-'; up to 64):
+        /// each event goes to one connection of the pool, not to all. Omitted:
+        /// shared, every event (or, on a second handshake, the pool stays).
+        /// </summary>
+        public string? ShardPool
+        {
+            get; set;
+        }
+
+        public const int MaxShardPoolLength = 64;
+
         public HandshakePayload()
         {
         }
@@ -29,6 +41,12 @@ namespace EchoPhase.WebSockets.Processors.Payloads
             if (Intents is not null && Intents.Any(string.IsNullOrWhiteSpace))
                 return ValidationResult.Failure(error =>
                     error.Set(nameof(Intents), "Intent names cannot be empty."));
+
+            if (ShardPool is { } pool && (pool.Length is 0 or > MaxShardPoolLength
+                || !pool.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-')))
+                return ValidationResult.Failure(error =>
+                    error.Set(nameof(ShardPool),
+                        $"A shard pool is 1-{MaxShardPoolLength} letters, digits, '.', '_' or '-'."));
 
             return ValidationResult.Success();
         }

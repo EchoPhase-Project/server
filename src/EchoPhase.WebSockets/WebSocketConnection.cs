@@ -46,6 +46,16 @@ namespace EchoPhase.WebSockets
             set => Volatile.Write(ref field, value);
         } = BitMaskBase.Empty;
 
+        /// <summary>
+        /// The shard pool it joined at handshake; null: shared (it gets every
+        /// event of its user). A pool gets each event once, on one member.
+        /// </summary>
+        public string? ShardPool
+        {
+            get => Volatile.Read(ref field);
+            set => Volatile.Write(ref field, value);
+        }
+
         /// <summary>Timestamp (TimeProvider) of the last message from the client.</summary>
         public long LastSeen => Interlocked.Read(ref _lastSeen);
 

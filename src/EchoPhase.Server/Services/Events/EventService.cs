@@ -20,42 +20,24 @@ namespace EchoPhase.Server.Services.Events
             _webHookService = webHookService;
         }
 
-        public async Task SendMessageToAllAsync<T, TS>(T message, HashSet<string> intents, TS shardId, CancellationToken ct = default)
-            where TS : struct
+        public async Task SendMessageToAllAsync<T>(T message, HashSet<string> intents, CancellationToken ct = default,
+            string? shardKey = null)
         {
-            await _webSocketService.BroadcastMessageAsync(message, intents, shardId, ct);
+            await _webSocketService.BroadcastMessageAsync(message, intents, ct, shardKey);
             await _webHookService.SendMessageToAllAsync(message, intents, ct: ct);
         }
 
-        public async Task SendMessageToUsersAsync<T, TS>(HashSet<Guid> userIds, T message, HashSet<string> intents, TS shardId, CancellationToken ct = default)
-            where TS : struct
+        public async Task SendMessageToUsersAsync<T>(HashSet<Guid> userIds, T message, HashSet<string> intents,
+            CancellationToken ct = default, string? shardKey = null)
         {
-            await _webSocketService.SendMessageToUsersAsync(userIds, message, intents, shardId, ct);
+            await _webSocketService.SendMessageToUsersAsync(userIds, message, intents, ct, shardKey);
             await _webHookService.SendMessageToUsersAsync(userIds, message, intents, ct: ct);
         }
 
-        public async Task SendMessageToRolesAsync<T, TS>(HashSet<string> roles, T message, HashSet<string> intents, TS shardId, CancellationToken ct = default)
-            where TS : struct
+        public async Task SendMessageToRolesAsync<T>(HashSet<string> roles, T message, HashSet<string> intents,
+            CancellationToken ct = default, string? shardKey = null)
         {
-            await _webSocketService.SendMessageToRolesAsync(roles, message, intents, shardId, ct);
-            await _webHookService.SendMessageToRolesAsync(roles, message, intents, ct: ct);
-        }
-
-        public async Task SendMessageToAllAsync<T>(T message, HashSet<string> intents, CancellationToken ct = default)
-        {
-            await _webSocketService.BroadcastMessageAsync(message, intents, ct);
-            await _webHookService.SendMessageToAllAsync(message, intents, ct: ct);
-        }
-
-        public async Task SendMessageToUsersAsync<T>(HashSet<Guid> userIds, T message, HashSet<string> intents, CancellationToken ct = default)
-        {
-            await _webSocketService.SendMessageToUsersAsync(userIds, message, intents, ct);
-            await _webHookService.SendMessageToUsersAsync(userIds, message, intents, ct: ct);
-        }
-
-        public async Task SendMessageToRolesAsync<T>(HashSet<string> roles, T message, HashSet<string> intents, CancellationToken ct = default)
-        {
-            await _webSocketService.SendMessageToRolesAsync(roles, message, intents, ct);
+            await _webSocketService.SendMessageToRolesAsync(roles, message, intents, ct, shardKey);
             await _webHookService.SendMessageToRolesAsync(roles, message, intents, ct: ct);
         }
     }

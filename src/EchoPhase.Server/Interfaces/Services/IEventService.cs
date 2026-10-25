@@ -3,18 +3,21 @@
 
 namespace EchoPhase.Server.Interfaces.Services
 {
+    /// <summary>
+    /// Events to users' gateway connections (every replica: shared ones all,
+    /// one member per shard pool) and to their webhooks.
+    /// </summary>
     public interface IEventService
     {
-        Task SendMessageToAllAsync<T, TS>(T message, HashSet<string> intents, TS shardId, CancellationToken ct = default)
-            where TS : struct;
-        Task SendMessageToUsersAsync<T, TS>(HashSet<Guid> userIds, T message, HashSet<string> intents, TS shardId, CancellationToken ct = default)
-            where TS : struct;
-        Task SendMessageToRolesAsync<T, TS>(HashSet<string> roles, T message, HashSet<string> intents, TS shardId, CancellationToken ct = default)
-            where TS : struct;
-        Task SendMessageToAllAsync<T>(T message, HashSet<string> intents, CancellationToken ct = default);
+        /// <param name="shardKey">Picks the member in each shard pool: the same key, the same member while it stays; null: any.</param>
+        Task SendMessageToAllAsync<T>(T message, HashSet<string> intents, CancellationToken ct = default, string? shardKey = null);
 
-        Task SendMessageToUsersAsync<T>(HashSet<Guid> userIds, T message, HashSet<string> intents, CancellationToken ct = default);
+        /// <inheritdoc cref="SendMessageToAllAsync"/>
+        Task SendMessageToUsersAsync<T>(HashSet<Guid> userIds, T message, HashSet<string> intents, CancellationToken ct = default,
+            string? shardKey = null);
 
-        Task SendMessageToRolesAsync<T>(HashSet<string> roles, T message, HashSet<string> intents, CancellationToken ct = default);
+        /// <inheritdoc cref="SendMessageToAllAsync"/>
+        Task SendMessageToRolesAsync<T>(HashSet<string> roles, T message, HashSet<string> intents, CancellationToken ct = default,
+            string? shardKey = null);
     }
 }

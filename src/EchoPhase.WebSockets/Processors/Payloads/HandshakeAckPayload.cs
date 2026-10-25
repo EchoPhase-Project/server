@@ -16,6 +16,12 @@ namespace EchoPhase.WebSockets.Processors.Payloads
         }
         public string[] Intents { get; set; } = Array.Empty<string>();
 
+        /// <summary>The shard pool the connection is in; null: shared.</summary>
+        public string? ShardPool
+        {
+            get; set;
+        }
+
         public HandshakeAckPayload()
         {
         }

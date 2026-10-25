@@ -215,6 +215,7 @@ namespace EchoPhase.Server
             services.AddPostgres();
             services.AddScylla();
             services.AddRedisCache();
+            services.AddRedisGatewayBackplane();
 
             services.AddRoles();
 

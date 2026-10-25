@@ -6,6 +6,7 @@ using EchoPhase.Identity;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
 using EchoPhase.WebSockets;
+using EchoPhase.WebSockets.Cluster;
 using EchoPhase.WebSockets.Processors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -26,6 +27,7 @@ namespace EchoPhase.Server.Controllers.WebSockets.v1
 
         private readonly IUserService _userService;
         private readonly WebSocketConnectionManager _connections;
+        private readonly IGatewayBackplane _backplane;
         private readonly WebSocketProcessor _processor;
         private readonly GatewayOptions _settings;
         private readonly ILogger<GatewayController> _logger;
@@ -33,12 +35,14 @@ namespace EchoPhase.Server.Controllers.WebSockets.v1
         public GatewayController(
             IUserService userService,
             WebSocketConnectionManager connections,
+            IGatewayBackplane backplane,
             WebSocketProcessor processor,
             IOptions<GatewayOptions> settings,
             ILogger<GatewayController> logger)
         {
             _userService = userService;
             _connections = connections;
+            _backplane = backplane;
             _processor = processor;
             _settings = settings.Value;
             _logger = logger;
@@ -73,9 +77,24 @@ namespace EchoPhase.Server.Controllers.WebSockets.v1
             finally
             {
                 _connections.Remove(connection);
+                await LeavePoolAsync(connection);
             }
 
             return new EmptyResult();
+        }
+
+        // Out of its shard pool on every replica; the pool's other members get its events.
+        private async Task LeavePoolAsync(WebSocketConnection connection)
+        {
+            try
+            {
+                await _backplane.LeaveAsync(connection, CancellationToken.None);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // Its replica's heartbeat or a failed send drops it later.
+                _logger.LogWarning(e, "Could not take connection {ConnectionId} out of its shard pool", connection.Id);
+            }
         }
 
         // No Origin: not a browser. Otherwise the same host as the request
