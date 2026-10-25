@@ -138,6 +138,23 @@ can be accepted instead: add its line from the check's output (method, path,
 message) to `openapi.err-ignore`, with the reason, and empty the file after the
 release.
 
+## Databases
+
+The server needs PostgreSQL, ScyllaDB and Valkey (or Redis). Besides
+`Database:*` in `Configurations/appsettings*.json`, it reads them from the
+environment, as containers and the Helm chart set them:
+
+| Variables | What |
+|---|---|
+| `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | PostgreSQL; all five, or none (the configuration's connection string then) |
+| `POSTGRES_SSL_MODE` | `Disable`, `Allow`, `Prefer` (default), `Require`, `VerifyCA` or `VerifyFull` |
+| `POSTGRES_SSL_ROOT_CERT` | path of the CA certificate `VerifyCA` / `VerifyFull` check the server against (default: the system's trusted CAs) |
+| `VALKEY_HOST`, `VALKEY_PORT`, `VALKEY_PASSWORD`, `VALKEY_SSL`, `VALKEY_TIMEOUT` | Valkey or Redis |
+| `SCYLLA_CONTACT_POINT` (comma-separated), `SCYLLA_KEYSPACE`, `SCYLLA_USERNAME`, `SCYLLA_PASSWORD`, `SCYLLA_LOCAL_DC`, `SCYLLA_AUTO_CREATE_KEYSPACE` | ScyllaDB or Cassandra; the port is `Database__Scylla__Port` (default 9042) |
+
+An unknown `POSTGRES_SSL_MODE` stops the server at start with the accepted
+values.
+
 ## Telemetry
 
 Traces and metrics go out over OTLP when an endpoint is set with the standard

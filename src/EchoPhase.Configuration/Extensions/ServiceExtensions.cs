@@ -34,22 +34,9 @@ namespace EchoPhase.Configuration.Extensions
                 }
 
                 // Postgres env override
-                var pgHost = Environment.GetEnvironmentVariable("POSTGRES_HOST");
-                var pgPort = Environment.GetEnvironmentVariable("POSTGRES_PORT");
-                var pgPw = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD");
-                var pgUser = Environment.GetEnvironmentVariable("POSTGRES_USER");
-                var pgDb = Environment.GetEnvironmentVariable("POSTGRES_DB");
-
-                if (!string.IsNullOrEmpty(pgHost) && !string.IsNullOrEmpty(pgPort) &&
-                    !string.IsNullOrEmpty(pgPw) && !string.IsNullOrEmpty(pgUser) &&
-                    !string.IsNullOrEmpty(pgDb))
-                {
-                    // GSS (Kerberos) encryption is unused; Npgsql's default (Prefer)
-                    // tries to load libgssapi_krb5, absent from the aspnet image,
-                    // and logs an error on every start.
-                    options.Postgres.ConnectionString =
-                        $"Host={pgHost};Port={pgPort};Database={pgDb};Username={pgUser};Password={pgPw};GSS Encryption Mode=Disable";
-                }
+                var postgres = Database.Postgres.PostgresEnvironment.ConnectionString(Environment.GetEnvironmentVariable);
+                if (postgres is not null)
+                    options.Postgres.ConnectionString = postgres;
 
                 // Scylla env override
                 var scyllaContact = Environment.GetEnvironmentVariable("SCYLLA_CONTACT_POINT");
