@@ -32,6 +32,15 @@ namespace EchoPhase.DAL.Postgres.Models
         /// </summary>
         public string? ContentHash { get; set; }
 
+        /// <summary>The package it was installed from (it may be gone since); null: made here.</summary>
+        public Guid? SourcePackageId { get; set; }
+
+        /// <summary>That package's version.</summary>
+        public int? SourcePackageVersion { get; set; }
+
+        /// <summary>Which of the package's workflows it is (PackageWorkflow.Key): what an update replaces.</summary>
+        public Guid? SourceKey { get; set; }
+
         public ICollection<WorkflowSchedule> Schedules { get; set; } = new List<WorkflowSchedule>();
         public ICollection<WorkflowVersion> Versions { get; set; } = new List<WorkflowVersion>();
 

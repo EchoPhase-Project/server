@@ -218,13 +218,13 @@ namespace EchoPhase.Server.Tests
             Assert.Equal(WorkflowErrors.Invalid, result.Error.Code);
         }
 
-        private sealed class NoWorkflows : EchoPhase.Runners.Blocks.IWorkflowSource
+        internal sealed class NoWorkflows : EchoPhase.Runners.Blocks.IWorkflowSource
         {
             public Task<BlockProgram?> FindAsync(Guid userId, Guid workflowId, CancellationToken ct)
                 => Task.FromResult<BlockProgram?>(null);
         }
 
-        private sealed class NoTriggers : IWorkflowTriggerReloader
+        internal sealed class NoTriggers : IWorkflowTriggerReloader
         {
             public Task ReloadUserAsync(Guid userId, CancellationToken ct = default) => Task.CompletedTask;
         }

@@ -195,6 +195,7 @@ namespace EchoPhase.Server
             services.AddScoped<BlockRunService>();
             services.AddScoped<BlockRunEventsNotifier>();
             services.AddScoped<WorkflowService>();
+            services.AddScoped<WorkflowPackageService>();
             services.AddScoped<IWorkflowSource, WorkflowProgramSource>();
             services.AddScoped<IWorkflowStore, WorkflowStore>();
             services.AddHostedService<WorkflowScheduler>();

@@ -72,6 +72,10 @@ namespace EchoPhase.DAL.Postgres
         public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
         public DbSet<Note> Notes => Set<Note>();
         public DbSet<NoteShare> NoteShares => Set<NoteShare>();
+        public DbSet<WorkflowPackage> WorkflowPackages => Set<WorkflowPackage>();
+        public DbSet<WorkflowPackageVersion> WorkflowPackageVersions => Set<WorkflowPackageVersion>();
+        public DbSet<WorkflowPackageShare> WorkflowPackageShares => Set<WorkflowPackageShare>();
+        public DbSet<WorkflowPackageInstall> WorkflowPackageInstalls => Set<WorkflowPackageInstall>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

@@ -46,6 +46,10 @@ namespace EchoPhase.Server.Services.Workflows
     /// <param name="ContentHash">The program's hash: the file's ETag.</param>
     public sealed record WorkflowExport(string FileName, string Json, string ContentHash);
 
+    /// <summary>A workflow to create with others, its id chosen beforehand so they can name each other.</summary>
+    /// <param name="Source">The package it comes from: its id, version and the workflow's key in it.</param>
+    public sealed record NewWorkflow(Guid Id, string Name, BlockProgram Program, (Guid Package, int Version, Guid Key)? Source = null);
+
     /// <summary>A workflow made from an export file.</summary>
     /// <param name="Intact">The program matches the hash the file states (false: it was edited by hand).</param>
     public sealed record WorkflowImport(WorkflowDetails Details, bool Intact);
@@ -122,6 +126,46 @@ namespace EchoPhase.Server.Services.Workflows
             await _discordTriggers.ReloadUserAsync(userId, ct);
 
             return ServiceResult<WorkflowDetails>.Success(new WorkflowDetails(workflow, program));
+        }
+
+        /// <summary>
+        /// Several new workflows, inactive, saved together or not at all; their
+        /// error workflows may be among them.
+        /// </summary>
+        public async Task<IServiceResult<IReadOnlyList<WorkflowDetails>>> CreateManyAsync(
+            Guid userId, Guid? actorId, IReadOnlyList<NewWorkflow> items, CancellationToken ct = default)
+        {
+            var pending = items.ToDictionary(i => i.Id, i => i.Program);
+            var created = new List<WorkflowDetails>();
+            foreach (var item in items)
+            {
+                if (Check(item.Name, item.Program) is { } invalid)
+                    return Failure<IReadOnlyList<WorkflowDetails>>(WorkflowErrors.Invalid, $"\"{item.Name}\": {invalid}");
+
+                var workflow = new Workflow
+                {
+                    Id = item.Id,
+                    UserId = userId,
+                    Name = item.Name.Trim(),
+                    Definition = Serialize(item.Program),
+                    ContentHash = BlockProgramHash.Of(item.Program),
+                    SourcePackageId = item.Source?.Package,
+                    SourcePackageVersion = item.Source?.Version,
+                    SourceKey = item.Source?.Key,
+                };
+                if (await CheckErrorWorkflowAsync(workflow, item.Program, ct, pending) is { } badErrorWorkflow)
+                    return Failure<IReadOnlyList<WorkflowDetails>>(WorkflowErrors.Invalid, $"\"{item.Name}\": {badErrorWorkflow}");
+                created.Add(new WorkflowDetails(workflow, item.Program));
+            }
+
+            foreach (var (workflow, program) in created)
+            {
+                _workflows.Add(workflow);
+                _workflows.AddVersion(Snapshot(workflow, actorId ?? userId, parent: null, restoredFrom: null));
+                await _workflows.ReplaceSchedulesAsync(workflow.Id, await SchedulesAsync(workflow, program, ct), ct);
+            }
+            await _workflows.SaveAsync(ct);
+            return ServiceResult<IReadOnlyList<WorkflowDetails>>.Success(created);
         }
 
         /// <summary>
@@ -396,13 +440,16 @@ namespace EchoPhase.Server.Services.Workflows
 
         // The error workflow must be the owner's and able to start: caught on
         // save, not when a run has already failed. It may be the workflow itself.
-        private async Task<string?> CheckErrorWorkflowAsync(Workflow workflow, BlockProgram program, CancellationToken ct)
+        private async Task<string?> CheckErrorWorkflowAsync(Workflow workflow, BlockProgram program, CancellationToken ct,
+            IReadOnlyDictionary<Guid, BlockProgram>? pending = null)
         {
             if (program.Settings.ErrorWorkflowId is not { } id)
                 return null;
 
             var target = id == workflow.Id
                 ? program
+                : pending?.GetValueOrDefault(id) is { } saved
+                    ? saved
                 : await _workflows.Query().WithIds(id).WithUserIds(workflow.UserId).FirstOrDefaultAsync(ct) is { } other
                     ? Parse(other)
                     : null;

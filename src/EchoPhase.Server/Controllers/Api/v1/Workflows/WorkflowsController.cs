@@ -226,6 +226,9 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             active = w.Active,
             version = w.Version,
             contentHash = w.ContentHash,
+            source = w.SourcePackageId is { } package
+                ? new { packageId = package, version = w.SourcePackageVersion, key = w.SourceKey }
+                : null,
             createdAt = w.CreatedAt,
             updatedAt = w.UpdatedAt
         };
@@ -237,6 +240,9 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             active = details.Workflow.Active,
             version = details.Workflow.Version,
             contentHash = details.Workflow.ContentHash ?? BlockProgramHash.Of(details.Program),
+            source = details.Workflow.SourcePackageId is { } package
+                ? new { packageId = package, version = details.Workflow.SourcePackageVersion, key = details.Workflow.SourceKey }
+                : null,
             createdAt = details.Workflow.CreatedAt,
             updatedAt = details.Workflow.UpdatedAt,
             program = details.Program,

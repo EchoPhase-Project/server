@@ -22,7 +22,8 @@ namespace EchoPhase.Runners.Blocks.Models
         /// <summary>The hash of a program stored as JSON text.</summary>
         public static string OfJson(string json) => Of(JsonNode.Parse(json));
 
-        private static string Of(JsonNode? node)
+        /// <summary>The same hash of any JSON: what a package version is, from its workflows.</summary>
+        public static string Of(JsonNode? node)
         {
             using var buffer = new MemoryStream();
             using (var writer = new Utf8JsonWriter(buffer))

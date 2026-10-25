@@ -821,6 +821,15 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid?>("SourceKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SourcePackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("SourcePackageVersion")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -836,7 +845,152 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.HasIndex("UserId", "SourcePackageId")
+                        .HasFilter("\"SourcePackageId\" IS NOT NULL");
+
                     b.ToTable("Workflows", "EchoPhase");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowPackage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("LatestVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Readme")
+                        .IsRequired()
+                        .HasMaxLength(100000)
+                        .HasColumnType("character varying(100000)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.PrimitiveCollection<string[]>("Tags")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Visibility")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("Tags");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Tags"), "gin");
+
+                    b.HasIndex("Visibility");
+
+                    b.ToTable("WorkflowPackages", "EchoPhase");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowPackageInstall", b =>
+                {
+                    b.Property<Guid>("PackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("InstalledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PackageId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("WorkflowPackageInstalls", "EchoPhase");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowPackageShare", b =>
+                {
+                    b.Property<Guid>("PackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("PackageId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("WorkflowPackageShares", "EchoPhase");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowPackageVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Changelog")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PublishedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PackageId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("WorkflowPackageVersions", "EchoPhase");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowSchedule", b =>
@@ -1225,6 +1379,66 @@ namespace EchoPhase.DAL.Postgres.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowPackage", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowPackageInstall", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.WorkflowPackage", "Package")
+                        .WithMany("Installs")
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Package");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowPackageShare", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.WorkflowPackage", "Package")
+                        .WithMany("Shares")
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Package");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowPackageVersion", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.WorkflowPackage", "Package")
+                        .WithMany("Versions")
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Package");
+                });
+
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowSchedule", b =>
                 {
                     b.HasOne("EchoPhase.DAL.Postgres.Models.Workflow", "Workflow")
@@ -1336,6 +1550,15 @@ namespace EchoPhase.DAL.Postgres.Migrations
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.Workflow", b =>
                 {
                     b.Navigation("Schedules");
+
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowPackage", b =>
+                {
+                    b.Navigation("Installs");
+
+                    b.Navigation("Shares");
 
                     b.Navigation("Versions");
                 });
