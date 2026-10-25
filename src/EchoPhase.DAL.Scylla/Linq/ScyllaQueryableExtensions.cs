@@ -17,6 +17,27 @@ namespace EchoPhase.DAL.Scylla.Linq
         internal static readonly MethodInfo AllowFilteringMethod =
             typeof(ScyllaQueryableExtensions).GetMethod(nameof(AllowFiltering))!;
 
+        internal static readonly MethodInfo WithOptionsMethod =
+            typeof(ScyllaQueryableExtensions).GetMethod(nameof(WithOptions))!;
+
+        /// <summary>Runs the query with these options (consistency, timeout) instead of the connection's.</summary>
+        public static IQueryable<T> WithOptions<T>(this IQueryable<T> source, StatementOptions options)
+        {
+            if (source.Provider is not QueryProvider)
+                return source;
+
+            return source.Provider.CreateQuery<T>(
+                Expression.Call(null, WithOptionsMethod.MakeGenericMethod(typeof(T)), source.Expression, Expression.Constant(options)));
+        }
+
+        /// <summary>Reads at this consistency level: ONE (cheap), LOCAL_QUORUM (sees QUORUM writes), ...</summary>
+        public static IQueryable<T> WithConsistency<T>(this IQueryable<T> source, Cassandra.ConsistencyLevel consistency)
+            => source.WithOptions(new StatementOptions(Consistency: consistency));
+
+        /// <summary>Waits at most this long for the query.</summary>
+        public static IQueryable<T> WithTimeout<T>(this IQueryable<T> source, TimeSpan timeout)
+            => source.WithOptions(new StatementOptions(Timeout: timeout));
+
         internal static readonly MethodInfo AsNoTrackingMethod =
             typeof(ScyllaQueryableExtensions).GetMethod(nameof(AsNoTracking))!;
 

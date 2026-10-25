@@ -14,8 +14,11 @@ namespace EchoPhase.DAL.Scylla.Models
     /// Write timestamp used for last-write-wins conflict resolution; defaults to
     /// the coordinator's clock.
     /// </param>
-    public sealed record WriteOptions(TimeSpan? Ttl = null, DateTimeOffset? Timestamp = null)
+    /// <param name="Statement">Consistency (and LWT serial consistency) and timeout of the write.</param>
+    public sealed record WriteOptions(TimeSpan? Ttl = null, DateTimeOffset? Timestamp = null,
+        Database.StatementOptions? Statement = null)
     {
+        /// <summary>No USING clause (statement options are not part of the CQL text).</summary>
         internal bool IsEmpty => Ttl is null && Timestamp is null;
 
         internal void Validate()

@@ -51,8 +51,14 @@ namespace EchoPhase.DAL.Scylla.Cql
             get; private set;
         }
 
+        /// <summary>AsNoTracking was called.</summary>
+        public bool NoTracking { get; private set; }
+
         /// <summary>Whole entities, to be tracked: no Select, no AsNoTracking.</summary>
-        public bool ReturnsTrackedEntities { get => _selector == null && !field; private set; }
+        public bool ReturnsTrackedEntities => _selector == null && !NoTracking;
+
+        /// <summary>WithOptions / WithConsistency / WithTimeout of the query, if any.</summary>
+        public Database.StatementOptions? Options { get; private set; }
 
         private IEntityBuilder Builder
         {
@@ -129,10 +135,23 @@ namespace EchoPhase.DAL.Scylla.Cql
             }
 
             if (node.Method.IsGenericMethod
+                && node.Method.GetGenericMethodDefinition() == Linq.ScyllaQueryableExtensions.WithOptionsMethod)
+            {
+                Visit(node.Arguments[0]);
+                var options = (Database.StatementOptions)((ConstantExpression)node.Arguments[1]).Value!;
+                // Later calls refine earlier ones: WithConsistency(..).WithTimeout(..).
+                Options = Options is null ? options : new Database.StatementOptions(
+                    options.Consistency ?? Options.Consistency,
+                    options.SerialConsistency ?? Options.SerialConsistency,
+                    options.Timeout ?? Options.Timeout);
+                return node;
+            }
+
+            if (node.Method.IsGenericMethod
                 && node.Method.GetGenericMethodDefinition() == Linq.ScyllaQueryableExtensions.AsNoTrackingMethod)
             {
                 Visit(node.Arguments[0]);
-                ReturnsTrackedEntities = true;
+                NoTracking = true;
                 return node;
             }
 

@@ -76,8 +76,8 @@ namespace EchoPhase.DAL.Scylla.Linq
             {
                 var visitor = new ExpressionVisitor<object>(Database.GetBuilder);
                 var cql = visitor.VisitCount(source);
-                var count = Database.Executor
-                    .Execute<long>(cql, row => row.GetValue<long>(0), visitor.Parameters, idempotent: true)
+                var count = Database.Executor.Run(Statement(cql, visitor)).Rows
+                    .Select(row => row.GetValue<long>(0))
                     .FirstOrDefault();
 
                 // COUNT(*) yields a single row, so LIMIT would not cap it; apply Take() here instead.
@@ -119,8 +119,7 @@ namespace EchoPhase.DAL.Scylla.Linq
             if (visitor.Limit == 0)
                 return new List<T>();
 
-            // LINQ produces plain SELECTs, which are always safe to retry.
-            var rows = Database.Executor.Execute(cql, visitor.Projector, visitor.Parameters, idempotent: true).ToList();
+            var rows = Database.Executor.Run(Statement(cql, visitor), typeof(T)).Rows.Select(visitor.Projector!).ToList();
             return visitor.ReturnsTrackedEntities ? Database.AttachAll(rows) : rows;
         }
 
@@ -132,7 +131,7 @@ namespace EchoPhase.DAL.Scylla.Linq
             if (visitor.Limit == 0)
                 return new List<T>();
 
-            var rows = (await Database.Executor.ExecuteAsync(cql, visitor.Projector, visitor.Parameters, idempotent: true, ct)).ToList();
+            var rows = (await Database.Executor.RunAsync(Statement(cql, visitor), typeof(T), ct)).Rows.Select(visitor.Projector!).ToList();
             return visitor.ReturnsTrackedEntities ? Database.AttachAll(rows) : rows;
         }
 
@@ -141,8 +140,8 @@ namespace EchoPhase.DAL.Scylla.Linq
             var visitor = new ExpressionVisitor<object>(Database.GetBuilder);
             var cql = visitor.VisitCount(expression);
 
-            var rows = await Database.Executor.ExecuteAsync(cql, row => row.GetValue<long>(0), visitor.Parameters, idempotent: true, ct);
-            var count = rows.FirstOrDefault();
+            var result = await Database.Executor.RunAsync(Statement(cql, visitor), typeof(long), ct);
+            var count = result.Rows.Select(row => row.GetValue<long>(0)).FirstOrDefault();
 
             // COUNT(*) yields a single row, so LIMIT would not cap it; apply Take() here instead.
             return visitor.Limit.HasValue ? Math.Min(count, visitor.Limit.Value) : count;
@@ -157,8 +156,12 @@ namespace EchoPhase.DAL.Scylla.Linq
             if (visitor.Limit.HasValue)
                 throw new NotSupportedException("ToPageAsync() pages through all matching rows; remove Take() and use pageSize.");
 
-            var page = await Database.Executor.ExecutePageAsync(cql, visitor.Projector, visitor.Parameters, pageSize, pagingState, idempotent: true, ct);
-            return visitor.ReturnsTrackedEntities ? page with { Items = Database.AttachAll(page.Items.ToList()) } : page;
+            if (pageSize < 1)
+                throw new ArgumentOutOfRangeException(nameof(pageSize), "Page size must be positive.");
+            var result = await Database.Executor.RunAsync(
+                Statement(cql, visitor) with { PageSize = pageSize, PagingState = pagingState }, typeof(T), ct);
+            var items = result.Rows.Select(visitor.Projector!).ToList();
+            return new ScyllaPage<T>(visitor.ReturnsTrackedEntities ? Database.AttachAll(items) : items, result.PagingState);
         }
 
         internal async Task ExecuteUpdateAsync<T>(Expression expression, Action<UpdateSetters<T>> configure,
@@ -192,6 +195,10 @@ namespace EchoPhase.DAL.Scylla.Linq
             await Database.Executor.RunAsync(
                 new CqlStatement(cql, values.ToArray(), Idempotent: setters.Assignments.All(a => a.Idempotent)), null, ct);
         }
+
+        // LINQ produces plain SELECTs, which are always safe to retry.
+        private static CqlStatement Statement<T>(string cql, ExpressionVisitor<T> visitor)
+            => new(cql, visitor.Parameters, Idempotent: true, Options: visitor.Options);
 
         private static Type GetElementType(Type sequenceType)
         {

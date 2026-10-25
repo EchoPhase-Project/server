@@ -46,10 +46,17 @@ namespace EchoPhase.DAL.Scylla.InMemory
         /// <summary>Statements run so far (text only), to assert on in tests.</summary>
         public ConcurrentQueue<string> Log { get; } = new();
 
+        /// <summary>Statements run so far, with their values and options.</summary>
+        public ConcurrentQueue<CqlStatement> Statements { get; } = new();
+
         public CqlResult Execute(CqlStatement statement)
         {
             Log.Enqueue(statement.Cql);
+            Statements.Enqueue(statement);
             var parsed = Parsed.GetOrAdd(statement.Cql, CqlParser.Parse);
+            if (parsed.Statement is Insert or Update or Delete
+                && statement.Options?.Consistency is ConsistencyLevel.Serial or ConsistencyLevel.LocalSerial)
+                throw new InvalidQueryException("SERIAL/LOCAL_SERIAL consistency may only be requested for reads and as the serial consistency of an LWT");
             lock (_sync)
                 return Run(parsed, Values(statement), statement);
         }

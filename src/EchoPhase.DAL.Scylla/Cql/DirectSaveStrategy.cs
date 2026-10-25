@@ -39,7 +39,7 @@ namespace EchoPhase.DAL.Scylla.Cql
                 var conditional = Prepare(tracked, builder);
                 var applied = true;
                 foreach (var (cql, parameters) in _cqlGenerator.Generate(tracked, builder))
-                    applied &= _queryExecutor.Run(new CqlStatement(cql, parameters, Idempotent: !conditional)).Applied ?? true;
+                    applied &= _queryExecutor.Run(new CqlStatement(cql, parameters, Idempotent: !conditional, Options: tracked.Options?.Statement)).Applied ?? true;
                 count += Finish(tracked, builder, applied);
             }
             return count;
@@ -54,7 +54,7 @@ namespace EchoPhase.DAL.Scylla.Cql
                 var conditional = Prepare(tracked, builder);
                 var applied = true;
                 foreach (var (cql, parameters) in _cqlGenerator.Generate(tracked, builder))
-                    applied &= (await _queryExecutor.RunAsync(new CqlStatement(cql, parameters, Idempotent: !conditional), null, ct)).Applied ?? true;
+                    applied &= (await _queryExecutor.RunAsync(new CqlStatement(cql, parameters, Idempotent: !conditional, Options: tracked.Options?.Statement), null, ct)).Applied ?? true;
                 count += Finish(tracked, builder, applied);
             }
             return count;

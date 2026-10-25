@@ -11,12 +11,28 @@ namespace EchoPhase.DAL.Scylla.Database
     /// <param name="Idempotent">Safe to run twice (no LWT, no counters): the driver retries only these.</param>
     /// <param name="PageSize">One page of this many rows; null: every row.</param>
     /// <param name="PagingState">Where the page starts (from the previous result); null: the first.</param>
+    /// <param name="Options">Consistency and timeout for this statement; null: the connection's.</param>
     public sealed record CqlStatement(
         string Cql,
         object?[] Values,
         bool Idempotent = false,
         int? PageSize = null,
-        byte[]? PagingState = null);
+        byte[]? PagingState = null,
+        StatementOptions? Options = null);
+
+    /// <summary>
+    /// How one statement runs, overriding the connection's defaults: how many
+    /// replicas answer (ONE for a cheap read, QUORUM / LOCAL_QUORUM to read
+    /// what was written at QUORUM), the Paxos consistency of an LWT
+    /// (SERIAL / LOCAL_SERIAL), and how long to wait.
+    /// </summary>
+    public sealed record StatementOptions(
+        ConsistencyLevel? Consistency = null,
+        ConsistencyLevel? SerialConsistency = null,
+        TimeSpan? Timeout = null)
+    {
+        public bool IsEmpty => Consistency is null && SerialConsistency is null && Timeout is null;
+    }
 
     /// <summary>What a statement returned: its rows, and the cursor to the next page, if any.</summary>
     public sealed record CqlResult(IReadOnlyList<Row> Rows, byte[]? PagingState)

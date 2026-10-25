@@ -65,6 +65,15 @@ namespace EchoPhase.DAL.Scylla.Database
                 ? prepared.Bind(statement.Values)
                 : new SimpleStatement(statement.Cql);
             bound.SetIdempotence(statement.Idempotent);
+            if (statement.Options is { } options)
+            {
+                if (options.Consistency is { } consistency)
+                    bound.SetConsistencyLevel(consistency);
+                if (options.SerialConsistency is { } serial)
+                    bound.SetSerialConsistencyLevel(serial);
+                if (options.Timeout is { } timeout)
+                    bound.SetReadTimeoutMillis((int)timeout.TotalMilliseconds);
+            }
             if (statement.PageSize is { } size)
                 bound.SetPageSize(size).SetAutoPage(false).SetPagingState(statement.PagingState);
             return bound;
