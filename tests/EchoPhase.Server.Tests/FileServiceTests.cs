@@ -6,8 +6,10 @@ using EchoPhase.Configuration.Storage.Files;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Files;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using EchoPhase.Server.Controllers.Api.v1.Files;
 using EchoPhase.Storage;
+using EchoPhase.Types.Result;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -240,6 +242,17 @@ namespace EchoPhase.Server.Tests
             public Task<ObjectInfo?> HeadAsync(string key, CancellationToken cancellationToken) => throw new ObjectStorageNotConfiguredException();
             public Task DeleteAsync(string key, CancellationToken cancellationToken) => throw new ObjectStorageNotConfiguredException();
             public IAsyncEnumerable<ObjectInfo> ListAsync(string? prefix, CancellationToken cancellationToken) => throw new ObjectStorageNotConfiguredException();
+        }
+
+        [Fact]
+        public async Task TooLarge_SaysTheLimit_AndTheApiPassesItOn()
+        {
+            var result = await Files().UploadAsync(_alice.Id, FilePurpose.Avatar, "me.png", new MemoryStream(Png), 100, Ct);
+
+            Assert.Equal(64L, ((ServiceError)result.Error).Detail<long>(FileService.LimitDetail));
+            var body = ErrorBody.From(result.Error);
+            Assert.Equal("file", body.Field);
+            Assert.Equal(64L, body.Details![FileService.LimitDetail]);
         }
 
         [Fact]

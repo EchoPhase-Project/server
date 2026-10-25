@@ -37,7 +37,7 @@ namespace EchoPhase.Notes
         {
             var problem = Check(input);
             if (problem is not null)
-                return Fail<NoteView>(NoteErrors.Invalid, problem);
+                return Fail<NoteView>(NoteErrors.Invalid, problem.Value.Message, problem.Value.Field);
 
             var now = Now();
             var note = new Note
@@ -99,7 +99,7 @@ namespace EchoPhase.Notes
         {
             var problem = Check(input);
             if (problem is not null)
-                return Fail<NoteView>(NoteErrors.Invalid, problem);
+                return Fail<NoteView>(NoteErrors.Invalid, problem.Value.Message, problem.Value.Field);
 
             var view = await FindAsync(userId, noteId, tracking: true, ct);
             if (view is null)
@@ -116,7 +116,8 @@ namespace EchoPhase.Notes
                 note.RemindAt = input.RemindAt?.UtcDateTime;
             }
             note.UpdatedAt = Now();
-            await _db.SaveChangesAsync(ct);
+            if (!await TrySaveAsync(ct))
+                return Fail<NoteView>(NoteErrors.Conflict, "Its reminder was just sent; open the note again and save.");
             return ServiceResult<NoteView>.Success(view);
         }
 
@@ -132,7 +133,7 @@ namespace EchoPhase.Notes
             var note = view.Note;
             var body = note.Body.Length == 0 ? text : $"{note.Body.TrimEnd()}\n\n{text}";
             if (body.Length > NoteConfiguration.MaxBodyLength)
-                return Fail<NoteView>(NoteErrors.Invalid, TooLong);
+                return Fail<NoteView>(NoteErrors.Invalid, TooLong, "body");
             note.Body = body;
             note.UpdatedAt = Now();
             await _db.SaveChangesAsync(ct);
@@ -182,9 +183,9 @@ namespace EchoPhase.Notes
             var normalized = (userName ?? string.Empty).Trim().ToUpperInvariant();
             var user = await _db.Users.FirstOrDefaultAsync(u => u.NormalizedUserName == normalized, ct);
             if (user is null)
-                return Fail<NoteShare>(NoteErrors.NotFound, "No user has this username.");
+                return Fail<NoteShare>(NoteErrors.NotFound, "No user has this username.", "userName");
             if (user.Id == userId)
-                return Fail<NoteShare>(NoteErrors.Invalid, "The note is yours already.");
+                return Fail<NoteShare>(NoteErrors.Invalid, "The note is yours already.", "userName");
 
             var share = await _db.NoteShares.FirstOrDefaultAsync(s => s.NoteId == noteId && s.UserId == user.Id, ct);
             var isNew = share is null;
@@ -238,7 +239,10 @@ namespace EchoPhase.Notes
 
         /// <summary>
         /// Sends the reminders that are due and clears them; returns how many.
-        /// A reminder that cannot be sent stays for the next round.
+        /// Each one is claimed first with a conditional update (only while it
+        /// still holds the time it was found with), so with several servers
+        /// running this only one sends it. A reminder that cannot be sent is
+        /// put back for the next round.
         /// </summary>
         public async Task<int> SendDueRemindersAsync(int batch, CancellationToken ct = default)
         {
@@ -252,20 +256,41 @@ namespace EchoPhase.Notes
             var sent = 0;
             foreach (var note in due)
             {
+                var at = note.RemindAt;
+                note.RemindAt = null;
+                if (!await TrySaveAsync(ct))
+                    continue; // Another server took it, or the owner changed it meanwhile.
+
                 try
                 {
                     await _events.ReminderAsync(note, ct);
+                    sent++;
                 }
                 catch (Exception e) when (e is not OperationCanceledException)
                 {
                     _logger.LogWarning(e, "Could not send the reminder of note {Id}", note.Id);
-                    continue;
+                    // Back for the next round, unless the owner set another one meanwhile.
+                    note.RemindAt = at;
+                    await TrySaveAsync(CancellationToken.None);
                 }
-                note.RemindAt = null;
-                sent++;
             }
-            await _db.SaveChangesAsync(ct);
             return sent;
+        }
+
+        // False when a concurrency token no longer matched: the change is dropped.
+        private async Task<bool> TrySaveAsync(CancellationToken ct)
+        {
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+                return true;
+            }
+            catch (DbUpdateConcurrencyException e)
+            {
+                foreach (var entry in e.Entries)
+                    entry.State = EntityState.Detached;
+                return false;
+            }
         }
 
         private async Task<NoteView?> FindAsync(Guid userId, Guid noteId, bool tracking, CancellationToken ct)
@@ -299,15 +324,15 @@ namespace EchoPhase.Notes
 
         private const string TooLong = "The note is too long.";
 
-        // Why the input cannot be a note, or null.
-        private static string? Check(NoteInput input)
+        // Which input cannot be a note's and why, or null.
+        private static (string Field, string Message)? Check(NoteInput input)
         {
             if ((input.Title ?? string.Empty).Trim().Length > NoteConfiguration.MaxTitleLength)
-                return $"The title may be at most {NoteConfiguration.MaxTitleLength} characters.";
+                return ("title", $"The title may be at most {NoteConfiguration.MaxTitleLength} characters.");
             if ((input.Body ?? string.Empty).Length > NoteConfiguration.MaxBodyLength)
-                return TooLong;
+                return ("body", TooLong);
             if (string.IsNullOrWhiteSpace(input.Title) && string.IsNullOrWhiteSpace(input.Body))
-                return "A note needs a title or some text.";
+                return ("body", "A note needs a title or some text.");
             return null;
         }
 
@@ -338,8 +363,8 @@ namespace EchoPhase.Notes
 
         private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 
-        private static IServiceResult<T> Fail<T>(string code, string message) =>
-            ServiceResult<T>.Failure(new ServiceError(code, message));
+        private static IServiceResult<T> Fail<T>(string code, string message, string? field = null) =>
+            ServiceResult<T>.Failure(new ServiceError(code, message, field));
 
         private static IServiceResult<T> NotFound<T>() => Fail<T>(NoteErrors.NotFound, "Note not found.");
     }

@@ -26,6 +26,24 @@ namespace EchoPhase.Types.Result
         }
 
         /// <summary>
+        /// The input the error is about (its JSON name, camelCase), so a form
+        /// can show it next to the field; null when it is about the request.
+        /// </summary>
+        string? Field
+        {
+            get;
+        }
+
+        /// <summary>
+        /// Further values agreed for this code (a limit, the allowed types, an
+        /// id): what a client may act on beyond the message. Empty by default.
+        /// </summary>
+        IReadOnlyDictionary<string, object?> Details
+        {
+            get;
+        }
+
+        /// <summary>
         /// Gets the string representation of the error, typically combining the code and message.
         /// </summary>
         string Value

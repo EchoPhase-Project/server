@@ -21,6 +21,14 @@ namespace EchoPhase.Types.Result
         /// </summary>
         public string Message { get; private set; } = string.Empty;
 
+        /// <inheritdoc/>
+        public string? Field { get; private set; }
+
+        private readonly Dictionary<string, object?> _details = new(StringComparer.Ordinal);
+
+        /// <inheritdoc/>
+        public IReadOnlyDictionary<string, object?> Details => _details;
+
         /// <summary>
         /// Gets the string representation of the error, typically combining the code and message.
         /// </summary>
@@ -75,6 +83,21 @@ namespace EchoPhase.Types.Result
             _built = true;
         }
 
+        /// <summary>An error about one input.</summary>
+        /// <param name="code">The error code.</param>
+        /// <param name="message">The error message.</param>
+        /// <param name="field">The input's JSON name (camelCase).</param>
+        public ServiceError(string code, string message, string? field)
+        {
+            Code = code ?? string.Empty;
+            Message = message ?? string.Empty;
+            Field = field;
+            _built = true;
+        }
+
+        /// <summary>The value a detail holds, or default when it is absent or of another type.</summary>
+        public T? Detail<T>(string key) => _details.TryGetValue(key, out var value) && value is T typed ? typed : default;
+
         /// <summary>
         /// Returns a string representation of this error.
         /// </summary>
@@ -115,6 +138,25 @@ namespace EchoPhase.Types.Result
         {
             SetCode(code);
             SetMessage(message);
+        }
+
+        /// <summary>Sets the input the error is about. Only inside the constructor's configure action.</summary>
+        /// <exception cref="InvalidOperationException">The error is already built.</exception>
+        public void SetField(string? field)
+        {
+            EnsureBuilding();
+            Field = field;
+        }
+
+        /// <summary>
+        /// Adds a detail (a value clients may act on, serialized as JSON). Only
+        /// inside the constructor's configure action.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The error is already built.</exception>
+        public void SetDetail(string key, object? value)
+        {
+            EnsureBuilding();
+            _details[key] = value;
         }
 
         private void EnsureBuilding()

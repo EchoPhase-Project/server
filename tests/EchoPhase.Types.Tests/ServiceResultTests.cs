@@ -70,5 +70,24 @@ namespace EchoPhase.Types.Tests
             Assert.Throws<InvalidOperationException>(() => error.Set("Other", "Changed."));
             Assert.Throws<InvalidOperationException>(() => new ServiceError("A", "B").SetCode("C"));
         }
+
+        [Fact]
+        public void Error_CarriesAFieldAndDetails_ReadOnlyOnceBuilt()
+        {
+            var error = new ServiceError(e =>
+            {
+                e.Set("FileTooLarge", "Too large.");
+                e.SetField("file");
+                e.SetDetail("limitBytes", 5L);
+            });
+
+            Assert.Equal("file", error.Field);
+            Assert.Equal(5L, error.Detail<long>("limitBytes"));
+            Assert.Equal(0, error.Detail<int>("missing"));
+            Assert.Throws<InvalidOperationException>(() => error.SetDetail("x", 1));
+            Assert.Throws<InvalidOperationException>(() => error.SetField("other"));
+            Assert.Empty(new ServiceError("A", "B").Details);
+            Assert.Equal("title", new ServiceError("Invalid", "Too long.", "title").Field);
+        }
     }
 }

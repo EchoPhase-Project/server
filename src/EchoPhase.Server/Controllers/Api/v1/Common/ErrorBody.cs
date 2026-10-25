@@ -13,11 +13,17 @@ namespace EchoPhase.Server.Controllers.Api.v1.Common
     /// when the error is about one input, that input's JSON name (camelCase) so a
     /// form can show it next to the field. No field: the error is about the request.
     /// </summary>
-    public sealed record ErrorBody(string Code, string Message, string? Field = null)
+    /// <param name="Code">Stable: branch on it.</param>
+    /// <param name="Message">For people, in English.</param>
+    /// <param name="Field">The input it is about (camelCase JSON name), or null.</param>
+    /// <param name="Details">Values agreed for the code (e.g. a limit), or null when there are none.</param>
+    public sealed record ErrorBody(string Code, string Message, string? Field = null,
+        IReadOnlyDictionary<string, object?>? Details = null)
     {
         public const string InvalidCode = "Invalid";
 
-        public static ErrorBody From(IServiceError error) => new(error.Code, error.Message);
+        public static ErrorBody From(IServiceError error) =>
+            new(error.Code, error.Message, error.Field, error.Details.Count > 0 ? error.Details : null);
 
         public static ErrorBody From(IdentityError error) => new(error.Code, error.Description, FieldOf(error.Code));
 

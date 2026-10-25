@@ -295,8 +295,16 @@ namespace EchoPhase.Files
 
         private static IServiceResult<T> NotFound<T>() => Fail<T>(FileErrors.NotFound, "File not found.");
 
+        /// <summary>The detail of <see cref="FileErrors.TooLarge"/>: the limit, in bytes.</summary>
+        public const string LimitDetail = "limitBytes";
+
         private static IServiceResult<T> TooLarge<T>(long limit) =>
-            Fail<T>(FileErrors.TooLarge, $"The file is larger than this kind of file may be ({limit} bytes).");
+            ServiceResult<T>.Failure(new ServiceError(e =>
+            {
+                e.Set(FileErrors.TooLarge, $"The file is larger than this kind of file may be ({limit} bytes).");
+                e.SetField("file");
+                e.SetDetail(LimitDetail, limit);
+            }));
 
         private static IServiceResult<T> QuotaExceeded<T>() =>
             Fail<T>(FileErrors.QuotaExceeded, "The file does not fit in what you may store; delete some files first.");

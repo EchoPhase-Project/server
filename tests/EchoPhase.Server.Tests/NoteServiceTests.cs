@@ -6,6 +6,7 @@ using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Notes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 
@@ -15,6 +16,8 @@ namespace EchoPhase.Server.Tests
     public class NoteServiceTests : IDisposable
     {
         private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
+        private readonly string _dbName = Guid.NewGuid().ToString();
+        private readonly InMemoryDatabaseRoot _root = new();
         private readonly PostgresContext _db;
         private readonly RecordingEvents _events = new();
         private readonly User _alice;
@@ -24,7 +27,7 @@ namespace EchoPhase.Server.Tests
         public NoteServiceTests()
         {
             _db = new PostgresContext(new DbContextOptionsBuilder<PostgresContext>()
-                .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                .UseInMemoryDatabase(_dbName, _root)
                 .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
                 .Options);
             _alice = new User("Alice") { UserName = "alice", NormalizedUserName = "ALICE" };
@@ -57,6 +60,15 @@ namespace EchoPhase.Server.Tests
             var result = await Notes().CreateAsync(_alice.Id, new NoteInput(" ", ""), Ct);
 
             Assert.Equal(NoteErrors.Invalid, result.Error.Code);
+            Assert.Equal("body", result.Error.Field);
+        }
+
+        [Fact]
+        public async Task TooLongTitle_NamesTheField()
+        {
+            var result = await Notes().CreateAsync(_alice.Id, new NoteInput(new string('t', 201), "x"), Ct);
+
+            Assert.Equal("title", result.Error.Field);
         }
 
         [Fact]
@@ -163,7 +175,9 @@ namespace EchoPhase.Server.Tests
             var note = await Create(_alice, "plan");
 
             Assert.Equal(NoteErrors.Invalid, (await Notes().ShareAsync(_alice.Id, note.Id, "alice", false, Ct)).Error.Code);
-            Assert.Equal(NoteErrors.NotFound, (await Notes().ShareAsync(_alice.Id, note.Id, "nobody", false, Ct)).Error.Code);
+            var nobody = await Notes().ShareAsync(_alice.Id, note.Id, "nobody", false, Ct);
+            Assert.Equal(NoteErrors.NotFound, nobody.Error.Code);
+            Assert.Equal("userName", nobody.Error.Field);
         }
 
         [Fact]
@@ -211,6 +225,25 @@ namespace EchoPhase.Server.Tests
             Assert.Equal(0, await Notes().SendDueRemindersAsync(100, Ct));
             _events.FailReminders = false;
             Assert.Equal(1, await Notes().SendDueRemindersAsync(100, Ct));
+        }
+
+        [Fact]
+        public async Task AReminderClaim_LosesToAnotherServersClaim()
+        {
+            await Notes().CreateAsync(_alice.Id, new NoteInput("call", "x", RemindAt: _time.GetUtcNow()), Ct);
+            // A second server, its own context on the same database; both read it due.
+            using var other = new PostgresContext(new DbContextOptionsBuilder<PostgresContext>()
+                .UseInMemoryDatabase(_dbName, _root)
+                .Options);
+            var mine = await _db.Notes.SingleAsync(Ct);
+            var theirs = await other.Notes.SingleAsync(Ct);
+
+            theirs.RemindAt = null;
+            await other.SaveChangesAsync(Ct);
+            mine.RemindAt = null;
+
+            // The clearing is conditional on the time it was read with.
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => _db.SaveChangesAsync(Ct));
         }
 
         private sealed class RecordingEvents : INoteEvents
