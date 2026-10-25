@@ -31,7 +31,12 @@ namespace EchoPhase.DAL.Scylla.Cql
 
             foreach (var tracked in entities)
             {
-                var statements = _cqlGenerator.Generate(tracked, _getBuilder(tracked.EntityType));
+                var builder = _getBuilder(tracked.EntityType);
+                if (CqlGenerator.ConditionFor(tracked, builder) is not null)
+                    throw new InvalidOperationException(
+                        $"{tracked.EntityType.Name} is written conditionally (a concurrency token or an IF), which a batch " +
+                        "cannot do across partitions; save it outside the batch.");
+                var statements = _cqlGenerator.Generate(tracked, builder);
                 if (statements.Count == 0) continue;
 
                 foreach (var (cql, parameters) in statements)

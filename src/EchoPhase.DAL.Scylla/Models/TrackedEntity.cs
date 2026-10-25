@@ -36,6 +36,15 @@ namespace EchoPhase.DAL.Scylla.Models
         /// <summary>USING TTL / TIMESTAMP for this entity's write.</summary>
         public WriteOptions? Options { get; set; }
 
+        /// <summary>An IF clause for this entity's write (its concurrency token adds one by itself).</summary>
+        public WriteCondition? Condition { get; set; }
+
+        /// <summary>The token value this save writes (set by the save, kept on success).</summary>
+        internal object? NewToken { get; set; }
+
+        /// <summary>The save's conditional write did not apply.</summary>
+        internal bool Conflicted { get; set; }
+
         /// <summary>
         /// Properties whose stored values should be deleted. Separate from null
         /// values, which mean "leave unchanged" on both insert and update.
@@ -58,7 +67,7 @@ namespace EchoPhase.DAL.Scylla.Models
 
         public TrackedEntity Clone()
         {
-            var clone = new TrackedEntity(EntityType, Entity, State) { Options = Options };
+            var clone = new TrackedEntity(EntityType, Entity, State) { Options = Options, Condition = Condition };
             clone.ClearedColumns.UnionWith(ClearedColumns);
             return clone;
         }

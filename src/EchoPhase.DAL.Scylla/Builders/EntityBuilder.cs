@@ -58,6 +58,16 @@ namespace EchoPhase.DAL.Scylla.Builders
 
         public bool IsIgnored(string propertyName) => _ignoredProperties.Contains(propertyName);
 
+        public string? ConcurrencyToken { get; private set; }
+
+        internal void SetConcurrencyToken(string propertyName, Type type)
+        {
+            if (type != typeof(Guid) && type != typeof(int) && type != typeof(long))
+                throw new InvalidOperationException(
+                    $"A concurrency token must be a Guid, int or long; {typeof(TEntity).Name}.{propertyName} is {type.Name}.");
+            ConcurrencyToken = propertyName;
+        }
+
         internal void SetColumnName(string propertyName, string columnName)
         {
             if (string.IsNullOrWhiteSpace(columnName))
@@ -169,6 +179,10 @@ namespace EchoPhase.DAL.Scylla.Builders
                     throw new InvalidOperationException(
                         $"Key property '{key}' not found in entity {typeof(TEntity).Name}");
             }
+
+            if (ConcurrencyToken is not null && _partitionKeys.Concat(_clusteringKeys).Contains(ConcurrencyToken))
+                throw new InvalidOperationException(
+                    $"The concurrency token of {typeof(TEntity).Name} ({ConcurrencyToken}) cannot be part of the primary key.");
         }
 
         #endregion

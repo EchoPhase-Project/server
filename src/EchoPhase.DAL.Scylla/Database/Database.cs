@@ -10,7 +10,6 @@ using EchoPhase.DAL.Scylla.Enums;
 using EchoPhase.DAL.Scylla.Interfaces;
 using EchoPhase.DAL.Scylla.Models;
 using EchoPhase.DAL.Scylla.Schema;
-using ISession = Cassandra.ISession;
 
 namespace EchoPhase.DAL.Scylla.Database
 {
@@ -40,8 +39,6 @@ namespace EchoPhase.DAL.Scylla.Database
         private readonly ISaveStrategy _directStrategy;
         private readonly ISaveStrategy _batchStrategy;
         private bool _disposed;
-
-        public ISession Session => _connection.Session;
 
         public string Keyspace => _connection.Keyspace;
 
@@ -149,6 +146,31 @@ namespace EchoPhase.DAL.Scylla.Database
             }
         }
 
+        /// <summary>Stops tracking the entity: its pending change is dropped (e.g. after a conflict).</summary>
+        public void Detach<T>(T entity)
+        {
+            if (entity is null)
+                throw new ArgumentNullException(nameof(entity));
+            lock (_sync)
+                _changeTracker.Remove(entity);
+        }
+
+        /// <summary>
+        /// Writes one entity now, as a lightweight transaction; true when it
+        /// applied. Its concurrency token, if any, is checked and renewed too.
+        /// Not tracked and not part of the current batch.
+        /// </summary>
+        internal async Task<bool> WriteConditionallyAsync<T>(T entity, EntityState state, WriteCondition? condition,
+            WriteOptions? options, CancellationToken ct)
+        {
+            if (entity is null)
+                throw new ArgumentNullException(nameof(entity));
+            options?.Validate();
+            var tracked = new TrackedEntity(typeof(T), entity, state) { Condition = condition, Options = options };
+            await _directStrategy.ExecuteAsync([tracked], null, ct);
+            return !tracked.Conflicted;
+        }
+
         private static string PropertyName<T>(Expression<Func<T, object?>> expression)
             => expression.Body switch
             {
@@ -222,6 +244,7 @@ namespace EchoPhase.DAL.Scylla.Database
 
             var count = StrategyFor(batch).Execute(snapshot.Select(s => s.Entity), batch);
             Complete(snapshot);
+            ThrowIfConflicted(snapshot);
             return count;
         }
 
@@ -233,7 +256,16 @@ namespace EchoPhase.DAL.Scylla.Database
 
             var count = await StrategyFor(batch).ExecuteAsync(snapshot.Select(s => s.Entity), batch, ct);
             Complete(snapshot);
+            ThrowIfConflicted(snapshot);
             return count;
+        }
+
+        // Conflicted entities stay tracked (Complete skips them): reload, or detach.
+        private static void ThrowIfConflicted(List<(TrackedEntity Entity, int Version)> snapshot)
+        {
+            var conflicted = snapshot.Where(s => s.Entity.Conflicted).Select(s => s.Entity.Entity).ToList();
+            if (conflicted.Count > 0)
+                throw new ScyllaConcurrencyException(conflicted);
         }
 
         // Chosen per call instead of swapped on push/pop, so a save cannot pick
@@ -261,7 +293,7 @@ namespace EchoPhase.DAL.Scylla.Database
             {
                 foreach (var (tracked, version) in snapshot)
                 {
-                    if (tracked.Version == version)
+                    if (tracked.Version == version && !tracked.Conflicted)
                         _changeTracker.Remove(tracked.Entity);
                 }
             }

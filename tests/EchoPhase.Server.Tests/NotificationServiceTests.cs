@@ -11,19 +11,23 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace EchoPhase.Server.Tests
 {
-    /// <summary>NotificationService on the in-memory store: kept, delivered live, read, expiring.</summary>
-    public class NotificationServiceTests
+    /// <summary>NotificationService on its ScyllaDB store (the in-memory engine): kept, delivered live, read, expiring.</summary>
+    public class NotificationServiceTests : IDisposable
     {
         private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
-        private readonly InMemoryNotificationStore _store;
+        private readonly ScyllaTestDb _scylla;
+        private readonly ScyllaNotificationStore _store;
         private readonly RecordingPublisher _publisher = new();
         private readonly NotificationsOptions _options = new() { Ttl = TimeSpan.FromDays(30), InboxSize = 3 };
         private readonly Guid _user = Guid.NewGuid();
 
         public NotificationServiceTests()
         {
-            _store = new InMemoryNotificationStore(_time);
+            _scylla = new ScyllaTestDb(_time);
+            _store = new ScyllaNotificationStore(_scylla.Context());
         }
+
+        public void Dispose() => _scylla.Dispose();
 
         private static CancellationToken Ct => TestContext.Current.CancellationToken;
 

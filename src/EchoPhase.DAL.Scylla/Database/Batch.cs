@@ -1,7 +1,6 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Text.RegularExpressions;
 using Cassandra;
 
 namespace EchoPhase.DAL.Scylla.Database
@@ -13,10 +12,10 @@ namespace EchoPhase.DAL.Scylla.Database
     /// write; an <c>UNLOGGED</c> one is not atomic and is only worth it for
     /// several writes to the same partition.
     /// </summary>
-    public partial class Batch : IDisposable
+    public class Batch : IDisposable
     {
         private readonly Database _database;
-        private readonly List<(BoundStatement Statement, string Table, bool Idempotent)> _statements = new();
+        private readonly List<CqlStatement> _statements = new();
         private bool _committed;
         private bool _disposed;
         private BatchType _batchType;
@@ -36,8 +35,7 @@ namespace EchoPhase.DAL.Scylla.Database
             if (_disposed)
                 throw new ObjectDisposedException(nameof(Batch));
 
-            var prepared = _database.Executor.Prepare(cql);
-            _statements.Add((prepared.Bind(parameters), TableOf(cql), idempotent));
+            _statements.Add(new CqlStatement(cql, parameters, idempotent));
         }
 
         public int StatementCount => _statements.Count;
@@ -60,7 +58,7 @@ namespace EchoPhase.DAL.Scylla.Database
             try
             {
                 if (_statements.Count > 0)
-                    _database.Session.Execute(BuildBatch());
+                    _database.Executor.ExecuteBatch(_statements, _batchType);
 
                 _committed = true;
             }
@@ -77,8 +75,7 @@ namespace EchoPhase.DAL.Scylla.Database
             try
             {
                 if (_statements.Count > 0)
-                    // Driver 3.x: no cancellable ExecuteAsync; WaitAsync releases the caller.
-                    await _database.Session.ExecuteAsync(BuildBatch()).WaitAsync(ct);
+                    await _database.Executor.ExecuteBatchAsync(_statements, _batchType, ct);
 
                 _committed = true;
             }
@@ -86,44 +83,6 @@ namespace EchoPhase.DAL.Scylla.Database
             {
                 _database.PopActiveBatch();
             }
-        }
-
-        private BatchStatement BuildBatch()
-        {
-            WarnIfMisused();
-
-            var batch = new BatchStatement();
-            batch.SetBatchType(_batchType);
-
-            foreach (var (statement, _, _) in _statements)
-                batch.Add(statement);
-
-            // A batch can be retried only when every statement in it can.
-            batch.SetIdempotence(_batchType != BatchType.Counter && _statements.All(s => s.Idempotent));
-            return batch;
-        }
-
-        /// <summary>
-        /// An unlogged batch over several partitions gives no atomicity and makes
-        /// one coordinator fan out to every replica set; separate writes are
-        /// faster. Logged batches across partitions are legitimate but costly.
-        /// </summary>
-        private void WarnIfMisused()
-        {
-            if (_batchType != BatchType.Unlogged)
-                return;
-
-            var partitions = _statements
-                .Select(s => s.Table + ":" + (s.Statement.RoutingKey?.RawRoutingKey is { } key
-                    ? Convert.ToBase64String(key)
-                    : "?"))
-                .Distinct()
-                .Count();
-
-            if (partitions > 1)
-                _database.Executor.Logger?.LogWarning(
-                    $"Unlogged batch spans {partitions} partitions: it is not atomic and adds coordinator load. " +
-                    "Use separate writes, or a Logged batch if atomicity is required.");
         }
 
         private void EnsureUsable()
@@ -134,12 +93,6 @@ namespace EchoPhase.DAL.Scylla.Database
             if (_disposed)
                 throw new ObjectDisposedException(nameof(Batch));
         }
-
-        [GeneratedRegex(@"\b(?:INTO|UPDATE|FROM)\s+([\w.""]+)", RegexOptions.IgnoreCase)]
-        private static partial Regex TableRegex();
-
-        private static string TableOf(string cql)
-            => TableRegex().Match(cql) is { Success: true } m ? m.Groups[1].Value : string.Empty;
 
         public void Rollback()
         {

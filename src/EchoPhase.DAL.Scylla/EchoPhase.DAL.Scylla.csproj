@@ -9,6 +9,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="EchoPhase.DAL.Scylla.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\EchoPhase.Configuration\EchoPhase.Configuration.csproj" />
   </ItemGroup>
 

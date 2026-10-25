@@ -1,11 +1,9 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using Cassandra;
 using EchoPhase.DAL.Scylla.Interfaces;
-using ISession = Cassandra.ISession;
 
 namespace EchoPhase.DAL.Scylla.Database
 {
@@ -18,19 +16,21 @@ namespace EchoPhase.DAL.Scylla.Database
         public bool HasMore => NextPagingState is not null;
     }
 
+    /// <summary>
+    /// Runs CQL through the connection's <see cref="ICqlEngine"/>, logging each
+    /// statement and its timing, and maps rows to results.
+    /// </summary>
     public class QueryExecutor
     {
-        private readonly ISession _session;
-        private readonly ConcurrentDictionary<string, PreparedStatement> _preparedStatements;
-
-        public QueryExecutor(ISession session, IQueryLogger? logger = null)
+        public QueryExecutor(ICqlEngine engine, IQueryLogger? logger = null)
         {
-            _session = session ?? throw new ArgumentNullException(nameof(session));
+            Engine = engine ?? throw new ArgumentNullException(nameof(engine));
             Logger = logger;
-            _preparedStatements = new ConcurrentDictionary<string, PreparedStatement>();
         }
 
         internal IQueryLogger? Logger { get; }
+
+        internal ICqlEngine Engine { get; }
 
         #region Sync
 
@@ -49,27 +49,11 @@ namespace EchoPhase.DAL.Scylla.Database
             Func<Row, TResult>? projector,
             object[] parameters,
             bool idempotent)
-        {
-            var stopwatch = Stopwatch.StartNew();
+            => Project(Run(new CqlStatement(cql, parameters, idempotent), typeof(TResult)).Rows, projector);
 
-            try
-            {
-                Logger?.LogQuery(cql, typeof(TResult), parameters);
-
-                var rowSet = _session.Execute(CreateStatement(cql, parameters, idempotent));
-
-                stopwatch.Stop();
-                Logger?.LogQueryTiming(stopwatch.ElapsedMilliseconds);
-
-                return ProjectResults<TResult>(rowSet, projector, materializeAllPages: true);
-            }
-            catch (Exception ex)
-            {
-                stopwatch.Stop();
-                Logger?.LogError(cql, ex);
-                throw;
-            }
-        }
+        /// <summary>The whole result of a statement: its rows and, for an LWT, whether it applied.</summary>
+        internal CqlResult Run(CqlStatement statement, Type? resultType = null)
+            => Timed(statement, resultType, () => Engine.Execute(statement));
 
         public IEnumerable<Row> Execute(string cql, params object[] parameters)
             => Execute<Row>(cql, null, parameters);
@@ -107,8 +91,8 @@ namespace EchoPhase.DAL.Scylla.Database
             bool idempotent,
             CancellationToken ct)
         {
-            var rowSet = await RunAsync(cql, typeof(TResult), parameters, idempotent, pageSize: null, pagingState: null, ct);
-            return ProjectResults<TResult>(rowSet, projector, materializeAllPages: true);
+            var result = await RunAsync(new CqlStatement(cql, parameters, idempotent), typeof(TResult), ct);
+            return Project(result.Rows, projector);
         }
 
         /// <summary>
@@ -128,9 +112,27 @@ namespace EchoPhase.DAL.Scylla.Database
             if (pageSize < 1)
                 throw new ArgumentOutOfRangeException(nameof(pageSize), "Page size must be positive.");
 
-            var rowSet = await RunAsync(cql, typeof(TResult), parameters, idempotent, pageSize, pagingState, ct);
-            var items = ProjectResults<TResult>(rowSet, projector, materializeAllPages: false);
-            return new ScyllaPage<TResult>(items, rowSet.PagingState);
+            var result = await RunAsync(new CqlStatement(cql, parameters, idempotent, pageSize, pagingState), typeof(TResult), ct);
+            return new ScyllaPage<TResult>(Project(result.Rows, projector), result.PagingState);
+        }
+
+        /// <inheritdoc cref="Run"/>
+        internal async Task<CqlResult> RunAsync(CqlStatement statement, Type? resultType, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                Logger?.LogQuery(statement.Cql, resultType ?? typeof(Row), statement.Values!);
+                var result = await Engine.ExecuteAsync(statement, ct);
+                Logger?.LogQueryTiming(stopwatch.ElapsedMilliseconds);
+                return result;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Logger?.LogError(statement.Cql, ex);
+                throw;
+            }
         }
 
         public Task<IEnumerable<Row>> ExecuteAsync(string cql, params object[] parameters)
@@ -157,88 +159,47 @@ namespace EchoPhase.DAL.Scylla.Database
         internal Task ExecuteNonQueryAsync(string cql, object[] parameters, bool idempotent, CancellationToken ct)
             => ExecuteAsync<Row>(cql, null, parameters, idempotent, ct);
 
-        private async Task<RowSet> RunAsync(
-            string cql,
-            Type resultType,
-            object[] parameters,
-            bool idempotent,
-            int? pageSize,
-            byte[]? pagingState,
-            CancellationToken ct)
-        {
-            ct.ThrowIfCancellationRequested();
-            var stopwatch = Stopwatch.StartNew();
-
-            try
-            {
-                Logger?.LogQuery(cql, resultType, parameters);
-
-                var statement = parameters.Length > 0
-                    ? await CreateBoundStatementAsync(cql, parameters, idempotent, ct)
-                    : new SimpleStatement(cql).SetIdempotence(idempotent);
-
-                if (pageSize is { } size)
-                    statement.SetPageSize(size).SetAutoPage(false).SetPagingState(pagingState);
-
-                // Driver 3.x has no cancellable ExecuteAsync: WaitAsync releases the
-                // caller on cancellation; the server-side request still completes.
-                var rowSet = await _session.ExecuteAsync(statement).WaitAsync(ct);
-
-                stopwatch.Stop();
-                Logger?.LogQueryTiming(stopwatch.ElapsedMilliseconds);
-
-                return rowSet;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                stopwatch.Stop();
-                Logger?.LogError(cql, ex);
-                throw;
-            }
-        }
-
         #endregion
 
-        #region Statements
+        #region Batches
 
-        private IStatement CreateStatement(string cql, object[] parameters, bool idempotent)
-            => parameters.Length > 0
-                ? Prepare(cql).Bind(parameters).SetIdempotence(idempotent)
-                : new SimpleStatement(cql).SetIdempotence(idempotent);
+        internal void ExecuteBatch(IReadOnlyList<CqlStatement> statements, BatchType type)
+            => Timed(new CqlStatement($"BATCH ({statements.Count})", []), null, () =>
+            {
+                Engine.ExecuteBatch(statements, type);
+                return CqlResult.Empty;
+            });
 
-        private async Task<IStatement> CreateBoundStatementAsync(
-            string cql, object[] parameters, bool idempotent, CancellationToken ct)
-            => (await PrepareAsync(cql, ct)).Bind(parameters).SetIdempotence(idempotent);
-
-        /// <summary>
-        /// Prepared statement for <paramref name="cql"/>, shared by everything on
-        /// this connection (queries and batches alike).
-        /// </summary>
-        internal PreparedStatement Prepare(string cql)
-            => _preparedStatements.GetOrAdd(cql, _session.Prepare);
-
-        internal async Task<PreparedStatement> PrepareAsync(string cql, CancellationToken ct = default)
+        internal async Task ExecuteBatchAsync(IReadOnlyList<CqlStatement> statements, BatchType type, CancellationToken ct)
         {
-            if (_preparedStatements.TryGetValue(cql, out var prepared))
-                return prepared;
-
-            prepared = await _session.PrepareAsync(cql).WaitAsync(ct);
-            return _preparedStatements.GetOrAdd(cql, prepared);
+            var stopwatch = Stopwatch.StartNew();
+            await Engine.ExecuteBatchAsync(statements, type, ct);
+            Logger?.LogQueryTiming(stopwatch.ElapsedMilliseconds);
         }
 
         #endregion
 
         #region Results
 
-        private static List<TResult> ProjectResults<TResult>(
-            RowSet rowSet, Func<Row, TResult>? projector, bool materializeAllPages)
+        private CqlResult Timed(CqlStatement statement, Type? resultType, Func<CqlResult> run)
         {
-            // With auto-paging on, enumerating a RowSet fetches further pages;
-            // for a single page only the rows already received are read.
-            IEnumerable<Row> rows = materializeAllPages
-                ? rowSet
-                : rowSet.Take(rowSet.GetAvailableWithoutFetching());
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                Logger?.LogQuery(statement.Cql, resultType ?? typeof(Row), statement.Values!);
+                var result = run();
+                Logger?.LogQueryTiming(stopwatch.ElapsedMilliseconds);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(statement.Cql, ex);
+                throw;
+            }
+        }
 
+        private static List<TResult> Project<TResult>(IReadOnlyList<Row> rows, Func<Row, TResult>? projector)
+        {
             if (projector != null)
                 return rows.Select(projector).ToList();
 
@@ -253,25 +214,15 @@ namespace EchoPhase.DAL.Scylla.Database
         private static TResult MapScalar<TResult>(Row row)
         {
             if (row == null || row.GetValue<object>(0) == null)
-            {
                 return default!;
-            }
 
             var value = row.GetValue<object>(0);
-
             if (value is TResult typedValue)
-            {
                 return typedValue;
-            }
 
             return (TResult)Convert.ChangeType(value, typeof(TResult));
         }
 
         #endregion
-
-        public void ClearPreparedStatements()
-        {
-            _preparedStatements.Clear();
-        }
     }
 }

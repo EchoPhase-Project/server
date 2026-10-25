@@ -4,9 +4,13 @@
 using System.Collections;
 using System.Linq.Expressions;
 using Cassandra;
+using EchoPhase.DAL.Scylla.Cql;
+using EchoPhase.DAL.Scylla.Enums;
 using EchoPhase.DAL.Scylla.Interfaces;
 using EchoPhase.DAL.Scylla.Linq;
 using EchoPhase.DAL.Scylla.Models;
+
+
 
 namespace EchoPhase.DAL.Scylla.Database
 {
@@ -132,6 +136,36 @@ namespace EchoPhase.DAL.Scylla.Database
         /// </summary>
         public void ClearColumns(TEntity entity, params Expression<Func<TEntity, object?>>[] columns)
             => _database.ClearColumns(entity, columns);
+
+        /// <summary>Stops tracking the entity; its pending change is dropped.</summary>
+        public void Detach(TEntity entity) => _database.Detach(entity);
+
+        #endregion
+
+        #region Lightweight transactions
+
+        /// <summary>
+        /// Inserts the row now only if it does not exist (INSERT … IF NOT EXISTS):
+        /// true when it was inserted. A claim, a lock, a unique name.
+        /// </summary>
+        public Task<bool> AddIfNotExistsAsync(TEntity entity, WriteOptions? options = null, CancellationToken ct = default)
+            => _database.WriteConditionallyAsync(entity, EntityState.Added, WriteCondition.NotExists, options, ct);
+
+        /// <summary>
+        /// Updates the row now only if <paramref name="condition"/> holds on the
+        /// stored values (null: only if the row exists): true when it applied.
+        /// E.g. a status change that must not race: <c>r =&gt; r.Status == "queued"</c>.
+        /// </summary>
+        public Task<bool> UpdateIfAsync(TEntity entity, Expression<Func<TEntity, bool>>? condition,
+            WriteOptions? options = null, CancellationToken ct = default)
+            => _database.WriteConditionallyAsync(entity, EntityState.Modified,
+                condition is null ? WriteCondition.Exists : ConditionTranslator.Translate(condition), options, ct);
+
+        /// <summary>Deletes the row now only if <paramref name="condition"/> holds (null: if it exists): true when it applied.</summary>
+        public Task<bool> RemoveIfAsync(TEntity entity, Expression<Func<TEntity, bool>>? condition = null,
+            CancellationToken ct = default)
+            => _database.WriteConditionallyAsync(entity, EntityState.Deleted,
+                condition is null ? WriteCondition.Exists : ConditionTranslator.Translate(condition), null, ct);
 
         #endregion
 

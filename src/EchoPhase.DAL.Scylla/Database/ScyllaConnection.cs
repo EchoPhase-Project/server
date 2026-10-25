@@ -26,11 +26,13 @@ namespace EchoPhase.DAL.Scylla.Database
         internal const string MigrationsTable = "schema_migrations";
         internal const string MigrationLockTable = "schema_migration_lock";
 
-        private readonly ICluster _cluster;
+        private readonly ICluster? _cluster;
+        private readonly ISession? _session;
         private readonly List<IMigration> _migrations;
         private bool _disposed;
 
-        public ISession Session { get; }
+        /// <summary>What runs the CQL: the cluster, or an in-memory engine in tests.</summary>
+        public ICqlEngine Engine { get; }
 
         public string Keyspace { get; }
 
@@ -55,7 +57,7 @@ namespace EchoPhase.DAL.Scylla.Database
 
             try
             {
-                Session = Connect(settings);
+                _session = Connect(settings);
             }
             catch
             {
@@ -63,9 +65,30 @@ namespace EchoPhase.DAL.Scylla.Database
                 throw;
             }
 
-            Executor = new QueryExecutor(Session, Logger);
+            Engine = new DriverCqlEngine(_session, Logger);
+            Executor = new QueryExecutor(Engine, Logger);
 
             // Once per application rather than once per context.
+            EnsureMigrationTables();
+            _migrations = LoadMigrations(migrationAssemblies ?? [Assembly.GetExecutingAssembly()]);
+        }
+
+        /// <summary>
+        /// On another engine, e.g. <see cref="InMemory.InMemoryCqlEngine"/> for
+        /// tests: the same ORM, migrations included, without a cluster.
+        /// </summary>
+        /// <param name="engine">Disposed with the connection.</param>
+        public ScyllaConnection(
+            ICqlEngine engine,
+            string keyspace,
+            IQueryLogger? logger = null,
+            IEnumerable<Assembly>? migrationAssemblies = null)
+        {
+            Engine = engine ?? throw new ArgumentNullException(nameof(engine));
+            Keyspace = keyspace;
+            Logger = logger ?? NullQueryLogger.Instance;
+            Executor = new QueryExecutor(Engine, Logger);
+
             EnsureMigrationTables();
             _migrations = LoadMigrations(migrationAssemblies ?? [Assembly.GetExecutingAssembly()]);
         }
@@ -97,9 +120,10 @@ namespace EchoPhase.DAL.Scylla.Database
 
         private ISession Connect(IScyllaOptions settings)
         {
+            var cluster = _cluster!;
             try
             {
-                return _cluster.Connect(settings.Keyspace);
+                return cluster.Connect(settings.Keyspace);
             }
             catch (InvalidQueryException ex) when (ex.Message.Contains($"Keyspace '{settings.Keyspace}' does not exist"))
             {
@@ -110,14 +134,14 @@ namespace EchoPhase.DAL.Scylla.Database
                         $"Keyspace '{settings.Keyspace}' does not exist. Create it (NetworkTopologyStrategy " +
                         "for clusters) or set Database:Scylla:AutoCreateKeyspace=true for single-node development.", ex);
 
-                using (var bootstrap = _cluster.Connect())
+                using (var bootstrap = cluster.Connect())
                 {
                     var migration = new MigrationBuilder();
                     migration.CreateKeyspace(settings.Keyspace, replicationFactor: settings.ReplicationFactor);
                     bootstrap.Execute(migration.GetCommands().First());
                 }
 
-                return _cluster.Connect(settings.Keyspace);
+                return cluster.Connect(settings.Keyspace);
             }
         }
 
@@ -166,9 +190,9 @@ namespace EchoPhase.DAL.Scylla.Database
             if (_disposed) return;
             _disposed = true;
 
-            Executor.ClearPreparedStatements();
-            Session.Dispose();
-            _cluster.Dispose();
+            Engine.Dispose();
+            _session?.Dispose();
+            _cluster?.Dispose();
         }
     }
 }

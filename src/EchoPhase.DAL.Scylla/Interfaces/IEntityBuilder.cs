@@ -34,6 +34,12 @@ namespace EchoPhase.DAL.Scylla.Interfaces
         bool IsIgnored(string propertyName);
         IReadOnlyDictionary<string, string> GetAllColumnMappings();
         IEnumerable<string> GetMappedProperties();
+
+        /// <summary>
+        /// The property checked on every update and delete (IF token = read value)
+        /// and renewed by it; null when the entity has none.
+        /// </summary>
+        string? ConcurrencyToken { get; }
         void Validate();
     }
 }

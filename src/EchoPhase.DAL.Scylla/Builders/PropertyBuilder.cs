@@ -35,6 +35,19 @@ namespace EchoPhase.DAL.Scylla.Builders
             return this;
         }
 
+        /// <summary>
+        /// Like EF's: every update and delete of the entity checks that this
+        /// property still holds the value it was read with (a lightweight
+        /// transaction) and writes a new one: a Guid (UUIDv7) or a number + 1.
+        /// A save that loses throws <see cref="Database.ScyllaConcurrencyException"/>;
+        /// an add inserts only if the row does not exist.
+        /// </summary>
+        public PropertyBuilder<TEntity, TProp> IsConcurrencyToken()
+        {
+            _entityBuilder.SetConcurrencyToken(_propertyName, typeof(TProp));
+            return this;
+        }
+
         public EntityBuilder<TEntity> And() => _entityBuilder;
     }
 }

@@ -20,20 +20,30 @@ namespace EchoPhase.DAL.Scylla.Cql
         public IReadOnlyList<(string cql, object[] parameters)> Generate(TrackedEntity tracked, IEntityBuilder builder)
         {
             var statements = new List<(string, object[])>();
+            var condition = ConditionFor(tracked, builder);
+            var overrides = builder.ConcurrencyToken is { } token && tracked.NewToken is not null
+                ? new Dictionary<string, object?> { [token] = tracked.NewToken }
+                : null;
 
             switch (tracked.State)
             {
                 case EntityState.Added:
-                    statements.Add(GenerateInsert(tracked.Entity, builder, tracked.Options));
+                    statements.Add(GenerateInsert(tracked.Entity, builder, tracked.Options, overrides, condition));
                     break;
+                case EntityState.Modified when condition is not null:
+                    // One conditional statement: cleared columns are set to null in it.
+                    statements.Add(GenerateUpdate(tracked.Entity, builder, tracked.Options, excluded: null,
+                        cleared: tracked.ClearedColumns, overrides, condition));
+                    return statements;
                 case EntityState.Modified:
                     // Only clearing requested: the column delete alone is the update.
                     if (tracked.ClearedColumns.Count == 0 || HasValuesToSet(tracked, builder))
-                        statements.Add(GenerateUpdate(tracked.Entity, builder, tracked.Options, tracked.ClearedColumns));
+                        statements.Add(GenerateUpdate(tracked.Entity, builder, tracked.Options, tracked.ClearedColumns,
+                            cleared: null, overrides: null, condition: null));
                     break;
                 case EntityState.Deleted:
                     // The row is gone; clearing its columns too would be redundant.
-                    statements.Add(GenerateDelete(tracked.Entity, builder, tracked.Options));
+                    statements.Add(GenerateDelete(tracked.Entity, builder, tracked.Options, condition));
                     return statements;
                 default:
                     return statements;
@@ -45,33 +55,66 @@ namespace EchoPhase.DAL.Scylla.Cql
             return statements;
         }
 
+        /// <summary>
+        /// The IF clause of a tracked write: its own condition, and with a
+        /// concurrency token, IF NOT EXISTS for an add or IF token = (the value
+        /// read) for an update or delete.
+        /// </summary>
+        public static WriteCondition? ConditionFor(TrackedEntity tracked, IEntityBuilder builder)
+        {
+            if (builder.ConcurrencyToken is not { } token)
+                return tracked.Condition;
+
+            if (tracked.State == EntityState.Added)
+                return tracked.Condition ?? WriteCondition.NotExists;
+
+            var checks = (tracked.Condition?.Checks ?? []).ToList();
+            checks.Add(new ConditionCheck(token, "=", tracked.EntityType.GetProperty(token)!.GetValue(tracked.Entity)));
+            return new WriteCondition(false, false, checks);
+        }
+
         public (string cql, object[] parameters) GenerateInsert(object entity, IEntityBuilder builder, WriteOptions? options = null)
+            => GenerateInsert(entity, builder, options, overrides: null, condition: null);
+
+        public (string cql, object[] parameters) GenerateInsert(object entity, IEntityBuilder builder, WriteOptions? options,
+            IReadOnlyDictionary<string, object?>? overrides, WriteCondition? condition)
         {
             var pkNames = ValidatePrimaryKey(builder, entity.GetType());
             GetPrimaryKeyValues(entity, pkNames);
+            if (condition is { IfExists: true } or { Checks.Count: > 0 })
+                throw new InvalidOperationException("An INSERT can only be conditional on the row not existing (IF NOT EXISTS).");
 
             var props = GetMappedProperties(entity.GetType(), builder);
             var columns = props.Select(p => builder.GetColumn(p.Name)).ToList();
             var placeholders = Enumerable.Repeat("?", columns.Count);
 
-            var values = new List<object>(props.Select(p => ValueOrUnset(p, entity)));
-            var (usingClause, usingValues) = BuildUsing(options, allowTtl: true);
+            var values = new List<object>(props.Select(p => ValueOf(p, entity, overrides)));
+            var (usingClause, usingValues) = BuildUsing(options, allowTtl: true, conditional: condition is not null);
             values.AddRange(usingValues);
 
             var cql = $"INSERT INTO {builder.GetFullTableName()} " +
                       $"({string.Join(", ", columns)}) " +
-                      $"VALUES ({string.Join(", ", placeholders)}){usingClause}";
+                      $"VALUES ({string.Join(", ", placeholders)})" +
+                      (condition is { IfNotExists: true } ? " IF NOT EXISTS" : string.Empty) +
+                      usingClause;
 
             return (cql, values.ToArray());
         }
 
         public (string cql, object[] parameters) GenerateUpdate(object entity, IEntityBuilder builder, WriteOptions? options = null)
-            => GenerateUpdate(entity, builder, options, excluded: null);
+            => GenerateUpdate(entity, builder, options, excluded: null, cleared: null, overrides: null, condition: null);
+
+        public (string cql, object[] parameters) GenerateUpdate(object entity, IEntityBuilder builder, WriteOptions? options,
+            WriteCondition? condition)
+            => GenerateUpdate(entity, builder, options, excluded: null, cleared: null, overrides: null, condition);
 
         private (string cql, object[] parameters) GenerateUpdate(
-            object entity, IEntityBuilder builder, WriteOptions? options, IReadOnlySet<string>? excluded)
+            object entity, IEntityBuilder builder, WriteOptions? options, IReadOnlySet<string>? excluded,
+            IReadOnlySet<string>? cleared, IReadOnlyDictionary<string, object?>? overrides, WriteCondition? condition)
         {
             var pkNames = ValidatePrimaryKey(builder, entity.GetType());
+            if (condition is { IfNotExists: true })
+                throw new InvalidOperationException("An UPDATE cannot be conditional on the row not existing; use an INSERT.");
 
             var props = GetMappedProperties(entity.GetType(), builder)
                 .Where(p => !pkNames.Contains(p.Name) && excluded?.Contains(p.Name) != true)
@@ -79,33 +122,65 @@ namespace EchoPhase.DAL.Scylla.Cql
 
             // UPDATE needs at least one SET clause; for key-only entities an INSERT is the equivalent upsert.
             if (props.Count == 0)
-                return GenerateInsert(entity, builder, options);
+                return condition is null
+                    ? GenerateInsert(entity, builder, options)
+                    : throw new InvalidOperationException($"{entity.GetType().Name} has only key columns: nothing to update conditionally.");
 
-            var (usingClause, usingValues) = BuildUsing(options, allowTtl: true);
+            var (usingClause, usingValues) = BuildUsing(options, allowTtl: true, conditional: condition is not null);
 
             // Bind markers are positional: USING comes before SET in the text.
             var values = new List<object>(usingValues);
-            values.AddRange(props.Select(p => ValueOrUnset(p, entity)));
+            values.AddRange(props.Select(p => cleared?.Contains(p.Name) == true ? null! : ValueOf(p, entity, overrides)));
             values.AddRange(GetPrimaryKeyValues(entity, pkNames));
 
             var setClauses = props.Select(p => $"{builder.GetColumn(p.Name)} = ?");
             var cql = $"UPDATE {builder.GetFullTableName()}{usingClause} " +
                       $"SET {string.Join(", ", setClauses)} " +
-                      $"WHERE {BuildWhereClause(builder, pkNames)}";
+                      $"WHERE {BuildWhereClause(builder, pkNames)}" +
+                      IfClause(condition, builder, values);
 
             return (cql, values.ToArray());
         }
 
         public (string cql, object[] parameters) GenerateDelete(object entity, IEntityBuilder builder, WriteOptions? options = null)
+            => GenerateDelete(entity, builder, options, condition: null);
+
+        public (string cql, object[] parameters) GenerateDelete(object entity, IEntityBuilder builder, WriteOptions? options,
+            WriteCondition? condition)
         {
             var pkNames = ValidatePrimaryKey(builder, entity.GetType());
-            var (usingClause, usingValues) = BuildUsing(options, allowTtl: false);
+            if (condition is { IfNotExists: true })
+                throw new InvalidOperationException("A DELETE cannot be conditional on the row not existing.");
+            var (usingClause, usingValues) = BuildUsing(options, allowTtl: false, conditional: condition is not null);
 
             var values = new List<object>(usingValues);
             values.AddRange(GetPrimaryKeyValues(entity, pkNames));
 
-            var cql = $"DELETE FROM {builder.GetFullTableName()}{usingClause} WHERE {BuildWhereClause(builder, pkNames)}";
+            var cql = $"DELETE FROM {builder.GetFullTableName()}{usingClause} WHERE {BuildWhereClause(builder, pkNames)}" +
+                      IfClause(condition, builder, values);
             return (cql, values.ToArray());
+        }
+
+        private static readonly HashSet<string> ConditionOperators = ["=", "!=", "<", "<=", ">", ">="];
+
+        // " IF EXISTS", " IF col = ? AND ...": the values go last, after WHERE's.
+        private static string IfClause(WriteCondition? condition, IEntityBuilder builder, List<object> values)
+        {
+            if (condition is null)
+                return string.Empty;
+            if (condition.IfExists && condition.Checks.Count == 0)
+                return " IF EXISTS";
+            if (condition.Checks.Count == 0)
+                return string.Empty;
+
+            var parts = condition.Checks.Select(check =>
+            {
+                if (!ConditionOperators.Contains(check.Operator))
+                    throw new InvalidOperationException($"Unsupported condition operator '{check.Operator}'.");
+                values.Add(check.Value!);
+                return $"{builder.GetColumn(check.Property)} {check.Operator} ?";
+            });
+            return $" IF {string.Join(" AND ", parts)}";
         }
 
         public (string cql, object[] parameters) GenerateClearColumns(
@@ -121,7 +196,7 @@ namespace EchoPhase.DAL.Scylla.Cql
                 throw new InvalidOperationException(
                     $"Primary key columns cannot be cleared: {string.Join(", ", keyColumns)}. Delete the row instead.");
 
-            var (usingClause, usingValues) = BuildUsing(options, allowTtl: false);
+            var (usingClause, usingValues) = BuildUsing(options, allowTtl: false, conditional: false);
 
             var values = new List<object>(usingValues);
             values.AddRange(GetPrimaryKeyValues(entity, pkNames));
@@ -133,12 +208,15 @@ namespace EchoPhase.DAL.Scylla.Cql
             return (cql, values.ToArray());
         }
 
-        private static (string clause, object[] values) BuildUsing(WriteOptions? options, bool allowTtl)
+        private static (string clause, object[] values) BuildUsing(WriteOptions? options, bool allowTtl, bool conditional)
         {
             if (options is null || options.IsEmpty)
                 return (string.Empty, []);
 
             options.Validate();
+
+            if (conditional && options.Timestamp is not null)
+                throw new InvalidOperationException("A conditional write (lightweight transaction) cannot use a custom timestamp.");
 
             if (options.Ttl is not null && !allowTtl)
                 throw new InvalidOperationException("USING TTL applies to inserts and updates only, not to deletes.");
@@ -171,8 +249,9 @@ namespace EchoPhase.DAL.Scylla.Cql
         }
 
         // Unset leaves null columns untouched instead of writing tombstones.
-        private static object ValueOrUnset(PropertyInfo property, object entity)
-            => property.GetValue(entity) ?? Unset.Value;
+        private static object ValueOf(PropertyInfo property, object entity, IReadOnlyDictionary<string, object?>? overrides)
+            => (overrides is not null && overrides.TryGetValue(property.Name, out var value) ? value : property.GetValue(entity))
+               ?? Unset.Value;
 
         private static List<PropertyInfo> GetMappedProperties(Type type, IEntityBuilder builder) =>
             builder.GetMappedProperties()
