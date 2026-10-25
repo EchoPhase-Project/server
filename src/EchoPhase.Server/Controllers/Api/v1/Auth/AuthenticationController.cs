@@ -1,13 +1,16 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Server.Controllers.Api.v1.Common;
 using EchoPhase.Server.RateLimiting;
+using EchoPhase.Server.Services.Notifications;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -18,13 +21,22 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
     {
         private readonly IAuthenticationService _authService;
         private readonly IUserService _userService;
+        private readonly UserManager<User> _users;
+        private readonly NotificationEventsNotifier _notifier;
+        private readonly ILogger<AuthenticationController> _logger;
 
         public AuthenticationController(
             IAuthenticationService authService,
-            IUserService userService)
+            IUserService userService,
+            UserManager<User> users,
+            NotificationEventsNotifier notifier,
+            ILogger<AuthenticationController> logger)
         {
             _authService = authService;
             _userService = userService;
+            _users = users;
+            _notifier = notifier;
+            _logger = logger;
         }
 
         /// <summary>Creates the account and signs in (sets the token cookies).</summary>
@@ -60,7 +72,23 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
             if (!result.Successful)
                 return Failure(result.Error);
 
+            await TellAboutSignInAsync(dto.Username, ct);
             return NoContent();
+        }
+
+        // The account's owner hears of every sign-in, so a stranger's stands out.
+        private async Task TellAboutSignInAsync(string username, CancellationToken ct)
+        {
+            try
+            {
+                var user = await _users.FindByNameAsync(username);
+                if (user is not null)
+                    await _notifier.SignedInAsync(user.Id, Request.Headers.UserAgent.ToString(), ct);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                _logger.LogWarning(e, "Could not tell about a sign-in");
+            }
         }
 
         [HttpGet("me")]

@@ -20,6 +20,8 @@ namespace EchoPhase.Security.BitMasks.Constants
         /// <summary>Saved block programs and their versions (api/v1/workflows).</summary>
         public const string Workflows = "workflows";
         public const string Files = "files";
+        public const string Notes = "notes";
+        public const string Notifications = "notifications";
         public const string Discord = "discord";
         public const string Twitch = "twitch";
 

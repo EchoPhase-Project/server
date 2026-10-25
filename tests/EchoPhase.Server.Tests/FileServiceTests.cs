@@ -45,7 +45,9 @@ namespace EchoPhase.Server.Tests
 
         private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-        private FileService Files() => new(_db, _storage, Options.Create(_options), _time, NullLogger<FileService>.Instance);
+        private readonly QuotaEvents _events = new();
+
+        private FileService Files() => new(_db, _storage, Options.Create(_options), _time, NullLogger<FileService>.Instance, _events);
 
         private static MemoryStream Text(string value) => new(Encoding.UTF8.GetBytes(value));
 
@@ -238,6 +240,30 @@ namespace EchoPhase.Server.Tests
             public Task<ObjectInfo?> HeadAsync(string key, CancellationToken cancellationToken) => throw new ObjectStorageNotConfiguredException();
             public Task DeleteAsync(string key, CancellationToken cancellationToken) => throw new ObjectStorageNotConfiguredException();
             public IAsyncEnumerable<ObjectInfo> ListAsync(string? prefix, CancellationToken cancellationToken) => throw new ObjectStorageNotConfiguredException();
+        }
+
+        [Fact]
+        public async Task Quota_WarnsOnceWhenAnUploadCrossesTheLine()
+        {
+            // Quota 1500: the line is 1350.
+            await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "a.txt", Text(new string('a', 1000)), 1000, Ct);
+            Assert.Empty(_events.Warnings);
+
+            await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "b.txt", Text(new string('b', 400)), 400, Ct);
+            await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "c.txt", Text("c"), 1, Ct);
+
+            Assert.Equal((_alice.Id, 93), Assert.Single(_events.Warnings));
+        }
+
+        private sealed class QuotaEvents : IFileEvents
+        {
+            public List<(Guid Owner, int Percent)> Warnings { get; } = [];
+
+            public Task QuotaNearlyFullAsync(Guid ownerId, int percent, CancellationToken ct = default)
+            {
+                Warnings.Add((ownerId, percent));
+                return Task.CompletedTask;
+            }
         }
     }
 

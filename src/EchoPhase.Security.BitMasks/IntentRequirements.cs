@@ -19,6 +19,7 @@ namespace EchoPhase.Security.BitMasks
                 [Intents.Connections] = (Resources.Connections, Permissions.Read),
                 [Intents.Impersonation] = (Resources.Sessions, Permissions.Read),
                 [Intents.Blocks] = (Resources.Scripts, Permissions.Read),
+                [Intents.Notifications] = (Resources.Notifications, Permissions.Read),
             };
 
         /// <summary>

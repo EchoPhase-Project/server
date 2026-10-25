@@ -20,6 +20,7 @@ namespace EchoPhase.DAL.Scylla.Tests
             builder.Entity<BlockRun>().Validate();
             builder.Entity<BlockRunResult>().Validate();
             builder.Entity<ActiveBlockRun>().Validate();
+            builder.Entity<Notification>().Validate();
             return builder;
         }
 
@@ -76,6 +77,23 @@ namespace EchoPhase.DAL.Scylla.Tests
             var keys = Model().Entity<ActiveBlockRun>().GetPrimaryKey();
 
             Assert.Equal([nameof(ActiveBlockRun.RunId)], keys);
+        }
+
+        [Fact]
+        public void Inbox_IsOnePartitionPerUser_NewestFirstByTtl()
+        {
+            var userId = Guid.NewGuid();
+            var (cql, _) = QueryHarness.Translate(
+                QueryHarness.Query<Notification>().Where(n => n.UserId == userId), Model().Entity<Notification>());
+            Assert.Contains("FROM notifications WHERE user_id = ?", cql);
+            Assert.DoesNotContain("ALLOW FILTERING", cql);
+
+            var (insert, _) = new CqlGenerator().GenerateInsert(
+                new Notification { UserId = userId, Id = Guid.CreateVersion7(), Kind = "workflow", CreatedAt = DateTimeOffset.UtcNow },
+                Model().Entity<Notification>(), new Models.WriteOptions(Ttl: TimeSpan.FromDays(30)));
+            Assert.StartsWith("INSERT INTO notifications (", insert);
+            Assert.Contains("created_at", insert);
+            Assert.EndsWith("USING TTL ?", insert);
         }
     }
 }

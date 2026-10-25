@@ -8,6 +8,6 @@ namespace EchoPhase.Server.Controllers.Api.v1.Maintenance
     /// <param name="Message">Shown to users; a default one when absent.</param>
     /// <param name="Minutes">It ends by itself after this long; absent: until turned off.</param>
     public sealed record EnableMaintenanceRequest(
-        [property: StringLength(500)] string? Message,
-        [property: Range(1, 7 * 24 * 60)] int? Minutes);
+        [StringLength(500)] string? Message,
+        [Range(1, 7 * 24 * 60)] int? Minutes);
 }

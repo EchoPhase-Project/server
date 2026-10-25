@@ -231,6 +231,72 @@ namespace EchoPhase.DAL.Postgres.Migrations
                     b.ToTable("Impersonations", "EchoPhase");
                 });
 
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.Note", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(100000)
+                        .HasColumnType("character varying(100000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Pinned")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("RemindAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RemindAt")
+                        .HasFilter("\"RemindAt\" IS NOT NULL");
+
+                    b.HasIndex("OwnerId", "Pinned", "UpdatedAt");
+
+                    b.ToTable("Notes", "EchoPhase");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.NoteShare", b =>
+                {
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("CanEdit")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("NoteId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("NoteShares", "EchoPhase");
+                });
+
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.OAuthApp", b =>
                 {
                     b.Property<Guid>("Id")
@@ -994,6 +1060,36 @@ namespace EchoPhase.DAL.Postgres.Migrations
                     b.Navigation("Target");
                 });
 
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.Note", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.NoteShare", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.Note", "Note")
+                        .WithMany("Shares")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Note");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.OAuthApp", b =>
                 {
                     b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
@@ -1182,6 +1278,11 @@ namespace EchoPhase.DAL.Postgres.Migrations
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.ApiClient", b =>
                 {
                     b.Navigation("Permissions");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.Note", b =>
+                {
+                    b.Navigation("Shares");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.OAuthApp", b =>

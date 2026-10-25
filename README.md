@@ -176,6 +176,18 @@ download unless it is a raster image. Limits, from `Storage:Files`:
 (1 GiB) and `PendingTimeout` (1 day: an upload unfinished by then is removed
 by `prune`, as are stored objects left without a record).
 
+## Notes and notifications
+
+Users write notes in Markdown (`/api/v1/notes`), share them with other users
+to read or to edit, and may set a reminder; workflows read and write them
+too (the CreateNote, GetNote, EditNote, DeleteNote and IfNoteExists blocks).
+Notifications (`/api/v1/notifications`) are kept in ScyllaDB per user, for
+`Notifications:Ttl` (30 days), and delivered live over the gateway (intent
+`notifications`), so what a user misses while away waits in their inbox.
+They come from workflows (the Notify block), sign-ins, a storage quota
+nearly full, notes shared with the user and notes' reminders (looked for
+every `Notes:ReminderInterval`, a minute by default).
+
 ## Telemetry
 
 Traces and metrics go out over OTLP when an endpoint is set with the standard

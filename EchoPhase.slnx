@@ -9,6 +9,8 @@
     <Project Path="src/EchoPhase.DAL.Redis/EchoPhase.DAL.Redis.csproj" />
     <Project Path="src/EchoPhase.Storage/EchoPhase.Storage.csproj" />
     <Project Path="src/EchoPhase.Files/EchoPhase.Files.csproj" />
+    <Project Path="src/EchoPhase.Notes/EchoPhase.Notes.csproj" />
+    <Project Path="src/EchoPhase.Notifications/EchoPhase.Notifications.csproj" />
     <Project Path="src/EchoPhase.DAL.Scylla/EchoPhase.DAL.Scylla.csproj" />
     <Project Path="src/EchoPhase.Identity/EchoPhase.Identity.csproj" />
     <Project Path="src/EchoPhase.Profilers/EchoPhase.Profilers.csproj" />

@@ -12,6 +12,7 @@ namespace EchoPhase.DAL.Scylla
         public DbSet<BlockRun> BlockRuns { get; set; } = null!;
         public DbSet<BlockRunResult> BlockRunResults { get; set; } = null!;
         public DbSet<ActiveBlockRun> ActiveBlockRuns { get; set; } = null!;
+        public DbSet<Notification> Notifications { get; set; } = null!;
 
         public ScyllaContext(ScyllaConnection connection) : base(connection)
         {
@@ -65,6 +66,23 @@ namespace EchoPhase.DAL.Scylla
             {
                 [nameof(ActiveBlockRun.RunId)] = "run_id",
                 [nameof(ActiveBlockRun.UserId)] = "user_id",
+            });
+
+            builder.Entity<Notification>()
+                .ToTable("notifications")
+                .HasPartitionKey<Guid>(x => x.UserId)
+                .HasClusteringKey<Guid>(x => x.Id);
+            Columns(builder.Entity<Notification>(), new()
+            {
+                [nameof(Notification.UserId)] = "user_id",
+                [nameof(Notification.Id)] = "id",
+                [nameof(Notification.Kind)] = "kind",
+                [nameof(Notification.Title)] = "title",
+                [nameof(Notification.Body)] = "body",
+                [nameof(Notification.Link)] = "link",
+                [nameof(Notification.Params)] = "params",
+                [nameof(Notification.Read)] = "read",
+                [nameof(Notification.CreatedAt)] = "created_at",
             });
         }
 

@@ -83,6 +83,8 @@
     <ProjectReference Include="..\EchoPhase.WebSockets\EchoPhase.WebSockets.csproj" />
     <ProjectReference Include="..\EchoPhase.WebHooks\EchoPhase.WebHooks.csproj" />
     <ProjectReference Include="..\EchoPhase.Cli\EchoPhase.Cli.csproj" />
+    <ProjectReference Include="..\EchoPhase.Notes\EchoPhase.Notes.csproj" />
+    <ProjectReference Include="..\EchoPhase.Notifications\EchoPhase.Notifications.csproj" />
   </ItemGroup>
 
   <ItemGroup>

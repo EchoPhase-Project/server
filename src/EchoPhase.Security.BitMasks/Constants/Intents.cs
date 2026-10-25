@@ -9,5 +9,6 @@ namespace EchoPhase.Security.BitMasks.Constants
         public const string Connections = "connections";
         public const string Impersonation = "impersonation";
         public const string Blocks = "blocks";
+        public const string Notifications = "notifications";
     }
 }

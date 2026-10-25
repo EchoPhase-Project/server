@@ -26,6 +26,8 @@ namespace EchoPhase.Security.BitMasks
             [Resources.Scripts] = [Permissions.Read, Permissions.Execute],
             [Resources.Workflows] = [.. Crud, Permissions.Execute],
             [Resources.Files] = [Permissions.Read, Permissions.Create, Permissions.Delete],
+            [Resources.Notes] = Crud,
+            [Resources.Notifications] = [Permissions.Read, Permissions.Update, Permissions.Delete],
             [Resources.Discord] = [Permissions.Read, Permissions.Connect],
             [Resources.Twitch] = [Permissions.Read],
             // The realtime gateway is how the webapp gets events; what each

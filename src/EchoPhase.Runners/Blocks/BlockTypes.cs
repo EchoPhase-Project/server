@@ -29,6 +29,12 @@ namespace EchoPhase.Runners.Blocks
         ExecuteWorkflow,
         HttpRequest,
         RespondToWebhook,
-        Storage
+        Storage,
+        CreateNote,
+        GetNote,
+        EditNote,
+        DeleteNote,
+        IfNoteExists,
+        Notify
     }
 }

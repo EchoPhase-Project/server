@@ -23,20 +23,25 @@ namespace EchoPhase.Files
         /// <summary>The prefix of every file's key in the bucket.</summary>
         public const string KeyPrefix = "files/";
 
+        /// <summary>The share of the quota past which the owner is warned (once, on crossing it).</summary>
+        public const int QuotaWarningPercent = 90;
+
         private readonly PostgresContext _db;
         private readonly IObjectStorage _storage;
         private readonly FilesOptions _options;
         private readonly TimeProvider _time;
         private readonly ILogger<FileService> _logger;
+        private readonly IFileEvents? _events;
 
         public FileService(PostgresContext db, IObjectStorage storage, IOptions<FilesOptions> options,
-            TimeProvider time, ILogger<FileService> logger)
+            TimeProvider time, ILogger<FileService> logger, IFileEvents? events = null)
         {
             _db = db;
             _storage = storage;
             _options = options.Value;
             _time = time;
             _logger = logger;
+            _events = events;
         }
 
         /// <summary>The limit of a file of this purpose.</summary>
@@ -110,6 +115,7 @@ namespace EchoPhase.Files
             file.Status = FileStatus.Ready;
             file.UpdatedAt = _time.GetUtcNow().UtcDateTime;
             await _db.SaveChangesAsync(cancellationToken);
+            await WarnAboutQuotaAsync(ownerId, used, used + file.Size, cancellationToken);
             return ServiceResult<StoredFile>.Success(file);
         }
 
@@ -252,6 +258,25 @@ namespace EchoPhase.Files
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Could not delete {Key} from object storage; prune will.", key);
+            }
+        }
+
+        // Tells the owner once, when this upload crossed the warning line.
+        private async Task WarnAboutQuotaAsync(Guid ownerId, long before, long after, CancellationToken ct)
+        {
+            if (_events is null)
+                return;
+            var line = _options.QuotaBytes * QuotaWarningPercent / 100;
+            if (before >= line || after < line)
+                return;
+            try
+            {
+                await _events.QuotaNearlyFullAsync(ownerId, (int)Math.Min(100, after * 100 / _options.QuotaBytes), ct);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // Stored already: only the warning is lost.
+                _logger.LogWarning(e, "Could not warn user {UserId} about their storage quota", ownerId);
             }
         }
 

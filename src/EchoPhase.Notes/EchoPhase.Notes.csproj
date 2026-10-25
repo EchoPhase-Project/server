@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EchoPhase.DAL.Postgres\EchoPhase.DAL.Postgres.csproj" />
+    <ProjectReference Include="..\EchoPhase.Configuration\EchoPhase.Configuration.csproj" />
+    <ProjectReference Include="..\EchoPhase.Types\EchoPhase.Types.csproj" />
+  </ItemGroup>
+
+</Project>

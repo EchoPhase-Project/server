@@ -44,6 +44,8 @@ namespace EchoPhase.DAL.Postgres
         public DbSet<WorkflowVersion> WorkflowVersions { get; set; } = default!;
         public DbSet<StorageEntry> StorageEntries { get; set; } = default!;
         public DbSet<StoredFile> StoredFiles { get; set; } = default!;
+        public DbSet<Note> Notes { get; set; } = default!;
+        public DbSet<NoteShare> NoteShares { get; set; } = default!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

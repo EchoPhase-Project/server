@@ -82,6 +82,18 @@ namespace EchoPhase.Configuration.Extensions
 
             services.AddSingleton<IValidateOptions<Storage.Files.FilesOptions>, Storage.Files.FilesValidator>();
 
+            services.AddOptions<Notifications.NotificationsOptions>()
+                .BindConfiguration(Notifications.NotificationsOptions.SectionName)
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<Notifications.NotificationsOptions>, Notifications.NotificationsValidator>();
+
+            services.AddOptions<Notes.NotesOptions>()
+                .BindConfiguration(Notes.NotesOptions.SectionName)
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<Notes.NotesOptions>, Notes.NotesValidator>();
+
             services.AddOptions<Configuration.Authentication.AuthenticationOptions>()
                 .BindConfiguration(Configuration.Authentication.AuthenticationOptions.SectionName)
                 .ValidateDataAnnotations()
