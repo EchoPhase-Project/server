@@ -10,6 +10,7 @@
       "src/EchoPhase.DAL.Postgres/EchoPhase.DAL.Postgres.csproj",
       "src/EchoPhase.DAL.Redis/EchoPhase.DAL.Redis.csproj",
       "src/EchoPhase.Storage/EchoPhase.Storage.csproj",
+      "src/EchoPhase.Files/EchoPhase.Files.csproj",
       "src/EchoPhase.DAL.Scylla/EchoPhase.DAL.Scylla.csproj",
       "src/EchoPhase.Identity/EchoPhase.Identity.csproj",
       "src/EchoPhase.Profilers/EchoPhase.Profilers.csproj",

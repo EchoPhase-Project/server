@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.Connections;
+using EchoPhase.Files;
 using EchoPhase.Security.Authentication;
 using EchoPhase.Security.Authentication.ApiClients;
 using EchoPhase.Server.Controllers.Api.v1.Common;
@@ -46,7 +47,9 @@ namespace EchoPhase.Server.Controllers.Api
                 => StatusCodes.Status409Conflict,
             BlockRunErrors.TooManyActive => StatusCodes.Status429TooManyRequests,
             ConnectionErrors.Upstream => StatusCodes.Status502BadGateway,
-            BlockRunErrors.QueueFull or ConnectionErrors.NotConfigured
+            FileErrors.TooLarge or FileErrors.QuotaExceeded => StatusCodes.Status413PayloadTooLarge,
+            FileErrors.UnsupportedType => StatusCodes.Status415UnsupportedMediaType,
+            BlockRunErrors.QueueFull or ErrorCodes.NotConfigured
                 => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest
         };

@@ -409,6 +409,70 @@ namespace EchoPhase.DAL.Postgres.Migrations
                     b.ToTable("StorageEntries", "EchoPhase");
                 });
 
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.StoredFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(127)
+                        .HasColumnType("character varying(127)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StorageKey")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex("OwnerId", "Purpose", "Id");
+
+                    b.ToTable("StoredFiles", "EchoPhase");
+                });
+
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -417,6 +481,9 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
+
+                    b.Property<Guid?>("AvatarFileId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -462,10 +529,6 @@ namespace EchoPhase.DAL.Postgres.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("ProfileImageName")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
 
@@ -488,6 +551,8 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasColumnType("character varying(36)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AvatarFileId");
 
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
@@ -978,6 +1043,27 @@ namespace EchoPhase.DAL.Postgres.Migrations
                     b.Navigation("User");
 
                     b.Navigation("Workflow");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.StoredFile", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.User", b =>
+                {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.StoredFile", "AvatarFile")
+                        .WithMany()
+                        .HasForeignKey("AvatarFileId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AvatarFile");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.UserPermissionGrant", b =>

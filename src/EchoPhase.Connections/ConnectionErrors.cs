@@ -23,6 +23,6 @@ namespace EchoPhase.Connections
         public const string Upstream = "Upstream";
 
         /// <summary>The required OAuth application is not configured.</summary>
-        public const string NotConfigured = "NotConfigured";
+        public const string NotConfigured = ErrorCodes.NotConfigured;
     }
 }

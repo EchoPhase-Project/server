@@ -24,7 +24,11 @@ namespace EchoPhase.DAL.Postgres.Configurations
 
             builder.Property(u => u.Name).HasMaxLength(36).IsRequired();
             builder.Property(u => u.UserName).HasMaxLength(36).IsRequired();
-            builder.Property(u => u.ProfileImageName).HasMaxLength(64);
+            // The file goes with its owner; deleting the file only unsets it.
+            builder.HasOne(u => u.AvatarFile)
+                .WithMany()
+                .HasForeignKey(u => u.AvatarFileId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

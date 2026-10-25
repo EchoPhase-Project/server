@@ -32,10 +32,15 @@ namespace EchoPhase.Storage
             _objects[key] = (copy.ToArray(), contentType, _time.GetUtcNow());
         }
 
-        public Task<StoredObject?> GetAsync(string key, CancellationToken cancellationToken) =>
-            Task.FromResult(_objects.TryGetValue(key, out var item)
-                ? new StoredObject(Info(key, item), new MemoryStream(item.Content, writable: false))
-                : null);
+        public Task<StoredObject?> GetAsync(string key, CancellationToken cancellationToken, ByteSpan? range = null)
+        {
+            if (!_objects.TryGetValue(key, out var item))
+                return Task.FromResult<StoredObject?>(null);
+            var content = range is { } span
+                ? new MemoryStream(item.Content, (int)span.From, (int)span.Length, writable: false)
+                : new MemoryStream(item.Content, writable: false);
+            return Task.FromResult<StoredObject?>(new StoredObject(Info(key, item), content));
+        }
 
         public Task<ObjectInfo?> HeadAsync(string key, CancellationToken cancellationToken) =>
             Task.FromResult(_objects.TryGetValue(key, out var item) ? Info(key, item) : null);

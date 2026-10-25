@@ -20,5 +20,7 @@ namespace EchoPhase.Types.Result
         public const string Unauthorized = "Unauthorized";
         /// <summary>Unknown user or wrong password (deliberately not told apart).</summary>
         public const string InvalidCredentials = "InvalidCredentials";
+        /// <summary>A feature needs settings the deployment does not have (503).</summary>
+        public const string NotConfigured = "NotConfigured";
     }
 }

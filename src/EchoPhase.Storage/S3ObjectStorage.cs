@@ -73,11 +73,14 @@ namespace EchoPhase.Storage
             await Client.PutObjectAsync(request, cancellationToken);
         }
 
-        public async Task<StoredObject?> GetAsync(string key, CancellationToken cancellationToken)
+        public async Task<StoredObject?> GetAsync(string key, CancellationToken cancellationToken, ByteSpan? range = null)
         {
             try
             {
-                var response = await Client.GetObjectAsync(_options.Bucket, key, cancellationToken);
+                var request = new GetObjectRequest { BucketName = _options.Bucket, Key = key };
+                if (range is { } span)
+                    request.ByteRange = new ByteRange(span.From, span.To);
+                var response = await Client.GetObjectAsync(request, cancellationToken);
                 var info = new ObjectInfo(key, response.ContentLength, ToOffset(response.LastModified), response.Headers.ContentType);
                 return new StoredObject(info, response.ResponseStream);
             }

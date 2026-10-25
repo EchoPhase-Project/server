@@ -166,6 +166,16 @@ AWS S3, Cloudflare R2, Garage, Ceph RGW), from `Storage:S3` or:
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | the keys, both or neither |
 | `S3_FORCE_PATH_STYLE` | `true` (default, most self-hosted servers) or `false` (bucket in the host name, as AWS prefers) |
 
+With object storage, users keep files through `/api/v1/files` (upload,
+list, fetch with byte ranges, delete) and set their picture with
+`PUT /api/v1/auth/me/avatar`. A file's purpose decides its limit and who
+may read it: an avatar (PNG, JPEG or WebP) any signed-in user, everything
+else only its owner. Its type comes from its content, and it is served as a
+download unless it is a raster image. Limits, from `Storage:Files`:
+`AvatarMaxBytes` (5 MiB), `MaxFileBytes` (100 MiB), `QuotaBytes` per user
+(1 GiB) and `PendingTimeout` (1 day: an upload unfinished by then is removed
+by `prune`, as are stored objects left without a record).
+
 ## Telemetry
 
 Traces and metrics go out over OTLP when an endpoint is set with the standard

@@ -19,8 +19,11 @@ namespace EchoPhase.Storage
         /// <summary>Stores <paramref name="content"/> under the key, replacing what was there.</summary>
         Task PutAsync(string key, Stream content, string? contentType, CancellationToken cancellationToken);
 
-        /// <summary>The object and its content (dispose it), or null when there is none.</summary>
-        Task<StoredObject?> GetAsync(string key, CancellationToken cancellationToken);
+        /// <summary>
+        /// The object and its content (dispose it), or null when there is none;
+        /// with <paramref name="range"/>, only those bytes of the content.
+        /// </summary>
+        Task<StoredObject?> GetAsync(string key, CancellationToken cancellationToken, ByteSpan? range = null);
 
         /// <summary>What is stored under the key, without its content, or null.</summary>
         Task<ObjectInfo?> HeadAsync(string key, CancellationToken cancellationToken);
@@ -30,6 +33,12 @@ namespace EchoPhase.Storage
 
         /// <summary>The objects whose keys start with <paramref name="prefix"/>, in key order.</summary>
         IAsyncEnumerable<ObjectInfo> ListAsync(string? prefix, CancellationToken cancellationToken);
+    }
+
+    /// <summary>Bytes <paramref name="From"/> to <paramref name="To"/> of an object, both included.</summary>
+    public readonly record struct ByteSpan(long From, long To)
+    {
+        public long Length => To - From + 1;
     }
 
     /// <summary>An object's key, size in bytes, last change and content type.</summary>

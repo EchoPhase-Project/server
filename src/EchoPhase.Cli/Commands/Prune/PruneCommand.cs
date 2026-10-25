@@ -4,6 +4,7 @@
 using System.ComponentModel;
 using EchoPhase.Cli.Commands.Maintenance;
 using EchoPhase.DAL.Postgres;
+using EchoPhase.Files;
 using Microsoft.EntityFrameworkCore;
 
 namespace EchoPhase.Cli.Commands.Prune
@@ -31,18 +32,22 @@ namespace EchoPhase.Cli.Commands.Prune
     /// the user signs in again), rotated refresh token hashes of that age
     /// (replaying one then reads as an unknown token instead of ending the
     /// session), impersonations and permission grants that ended that long ago,
-    /// and workflow storage values past their expiry.
+    /// workflow storage values past their expiry, and files: uploads left
+    /// unfinished past Storage:Files:PendingTimeout and stored objects without
+    /// a record (left behind by a failed delete).
     /// Meant for a CronJob.
     /// </summary>
     public class PruneCommand : AsyncCommand<PruneSettings>
     {
         private readonly PostgresContext _db;
         private readonly TimeProvider _time;
+        private readonly FileService _files;
 
-        public PruneCommand(PostgresContext db, TimeProvider time)
+        public PruneCommand(PostgresContext db, TimeProvider time, FileService files)
         {
             _db = db;
             _time = time;
+            _files = files;
         }
 
         public override async Task<int> ExecuteAsync(CommandContext context, PruneSettings settings, CancellationToken cancellationToken)
@@ -77,6 +82,11 @@ namespace EchoPhase.Cli.Commands.Prune
                 var count = settings.DryRun ? await rows.CountAsync(cancellationToken) : await delete();
                 table.AddRow(name, count.ToString());
             }
+            // Files go by Storage:Files:PendingTimeout, not --older-than: an
+            // upload either completes within it or never will.
+            var (pending, orphans) = await _files.PruneAsync(settings.DryRun, cancellationToken);
+            table.AddRow("Unfinished uploads", pending.ToString());
+            table.AddRow("Files without a record", orphans.ToString());
             table.Caption($"older than {cutoff:u}");
             AnsiConsole.Write(table);
             return CliExit.Success;

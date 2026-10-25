@@ -11,6 +11,7 @@ using EchoPhase.DAL.Postgres.Extensions;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Redis.Extensions;
 using EchoPhase.DAL.Scylla.Extensions;
+using EchoPhase.Files.Extensions;
 using EchoPhase.Identity;
 using EchoPhase.Profilers.Extensions;
 using EchoPhase.Projection.Extensions;
@@ -39,7 +40,6 @@ using EchoPhase.Server.Services.Permissions;
 using EchoPhase.Server.Services.Realtime;
 using EchoPhase.Server.Services.Storage;
 using EchoPhase.Server.Services.Workflows;
-using EchoPhase.Storage.Extensions;
 using EchoPhase.WebSockets.Extensions;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
@@ -151,7 +151,7 @@ namespace EchoPhase.Server
             services.AddConfiguredAntiforgery();
             services.AddLocalizationOptions();
             services.AddConfigurations();
-            services.AddObjectStorage();
+            services.AddFiles();
 
             services.AddSingleton<IStringLocalizerFactory, ResourceManagerStringLocalizerFactory>();
             services.AddHostedService<RealtimeCredentialMonitor>();

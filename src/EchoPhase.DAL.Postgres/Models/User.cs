@@ -18,7 +18,9 @@ namespace EchoPhase.DAL.Postgres.Models
         [Expose] public override string? UserName { get; set; }
         [Expose] public string Name { get; set; }
 
-        public string? ProfileImageName { get; set; } = default;
+        /// <summary>The user's picture (a file of purpose Avatar); null: none.</summary>
+        [Expose] public Guid? AvatarFileId { get; set; }
+        public StoredFile? AvatarFile { get; set; }
 
         /// <summary>
         /// IANA time zone (e.g. "Europe/Moscow") for showing and, later,

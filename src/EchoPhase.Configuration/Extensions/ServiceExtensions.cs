@@ -76,6 +76,12 @@ namespace EchoPhase.Configuration.Extensions
 
             services.AddSingleton<IValidateOptions<Storage.S3.S3Options>, Storage.S3.S3Validator>();
 
+            services.AddOptions<Storage.Files.FilesOptions>()
+                .BindConfiguration(Storage.Files.FilesOptions.SectionName)
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<Storage.Files.FilesOptions>, Storage.Files.FilesValidator>();
+
             services.AddOptions<Configuration.Authentication.AuthenticationOptions>()
                 .BindConfiguration(Configuration.Authentication.AuthenticationOptions.SectionName)
                 .ValidateDataAnnotations()
