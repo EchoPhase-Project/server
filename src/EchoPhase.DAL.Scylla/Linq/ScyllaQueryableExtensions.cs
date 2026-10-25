@@ -150,6 +150,26 @@ namespace EchoPhase.DAL.Scylla.Linq
             => Provider(source).ExecutePageAsync<T>(source.Expression, pageSize, pagingState, ct);
 
         /// <summary>
+        /// Streams every matching row, fetching <paramref name="pageSize"/> at a
+        /// time: memory stays bounded however many rows match (an export, a
+        /// migration over a table). Combine with AsNoTracking, or every row
+        /// stays tracked by the context. Do not use Take (see ToPageAsync).
+        /// </summary>
+        public static async IAsyncEnumerable<T> AsAsyncEnumerable<T>(this IQueryable<T> source, int pageSize = 500,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            byte[]? state = null;
+            do
+            {
+                var page = await source.ToPageAsync(pageSize, state, ct);
+                foreach (var item in page.Items)
+                    yield return item;
+                state = page.NextPagingState;
+            }
+            while (state is not null);
+        }
+
+        /// <summary>
         /// Updates the row the Where calls give (its whole primary key, or
         /// several by IN) without reading it, like EF's ExecuteUpdate: counters,
         /// collection appends and removals, map entries and plain values are

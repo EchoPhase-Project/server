@@ -526,7 +526,19 @@ namespace EchoPhase.DAL.Scylla.Cql
             return string.Join(", ", collector.Members.Select(Builder.GetColumn));
         }
 
+        // Compiling a projector costs far more than running the query's CQL
+        // building: shared by queries of one shape (no captured variables).
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<(IEntityBuilder, string), Func<Row, TResult>> Projectors = new();
+
         private Func<Row, TResult> BuildProjector()
+        {
+            var shape = _selector?.ToString() ?? string.Empty;
+            if (shape.Contains("value(", StringComparison.Ordinal))
+                return CompileProjector();
+            return Projectors.GetOrAdd((Builder, shape), _ => CompileProjector());
+        }
+
+        private Func<Row, TResult> CompileProjector()
         {
             var row = Expression.Parameter(typeof(Row), "row");
             var entity = Expression.Variable(_entityType!, "entity");

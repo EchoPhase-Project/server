@@ -1,51 +1,82 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using System.Reflection;
 using Cassandra;
 using EchoPhase.DAL.Scylla.Interfaces;
+using EchoPhase.DAL.Scylla.Models;
 
 namespace EchoPhase.DAL.Scylla.Database
 {
     internal static class EntityMapper
     {
+        private sealed record Column(string Name, string Property, Type Type, ValueConverter? Converter, Action<object, object?> Set);
+
+        private sealed record Plan(Func<object> Create, Column[] Columns);
+
+        // Per entity type and model: what to read and how to set it, with compiled
+        // setters instead of reflection on every row.
+        private static readonly ConcurrentDictionary<(Type, IEntityBuilder), Plan> Plans = new();
+
         public static object Map(Row row, Type entityType, IEntityBuilder builder)
         {
-            var entity = Activator.CreateInstance(entityType)
-                ?? throw new InvalidOperationException($"Cannot create an instance of {entityType.Name}");
+            var plan = Plans.GetOrAdd((entityType, builder), key => BuildPlan(key.Item1, key.Item2));
+            var entity = plan.Create();
 
-            foreach (var propertyName in builder.GetMappedProperties())
+            foreach (var column in plan.Columns)
             {
-                var prop = entityType.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
-                if (prop == null)
-                    continue;
-
-                var columnName = builder.GetColumn(prop.Name);
-
                 // Absent from a projection: nothing to map.
-                if (row.GetColumn(columnName) == null)
+                if (row.GetColumn(column.Name) == null)
                     continue;
 
                 object? value;
                 try
                 {
-                    value = builder.GetConverter(prop.Name) is { } converter
-                        ? converter.FromProvider(row.GetValue(converter.ProviderType, columnName))
-                        : Coerce(row.GetValue(prop.PropertyType, columnName), prop.PropertyType);
+                    value = column.Converter is { } converter
+                        ? converter.FromProvider(row.GetValue(converter.ProviderType, column.Name))
+                        : Coerce(row.GetValue(column.Type, column.Name), column.Type);
                 }
                 catch (Exception ex)
                 {
                     // Silently skipping would return entities with default values
                     // that look valid; a schema/type mismatch must be visible.
                     throw new InvalidOperationException(
-                        $"Cannot map column '{columnName}' to {entityType.Name}.{prop.Name} ({prop.PropertyType.Name}).", ex);
+                        $"Cannot map column '{column.Name}' to {entityType.Name}.{column.Property} ({column.Type.Name}).", ex);
                 }
 
                 if (value != null && value != DBNull.Value)
-                    prop.SetValue(entity, value);
+                    column.Set(entity, value);
             }
 
             return entity;
+        }
+
+        private static Plan BuildPlan(Type entityType, IEntityBuilder builder)
+        {
+            if (entityType.GetConstructor(Type.EmptyTypes) is null)
+                throw new InvalidOperationException($"Cannot create an instance of {entityType.Name}: it needs a parameterless constructor.");
+            var create = Expression.Lambda<Func<object>>(Expression.Convert(Expression.New(entityType), typeof(object))).Compile();
+
+            var columns = new List<Column>();
+            foreach (var propertyName in builder.GetMappedProperties())
+            {
+                var prop = entityType.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+                if (prop is not { CanWrite: true })
+                    continue;
+
+                var target = Expression.Parameter(typeof(object), "entity");
+                var value = Expression.Parameter(typeof(object), "value");
+                var set = Expression.Lambda<Action<object, object?>>(
+                    Expression.Assign(
+                        Expression.Property(Expression.Convert(target, entityType), prop),
+                        Expression.Convert(value, prop.PropertyType)),
+                    target, value).Compile();
+
+                columns.Add(new Column(builder.GetColumn(prop.Name), prop.Name, prop.PropertyType, builder.GetConverter(prop.Name), set));
+            }
+            return new Plan(create, columns.ToArray());
         }
 
         // The driver hands collections back in its own types (a SortedDictionary

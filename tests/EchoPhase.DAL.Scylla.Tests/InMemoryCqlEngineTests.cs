@@ -80,6 +80,24 @@ namespace EchoPhase.DAL.Scylla.Tests
         }
 
         [Fact]
+        public async Task Streaming_ReadsEveryRow_APageAtATime()
+        {
+            using var db = await Migrated();
+            var user = Guid.NewGuid();
+            for (var i = 0; i < 7; i++)
+                db.BlockRuns.Add(new BlockRun { UserId = user, RunId = Guid.CreateVersion7(), Status = "queued" });
+            await db.SaveChangesAsync(Ct);
+            _engine.Log.Clear();
+
+            var seen = 0;
+            await foreach (var _ in db.BlockRuns.Where(r => r.UserId == user).AsNoTracking().AsAsyncEnumerable(pageSize: 3, ct: Ct))
+                seen++;
+
+            Assert.Equal(7, seen);
+            Assert.Equal(3, _engine.Log.Count(c => c.StartsWith("SELECT")));
+        }
+
+        [Fact]
         public async Task UpdateAndRemove_WriteThrough()
         {
             using var db = await Migrated();
