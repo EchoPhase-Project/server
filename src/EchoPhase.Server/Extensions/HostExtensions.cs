@@ -175,6 +175,34 @@ namespace EchoPhase.Server.Extensions
                         .WithExample(new[] { "maintenance", "status" });
                 });
 
+                config.AddBranch<Commands.Storage.StorageSettings>("storage", storage =>
+                {
+                    storage.SetDescription("Object storage (S3): check it, upload, download, list and remove objects");
+
+                    storage.AddCommand<Commands.Storage.CheckCommand>("check")
+                        .WithDescription("Check that the bucket answers")
+                        .WithExample(new[] { "storage", "check" });
+
+                    storage.AddCommand<Commands.Storage.PutCommand>("put")
+                        .WithDescription("Upload a file (stdin when no file is given) under a key")
+                        .WithExample(new[] { "storage", "put", "tests/hello.txt", "hello.txt" })
+                        .WithExample(new[] { "storage", "put", "tests/notes.md", "notes.md", "--content-type", "text/markdown" });
+
+                    storage.AddCommand<Commands.Storage.GetCommand>("get")
+                        .WithDescription("Download an object to a file or stdout")
+                        .WithExample(new[] { "storage", "get", "tests/hello.txt" })
+                        .WithExample(new[] { "storage", "get", "tests/hello.txt", "hello.txt" });
+
+                    storage.AddCommand<Commands.Storage.ListCommand>("ls")
+                        .WithDescription("List objects, optionally under a prefix")
+                        .WithExample(new[] { "storage", "ls" })
+                        .WithExample(new[] { "storage", "ls", "tests/", "--json" });
+
+                    storage.AddCommand<Commands.Storage.DeleteCommand>("rm")
+                        .WithDescription("Remove an object")
+                        .WithExample(new[] { "storage", "rm", "tests/hello.txt" });
+                });
+
                 config.AddCommand<Commands.Database.Migrate.MigrateCommand>("migrate")
                     .WithDescription("Apply database migrations")
                     .WithExample(new[] { "migrate" })
@@ -186,7 +214,7 @@ namespace EchoPhase.Server.Extensions
                     .WithExample(new[] { "prune", "--older-than", "30d" });
 
                 config.AddCommand<Commands.Check.CheckCommand>("check")
-                    .WithDescription("Validate the settings and check Postgres, Scylla and Redis, and pending migrations")
+                    .WithDescription("Validate the settings and check Postgres, Scylla, Redis, object storage (if configured) and pending migrations")
                     .WithExample(new[] { "check" });
 
                 config.AddCommand<DiagnosticsCommands.ReportTestErrorCommand>("report-test-error")

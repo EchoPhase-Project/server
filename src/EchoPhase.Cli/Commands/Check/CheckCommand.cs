@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Scylla;
+using EchoPhase.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -17,8 +18,8 @@ namespace EchoPhase.Cli.Commands.Check
 
     /// <summary>
     /// Whether this configuration can run: the settings pass the validation
-    /// the server does on start (commands run before it), each store answers,
-    /// and no migration is pending.
+    /// the server does on start (commands run before it), each store answers
+    /// (object storage when it is configured), and no migration is pending.
     /// Exit 1 if anything fails, for an init container or a deploy step.
     /// </summary>
     public class CheckCommand : AsyncCommand<CheckSettings>
@@ -28,13 +29,16 @@ namespace EchoPhase.Cli.Commands.Check
         private readonly PostgresContext _postgres;
         private readonly ScyllaContext _scylla;
         private readonly IConnectionMultiplexer _redis;
+        private readonly IObjectStorage _storage;
         private readonly IServiceProvider _services;
 
-        public CheckCommand(PostgresContext postgres, ScyllaContext scylla, IConnectionMultiplexer redis, IServiceProvider services)
+        public CheckCommand(PostgresContext postgres, ScyllaContext scylla, IConnectionMultiplexer redis,
+            IObjectStorage storage, IServiceProvider services)
         {
             _postgres = postgres;
             _scylla = scylla;
             _redis = redis;
+            _storage = storage;
             _services = services;
         }
 
@@ -87,6 +91,15 @@ namespace EchoPhase.Cli.Commands.Check
                 var latency = await _redis.GetDatabase().PingAsync().WaitAsync(ct);
                 return $"ping {latency.TotalMilliseconds:0} ms";
             });
+
+            if (_storage.IsConfigured)
+            {
+                await Run("Object storage", async ct =>
+                {
+                    await _storage.CheckAsync(ct);
+                    return "bucket answers";
+                });
+            }
 
             AnsiConsole.Write(table);
             return failed ? CliExit.Failure : CliExit.Success;

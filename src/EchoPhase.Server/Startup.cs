@@ -39,6 +39,7 @@ using EchoPhase.Server.Services.Permissions;
 using EchoPhase.Server.Services.Realtime;
 using EchoPhase.Server.Services.Storage;
 using EchoPhase.Server.Services.Workflows;
+using EchoPhase.Storage.Extensions;
 using EchoPhase.WebSockets.Extensions;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
@@ -150,6 +151,7 @@ namespace EchoPhase.Server
             services.AddConfiguredAntiforgery();
             services.AddLocalizationOptions();
             services.AddConfigurations();
+            services.AddObjectStorage();
 
             services.AddSingleton<IStringLocalizerFactory, ResourceManagerStringLocalizerFactory>();
             services.AddHostedService<RealtimeCredentialMonitor>();
