@@ -67,7 +67,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Users
                 return UserNotFound(username);
 
             var result = await _permissions.GrantAsync(actor, target, resource, dto.Permissions, dto.Reason, dto.ExpiresAt, ct);
-            return result.Successful ? Ok(View(result.Value!, _time.GetUtcNow().UtcDateTime)) : Failure(result.Error);
+            return result.Successful ? Ok(View(result.Value, _time.GetUtcNow().UtcDateTime)) : Failure(result.Error);
         }
 
         [HttpDelete("{username:username}/permissions/{resource}")]

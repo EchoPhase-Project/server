@@ -41,7 +41,7 @@ namespace EchoPhase.Runners.Tests
         {
             // 25 October 2026 in Berlin: 02:30 happens twice; one run, at the first (00:30 UTC).
             var first = CronSchedule.Next("30 2 * * *", "Europe/Berlin", new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero));
-            var second = CronSchedule.Next("30 2 * * *", "Europe/Berlin", first!.Value);
+            var second = CronSchedule.Next("30 2 * * *", "Europe/Berlin", Assert.NotNull(first));
 
             Assert.Equal(new DateTimeOffset(2026, 10, 25, 0, 30, 0, TimeSpan.Zero), first);
             Assert.Equal(new DateTimeOffset(2026, 10, 26, 1, 30, 0, TimeSpan.Zero), second);

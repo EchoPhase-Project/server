@@ -22,7 +22,7 @@ namespace EchoPhase.Server.Tests
                 where type.GetMethod("<Clone>$") is not null
                 from ctor in type.GetConstructors()
                 from parameter in ctor.GetParameters()
-                let property = type.GetProperty(parameter.Name!)
+                let property = parameter.Name is { } name ? type.GetProperty(name) : null
                 where property is not null && property.GetCustomAttributes<ValidationAttribute>().Any()
                 select $"{type.Name}.{property.Name}";
 

@@ -14,7 +14,7 @@ namespace EchoPhase.Scripting.Tests
               "name": "shop", "empty": {}, "none": null, "ok": true, "count": 2 }
             """;
 
-        private static Dictionary<string, object> With(bool lazy)
+        private static Dictionary<string, object?> With(bool lazy)
         {
             using var document = JsonDocument.Parse(Document);
             var root = document.RootElement.Clone();
@@ -22,7 +22,7 @@ namespace EchoPhase.Scripting.Tests
         }
 
         // The document is an object, so its value is never null.
-        private static Dictionary<string, object> Body(object? body)
+        private static Dictionary<string, object?> Body(object? body)
         {
             Assert.NotNull(body);
             return new() { ["body"] = body };
@@ -97,8 +97,8 @@ namespace EchoPhase.Scripting.Tests
                 return GC.GetAllocatedBytesForCurrentThread() - before;
             }
 
-            long whole = Allocated(() => Eval.TypedExecute<object>("body.items[3].name", Body(Eval.Plain(root))));
-            long lazy = Allocated(() => Eval.TypedExecute<object>("body.items[3].name", Body(Eval.FromJsonLazily(root))));
+            long whole = Allocated(() => Eval.EvaluateExpression("body.items[3].name", Body(Eval.Plain(root))));
+            long lazy = Allocated(() => Eval.EvaluateExpression("body.items[3].name", Body(Eval.FromJsonLazily(root))));
 
             Assert.True(lazy * 5 < whole, $"lazy {lazy} B, at once {whole} B");
         }

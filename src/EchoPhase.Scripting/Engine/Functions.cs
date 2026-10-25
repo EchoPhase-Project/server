@@ -17,7 +17,7 @@ namespace EchoPhase.Scripting.Engine
         /// A body that reads the variables (the program's time zone) is not
         /// pure: its value depends on more than its arguments.
         /// </summary>
-        private sealed record Definition(int MinArgs, int MaxArgs, Func<object?[], IDictionary<string, object>, object?> Body, bool ReadsVariables = true)
+        private sealed record Definition(int MinArgs, int MaxArgs, Func<object?[], IDictionary<string, object?>, object?> Body, bool ReadsVariables = true)
         {
             public Definition(int minArgs, int maxArgs, Func<object?[], object?> body)
                 : this(minArgs, maxArgs, (a, _) => body(a), ReadsVariables: false)
@@ -81,7 +81,7 @@ namespace EchoPhase.Scripting.Engine
         };
 
         /// <summary>The function, and whether the same arguments always give the same value (so a call on constants can be computed when parsed).</summary>
-        public static (Func<object?[], IDictionary<string, object>, object?> Body, bool Pure) Resolve(string name, int arguments, int position)
+        public static (Func<object?[], IDictionary<string, object?>, object?> Body, bool Pure) Resolve(string name, int arguments, int position)
         {
             if (!All.TryGetValue(name, out var definition))
                 throw new ScriptSyntaxException($"Unknown function '{name}'", position);

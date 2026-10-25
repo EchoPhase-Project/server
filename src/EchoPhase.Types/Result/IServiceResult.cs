@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace EchoPhase.Types.Result
 {
     /// <summary>
@@ -33,6 +35,13 @@ namespace EchoPhase.Types.Result
     /// </summary>
     public interface IServiceResult<T> : IServiceResult
     {
+        /// <summary>
+        /// Whether the operation succeeded; when it did, <see cref="Value"/> holds
+        /// its value (null only when <typeparamref name="T"/> itself allows null).
+        /// </summary>
+        [MemberNotNullWhen(true, nameof(Value))]
+        new bool Successful { get; }
+
         /// <summary>
         /// Gets the value returned by the operation, or default if none.
         /// </summary>

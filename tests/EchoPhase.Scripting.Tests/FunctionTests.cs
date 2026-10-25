@@ -6,7 +6,7 @@ namespace EchoPhase.Scripting.Tests
     /// <summary>Literals, lambdas and the list, text, JSON and date functions.</summary>
     public class FunctionTests
     {
-        private static readonly Dictionary<string, object> Users = new()
+        private static readonly Dictionary<string, object?> Users = new()
         {
             ["users"] = new List<object?>
             {
@@ -16,10 +16,10 @@ namespace EchoPhase.Scripting.Tests
             }
         };
 
-        private static object? Run(string expression, Dictionary<string, object>? vars = null)
-            => Eval.TypedExecute<object>(expression, vars ?? []);
+        private static object? Run(string expression, Dictionary<string, object?>? vars = null)
+            => Eval.EvaluateExpression(expression, vars ?? []);
 
-        private static string Text(string expression, Dictionary<string, object>? vars = null)
+        private static string Text(string expression, Dictionary<string, object?>? vars = null)
             => Eval.TypedExecute<string>(expression, vars ?? []);
 
         [Fact]
@@ -44,7 +44,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Lambdas_SeeTheVariablesAround()
         {
-            var vars = new Dictionary<string, object>(Users) { ["min"] = 40L };
+            var vars = new Dictionary<string, object?>(Users) { ["min"] = 40L };
             Assert.Equal(1d, Run("count(users, u => u.age > min)", vars));
         }
 
@@ -63,7 +63,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Sort_IsStable_TypesKeys_AndExplainsMixedLists()
         {
-            var pairs = new Dictionary<string, object>
+            var pairs = new Dictionary<string, object?>
             {
                 ["xs"] = new List<object?>
             {
@@ -114,7 +114,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Dates_InTheProgramsZone()
         {
-            var vars = new Dictionary<string, object> { [Eval.TimeZoneVariable] = "Europe/Moscow" };
+            var vars = new Dictionary<string, object?> { [Eval.TimeZoneVariable] = "Europe/Moscow" };
             Assert.Equal("2026-10-20T12:00:00+03:00", Text("date('2026-10-20T09:00:00Z')", vars));
             Assert.Equal("2026-10-20T09:00:00+03:00", Text("date('2026-10-20 09:00')", vars));
             Assert.Equal("2026-10-23T09:00:00+03:00", Text("dateAdd('2026-10-20 09:00', 3, 'days')", vars));
@@ -130,7 +130,7 @@ namespace EchoPhase.Scripting.Tests
         public void Dates_FollowDaylightSaving()
         {
             // Berlin leaves summer time on 2026-10-25: a day later is the same wall time.
-            var berlin = new Dictionary<string, object> { [Eval.TimeZoneVariable] = "Europe/Berlin" };
+            var berlin = new Dictionary<string, object?> { [Eval.TimeZoneVariable] = "Europe/Berlin" };
             Assert.Equal("2026-10-25T12:00:00+01:00", Text("dateAdd('2026-10-24T12:00:00+02:00', 1, 'day')", berlin));
         }
 

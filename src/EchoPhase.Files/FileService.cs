@@ -180,7 +180,7 @@ namespace EchoPhase.Files
                 return uploaded;
 
             var previous = user.AvatarFileId;
-            user.AvatarFileId = uploaded.Value!.Id;
+            user.AvatarFileId = uploaded.Value.Id;
             await _db.SaveChangesAsync(cancellationToken);
             if (previous is { } old)
                 await DeleteAsync(userId, old, cancellationToken);

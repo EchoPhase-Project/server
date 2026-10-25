@@ -10,7 +10,7 @@ namespace EchoPhase.Scripting.Tests
     /// </summary>
     public class NumericPathTests
     {
-        private static readonly Dictionary<string, object> Vars = new()
+        private static readonly Dictionary<string, object?> Vars = new()
         {
             ["one"] = 1d,
             ["two"] = 2d,
@@ -69,14 +69,14 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Lambdas_SumWithoutBoxing_StillReadAnyValue()
         {
-            var vars = new Dictionary<string, object>
+            var vars = new Dictionary<string, object?>
             {
                 ["xs"] = new List<object?> { 1L, "2", true, 3.5 },
             };
             Assert.Equal(7.5, Eval.TypedExecute<double>("sum(xs)", vars));
             Assert.Equal(15d, Eval.TypedExecute<double>("sum(xs, x => x * 2)", vars));
             Assert.Equal(0.90625, Eval.TypedExecute<double>("avg(xs, (x, i) => x * i / 4)", vars), 12);
-            Assert.Null(Eval.TypedExecute<object>("avg([])", vars));
+            Assert.Null(Eval.EvaluateExpression("avg([])", vars));
         }
     }
 }

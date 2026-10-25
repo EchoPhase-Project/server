@@ -20,7 +20,7 @@ namespace EchoPhase.DAL.Scylla.Loggers
             _logger = logger;
         }
 
-        public void LogQuery(string cql, Type resultType, object[] parameters)
+        public void LogQuery(string cql, Type resultType, object?[] parameters)
         {
             if (_logger.IsEnabled(LogLevel.Debug))
                 _logger.LogDebug("Executing CQL returning {ResultType} with {ParameterCount} parameter(s): {Cql}",

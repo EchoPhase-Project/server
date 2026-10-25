@@ -57,6 +57,7 @@ namespace EchoPhase.DAL.Scylla.Models
 
         /// <summary>A value as JSON text: for structures CQL has no type for.</summary>
         public static ValueConverter<T, string> Json<T>(JsonSerializerOptions? options = null)
-            => new(v => JsonSerializer.Serialize(v, options), s => JsonSerializer.Deserialize<T>(s, options)!);
+            => new(v => JsonSerializer.Serialize(v, options), s => JsonSerializer.Deserialize<T>(s, options)
+                 ?? throw new InvalidOperationException($"The stored JSON is null, not a {typeof(T).Name}."));
     }
 }

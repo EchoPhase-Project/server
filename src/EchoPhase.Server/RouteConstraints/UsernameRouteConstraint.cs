@@ -21,7 +21,7 @@ namespace EchoPhase.Server.RouteConstraints
             if (!values.TryGetValue(routeKey, out var value) || value is null)
                 return false;
 
-            return UsernameRegex().IsMatch(value.ToString()!);
+            return value.ToString() is { } text && UsernameRegex().IsMatch(text);
         }
     }
 }

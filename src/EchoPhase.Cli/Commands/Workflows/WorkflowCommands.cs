@@ -47,7 +47,7 @@ namespace EchoPhase.Cli.Commands.Workflows
             if (!string.IsNullOrWhiteSpace(settings.User))
             {
                 var owner = settings.User.Trim();
-                workflows = workflows.Where(w => w.User!.UserName == owner);
+                workflows = workflows.Where(w => w.User != null && w.User.UserName == owner);
             }
             if (settings.Active)
                 workflows = workflows.Where(w => w.Active);
@@ -62,7 +62,7 @@ namespace EchoPhase.Cli.Commands.Workflows
                         page = page.Where(w => w.CreatedAt > since);
                     return page.OrderBy(w => w.CreatedAt).Take(take)
                         .Select(w => new WorkflowRow(
-                            w.Id, w.User!.UserName, w.Name, w.Active, w.Version,
+                            w.Id, w.User != null ? w.User.UserName : null, w.Name, w.Active, w.Version,
                             w.Schedules.Count(),
                             w.Active ? w.Schedules.Min(s => (DateTime?)s.NextRunAt) : null,
                             w.CreatedAt, w.UpdatedAt))

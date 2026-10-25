@@ -66,7 +66,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             tracked.Conflicted = false;
             tracked.NewToken = null;
             if (builder.ConcurrencyToken is { } token && tracked.State is EntityState.Added or EntityState.Modified)
-                tracked.NewToken = NextToken(tracked.EntityType.GetProperty(token)!.GetValue(tracked.Entity));
+                tracked.NewToken = NextToken(Reflect.Property(tracked.EntityType, token).GetValue(tracked.Entity));
             return CqlGenerator.ConditionFor(tracked, builder) is not null;
         }
 
@@ -79,7 +79,7 @@ namespace EchoPhase.DAL.Scylla.Cql
                 return 0;
             }
             if (builder.ConcurrencyToken is { } token && tracked.NewToken is not null)
-                tracked.EntityType.GetProperty(token)!.SetValue(tracked.Entity, tracked.NewToken);
+                Reflect.Property(tracked.EntityType, token).SetValue(tracked.Entity, tracked.NewToken);
             return 1;
         }
 

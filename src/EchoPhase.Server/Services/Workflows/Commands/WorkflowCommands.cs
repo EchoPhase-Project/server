@@ -83,7 +83,7 @@ namespace EchoPhase.Server.Services.Workflows.Commands
             }
 
             AnsiConsole.MarkupLineInterpolated(
-                $"[green]Imported '{result.Value!.Workflow.Name}' for '{settings.User}' as {result.Value.Workflow.Id}, inactive.[/]");
+                $"[green]Imported '{result.Value.Workflow.Name}' for '{settings.User}' as {result.Value.Workflow.Id}, inactive.[/]");
             return CliExit.Success;
         }
     }
@@ -153,7 +153,7 @@ namespace EchoPhase.Server.Services.Workflows.Commands
                 || !root.TryGetProperty("program", out var program) || program.ValueKind != JsonValueKind.Object)
                 throw new FormatException("Expected { \"name\": \"...\", \"program\": { ... } }, as `workflow export` writes.");
 
-            return (name.GetString()!, program.Deserialize<BlockProgram>(BlockParamsBinder.Options) ?? new BlockProgram());
+            return (name.GetString() ?? throw new FormatException("The workflow's name is null."), program.Deserialize<BlockProgram>(BlockParamsBinder.Options) ?? new BlockProgram());
         }
     }
 }

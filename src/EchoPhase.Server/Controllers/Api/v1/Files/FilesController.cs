@@ -33,8 +33,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Files
     public sealed class UploadFileRequest
     {
         /// <summary>The file.</summary>
-        [Required]
-        public IFormFile File { get; set; } = default!;
+        public required IFormFile File { get; set; }
 
         /// <summary>Import or Attachment (avatars: PUT /api/v1/auth/me/avatar; artifacts come from workflows).</summary>
         public FilePurpose Purpose { get; set; } = FilePurpose.Attachment;
@@ -78,7 +77,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Files
             var result = await _files.UploadAsync(User.GetUserId(), dto.Purpose, dto.File.FileName, content, dto.File.Length, ct);
             if (!result.Successful)
                 return Failure(result.Error);
-            return CreatedAtAction(nameof(Get), new { id = result.Value!.Id }, FileResponse.From(result.Value));
+            return CreatedAtAction(nameof(Get), new { id = result.Value.Id }, FileResponse.From(result.Value));
         }
 
         /// <summary>The caller's files, oldest first, a page at a time: pass the last id as `after`.</summary>
@@ -99,7 +98,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Files
         public async Task<IActionResult> Get(Guid id, CancellationToken ct)
         {
             var result = await _files.GetAsync(User.GetUserId(), id, ct);
-            return result.Successful ? Ok(FileResponse.From(result.Value!)) : Failure(result.Error);
+            return result.Successful ? Ok(FileResponse.From(result.Value)) : Failure(result.Error);
         }
 
         /// <summary>
@@ -119,7 +118,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Files
             var found = await _files.GetAsync(User.GetUserId(), id, ct);
             if (!found.Successful)
                 return Failure(found.Error);
-            var file = found.Value!;
+            var file = found.Value;
 
             var etag = new EntityTagHeaderValue($"\"{file.Sha256}\"");
             var headers = Response.GetTypedHeaders();
@@ -151,7 +150,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Files
             disposition.SetHttpFileName(file.Name);
             Response.Headers.ContentDisposition = disposition.ToString();
 
-            await using var stored = opened.Value!;
+            await using var stored = opened.Value;
             Response.ContentType = file.ContentType;
             if (range is { } span)
             {

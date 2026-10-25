@@ -8,10 +8,10 @@ namespace EchoPhase.Clients.Discord.Dto
     public class DiscordUserGuildsResponseDto
     {
         [JsonPropertyName("id")]
-        public string Id { get; set; } = null!;
+        public required string Id { get; set; }
 
         [JsonPropertyName("name")]
-        public string Name { get; set; } = null!;
+        public required string Name { get; set; }
 
         [JsonPropertyName("icon")]
         public string? Icon
@@ -32,7 +32,7 @@ namespace EchoPhase.Clients.Discord.Dto
         }
 
         [JsonPropertyName("permissions")]
-        public string Permissions { get; set; } = null!;
+        public required string Permissions { get; set; }
 
         [JsonPropertyName("features")]
         public List<string> Features { get; set; } = new();

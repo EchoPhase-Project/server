@@ -160,7 +160,8 @@ namespace EchoPhase.DAL.Scylla.InMemory
                 Literal l => l.Value,
                 ListLiteral list => list.Items.Select(Raw).ToList(),
                 SetLiteral set => set.Items.Select(Raw).ToList(),
-                MapLiteral map => map.Pairs.ToDictionary(p => Raw(p.Key)!, p => Raw(p.Value)),
+                MapLiteral map => map.Pairs.ToDictionary(
+                    p => Raw(p.Key) ?? throw new InvalidQueryException("A map key cannot be null."), p => Raw(p.Value)),
                 _ => throw new NotSupportedException(),
             };
 
@@ -199,26 +200,27 @@ namespace EchoPhase.DAL.Scylla.InMemory
         private CqlResult RunAlterTable(AlterTable alter)
         {
             var table = Table(alter.Table);
+            string Column() => alter.Column ?? throw new InvalidQueryException($"ALTER TABLE ... {alter.Action} needs a column.");
             switch (alter.Action)
             {
                 case "add":
-                    if (table.Columns.ContainsKey(alter.Column!))
+                    if (table.Columns.ContainsKey(Column()))
                         throw new InvalidQueryException($"Invalid column name {alter.Column} because it conflicts with an existing column");
-                    table.Columns[alter.Column!] = alter.Type!;
+                    table.Columns[Column()] = alter.Type ?? throw new InvalidQueryException("ALTER TABLE ... ADD needs a type.");
                     break;
                 case "drop":
-                    if (table.IsKey(alter.Column!))
+                    if (table.IsKey(Column()))
                         throw new InvalidQueryException($"Cannot drop PRIMARY KEY part {alter.Column}");
-                    if (!table.Columns.Remove(alter.Column!))
+                    if (!table.Columns.Remove(Column()))
                         throw new InvalidQueryException($"Column {alter.Column} was not found in table {table.Name}");
                     foreach (var partition in table.Partitions.Values)
                         foreach (var row in partition.Rows.Values)
-                            row.Cells.Remove(alter.Column!);
+                            row.Cells.Remove(Column());
                     break;
                 case "rename":
                     throw new NotSupportedException("Renaming columns is not supported by the in-memory engine.");
                 case "ttl":
-                    table.DefaultTtl = int.Parse(alter.Column!, System.Globalization.CultureInfo.InvariantCulture);
+                    table.DefaultTtl = int.Parse(Column(), System.Globalization.CultureInfo.InvariantCulture);
                     break;
                 case "truncate":
                     table.Partitions.Clear();
@@ -318,7 +320,7 @@ namespace EchoPhase.DAL.Scylla.InMemory
                     return Applied(false, table, existing, table.StarColumns);
             }
 
-            var row = RowFor(table, partitionKey, clustering, create: true)!;
+            var row = EnsureRow(table, partitionKey, clustering);
             Write(ref row, Cell(true, timestamp, expires), isMarker: true);
             foreach (var (column, value) in values.Where(v => !table.IsKey(v.Key)))
                 WriteCell(row, column, new Cell(value, timestamp, value is null ? null : expires));
@@ -379,8 +381,8 @@ namespace EchoPhase.DAL.Scylla.InMemory
 
             foreach (var (pk, ck) in targets)
             {
-                var row = RowFor(table, pk, ck, create: true)!;
-                var shadow = Math.Max(row.Tombstone, Partition(table, pk)!.Tombstone);
+                var row = EnsureRow(table, pk, ck);
+                var shadow = Math.Max(row.Tombstone, EnsurePartition(table, pk).Tombstone);
                 foreach (var (assignment, type, value, key) in assignments)
                 {
                     row.Cells.TryGetValue(assignment.Column, out var current);
@@ -401,29 +403,29 @@ namespace EchoPhase.DAL.Scylla.InMemory
                 case "set":
                     return value;
                 case "add" when type.IsCounter:
-                    return (long)(current ?? 0L) + (long)value!;
+                    return (long)(current ?? 0L) + As<long>(value, assignment);
                 case "remove" when type.IsCounter:
-                    return (long)(current ?? 0L) - (long)value!;
+                    return (long)(current ?? 0L) - As<long>(value, assignment);
                 case "add" or "prepend" when t.Name == "list":
                     var items = ((Array?)current)?.Cast<object?>() ?? [];
-                    var added = ((Array)value!).Cast<object?>();
+                    var added = As<Array>(value, assignment).Cast<object?>();
                     return t.Normalize(assignment.Kind == "add" ? items.Concat(added).ToList() : added.Concat(items).ToList());
                 case "add" when t.Name == "set":
-                    return t.Normalize((((Array?)current)?.Cast<object?>() ?? []).Concat(((Array)value!).Cast<object?>()).ToList());
+                    return t.Normalize((((Array?)current)?.Cast<object?>() ?? []).Concat(As<Array>(value, assignment).Cast<object?>()).ToList());
                 case "add" when t.Name == "map":
                     var merged = new Dictionary<object, object?>();
                     foreach (System.Collections.DictionaryEntry e in (System.Collections.IDictionary?)current ?? new Dictionary<object, object?>())
                         merged[e.Key] = e.Value;
-                    foreach (System.Collections.DictionaryEntry e in (System.Collections.IDictionary)value!)
+                    foreach (System.Collections.DictionaryEntry e in As<System.Collections.IDictionary>(value, assignment))
                         merged[e.Key] = e.Value;
                     return t.Normalize(merged);
                 case "remove" when t.Name is "list" or "set":
-                    var removed = ((Array)value!).Cast<object?>().ToList();
+                    var removed = As<Array>(value, assignment).Cast<object?>().ToList();
                     var kept = (((Array?)current)?.Cast<object?>() ?? [])
                         .Where(i => !removed.Any(r => t.Arguments[0].Compare(r, i) == 0)).ToList();
                     return kept.Count == 0 ? null : t.Normalize(kept);
                 case "remove" when t.Name == "map":
-                    var keys = ((System.Collections.IEnumerable)value!).Cast<object?>().Select(t.Arguments[0].Normalize).ToList();
+                    var keys = As<System.Collections.IEnumerable>(value, assignment).Cast<object?>().Select(t.Arguments[0].Normalize).ToList();
                     var rest = new Dictionary<object, object?>();
                     foreach (System.Collections.DictionaryEntry e in (System.Collections.IDictionary?)current ?? new Dictionary<object, object?>())
                         if (!keys.Any(k => t.Arguments[0].Compare(k, e.Key) == 0))
@@ -433,7 +435,7 @@ namespace EchoPhase.DAL.Scylla.InMemory
                     var map = new Dictionary<object, object?>();
                     foreach (System.Collections.DictionaryEntry e in (System.Collections.IDictionary?)current ?? new Dictionary<object, object?>())
                         map[e.Key] = e.Value;
-                    map[t.Arguments[0].Normalize(key)!] = t.Arguments[1].Normalize(value);
+                    map[t.Arguments[0].Normalize(key) ?? throw new InvalidQueryException("A map key cannot be null.")] = t.Arguments[1].Normalize(value);
                     return t.Normalize(map);
                 case "element" when t.Name == "list":
                     var list = ((Array?)current)?.Cast<object?>().ToList() ?? [];
@@ -446,6 +448,11 @@ namespace EchoPhase.DAL.Scylla.InMemory
                     throw new InvalidQueryException($"Invalid operation ({assignment.Kind}) for column {assignment.Column} of type {type}");
             }
         }
+
+        private static T As<T>(object? value, Assignment assignment)
+            => value is T typed
+                ? typed
+                : throw new InvalidQueryException($"Invalid value for the {assignment.Kind} of column {assignment.Column}.");
 
         private CqlResult RunDelete(Delete delete, Binder bind, long? batchTimestamp)
         {
@@ -479,7 +486,7 @@ namespace EchoPhase.DAL.Scylla.InMemory
             var clusteringValues = clusteringRelations.Select(r => (Relation: r, Value: Bound(table, r, bind))).ToList();
             foreach (var pk in partitions)
             {
-                var partition = Partition(table, pk, create: true)!;
+                var partition = EnsurePartition(table, pk);
                 if (clusteringRelations.Count == 0 && delete.Columns.Count == 0)
                 {
                     partition.Tombstone = Math.Max(partition.Tombstone, timestamp);
@@ -489,7 +496,7 @@ namespace EchoPhase.DAL.Scylla.InMemory
                 if (fullClustering)
                 {
                     var ck = table.ClusteringKey.Select(c => clusteringValues.First(v => v.Relation.Column == c).Value).ToArray();
-                    var row = RowFor(table, pk, ck, create: true)!;
+                    var row = EnsureRow(table, pk, ck);
                     if (delete.Columns.Count == 0)
                         row.Tombstone = Math.Max(row.Tombstone, timestamp);
                     else
@@ -622,27 +629,23 @@ namespace EchoPhase.DAL.Scylla.InMemory
 
         #region Rows
 
-        private static Partition? Partition(InMemoryTable table, object?[] key, bool create = false)
+        private static Partition? Partition(InMemoryTable table, object?[] key)
+            => table.Partitions.TryGetValue(table.PartitionId(key), out var partition) ? partition : null;
+
+        private static Partition EnsurePartition(InMemoryTable table, object?[] key)
         {
-            var id = table.PartitionId(key);
-            if (table.Partitions.TryGetValue(id, out var partition))
+            if (Partition(table, key) is { } partition)
                 return partition;
-            if (!create)
-                return null;
             partition = new Partition { Key = key, Rows = new SortedList<object?[], StoredRow>(table.ClusteringComparer) };
-            table.Partitions[id] = partition;
+            table.Partitions[table.PartitionId(key)] = partition;
             return partition;
         }
 
-        private static StoredRow? RowFor(InMemoryTable table, object?[] pk, object?[] ck, bool create)
+        private static StoredRow EnsureRow(InMemoryTable table, object?[] pk, object?[] ck)
         {
-            var partition = Partition(table, pk, create);
-            if (partition is null)
-                return null;
+            var partition = EnsurePartition(table, pk);
             if (partition.Rows.TryGetValue(ck, out var row))
                 return row;
-            if (!create)
-                return null;
             row = new StoredRow { Clustering = ck };
             partition.Rows[ck] = row;
             return row;
@@ -738,7 +741,9 @@ namespace EchoPhase.DAL.Scylla.InMemory
         private static List<object?> KeyValuesFrom(List<(Relation Relation, object? Value)> bound, string column)
         {
             var (relation, value) = bound.First(b => b.Relation.Column == column && b.Relation.Op is Operator.Eq or Operator.In);
-            return relation.Op == Operator.In ? ((IEnumerable<object?>)value!).ToList() : [value];
+            return relation.Op == Operator.In
+                ? (value as IEnumerable<object?> ?? throw new InvalidQueryException($"IN on {column} needs a list.")).ToList()
+                : [value];
         }
 
         // A relation's value, typed: IN gets a list, CONTAINS the element (or key) type.
@@ -764,7 +769,8 @@ namespace EchoPhase.DAL.Scylla.InMemory
             switch (op)
             {
                 case Operator.In:
-                    return ((IEnumerable<object?>)expected!).Any(v => type.Compare(actual, v) == 0);
+                    return (expected as IEnumerable<object?> ?? throw new InvalidQueryException($"IN on {column} needs a list."))
+                        .Any(v => type.Compare(actual, v) == 0);
                 case Operator.Contains:
                     var t = type.Unfrozen;
                     return t.Name == "map"

@@ -45,7 +45,7 @@ namespace EchoPhase.Scripting.Engine
         };
 
         // The zone argument at index, else the program's, else UTC.
-        private static TimeZoneInfo Zone(object?[] arguments, int index, IDictionary<string, object> variables)
+        private static TimeZoneInfo Zone(object?[] arguments, int index, IDictionary<string, object?> variables)
         {
             var id = arguments.Length > index && Values.Unwrap(arguments[index]) is { } given
                 ? Values.Format(given)

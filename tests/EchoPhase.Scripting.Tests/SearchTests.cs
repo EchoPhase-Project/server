@@ -6,13 +6,13 @@ namespace EchoPhase.Scripting.Tests
     /// <summary>bisectLeft, bisectRight, binarySearch and toSet.</summary>
     public class SearchTests
     {
-        private static object? Run(string expression, Dictionary<string, object>? vars = null)
-            => Eval.TypedExecute<object>(expression, vars ?? []);
+        private static object? Run(string expression, Dictionary<string, object?>? vars = null)
+            => Eval.EvaluateExpression(expression, vars ?? []);
 
-        private static int Int(string expression, Dictionary<string, object> vars)
+        private static int Int(string expression, Dictionary<string, object?> vars)
             => Eval.TypedExecute<int>(expression, vars);
 
-        private static object Value(string expression, Dictionary<string, object>? vars = null)
+        private static object Value(string expression, Dictionary<string, object?>? vars = null)
         {
             var value = Run(expression, vars);
             Assert.NotNull(value);
@@ -26,11 +26,11 @@ namespace EchoPhase.Scripting.Tests
             double?[] pool = [null, double.NaN, -2, 0, 1, 1, 3, 5, 5, 5, 8];
             for (int round = 0; round < 300; round++)
             {
-                var vars = new Dictionary<string, object>
+                var vars = new Dictionary<string, object?>
                 {
                     ["xs"] = Value("sort(raw)", new() { ["raw"] = Enumerable.Range(0, random.Next(0, 40)).Select(_ => (object?)pool[random.Next(pool.Length)]).ToList() })
                 };
-                var sorted = (List<object?>)vars["xs"];
+                var sorted = Assert.IsType<List<object?>>(vars["xs"]);
                 foreach (var probe in new double?[] { null, double.NaN, -3, -2, 0, 1, 2, 5, 8, 9 })
                 {
                     // null is searched for as a literal: a variable may not hold it.
@@ -60,7 +60,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Texts_SearchOrdinally_WithAKey()
         {
-            var vars = new Dictionary<string, object>
+            var vars = new Dictionary<string, object?>
             {
                 ["users"] = Value("sort([{ n: 'bob' }, { n: 'Ann' }, { n: 'cid' }, { n: 'bob' }], u => u.n)")
             };
@@ -87,7 +87,7 @@ namespace EchoPhase.Scripting.Tests
         {
             int reads = 0;
             var items = Enumerable.Range(0, 100_000).Select(i => (object?)new Counted(i, () => reads++)).ToList();
-            var vars = new Dictionary<string, object> { ["xs"] = items };
+            var vars = new Dictionary<string, object?> { ["xs"] = items };
 
             Assert.Equal(76_543, Int("binarySearch(xs, 76543, x => x.Value)", vars));
             Assert.InRange(reads, 1, 20); // ~log2(100 000) = 17, not 100 000
@@ -96,9 +96,9 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void MixingTypes_IsAnError_NotAWrongAnswer()
         {
-            var numbers = new Dictionary<string, object> { ["xs"] = new List<object?> { 1L, 2L, 3L } };
+            var numbers = new Dictionary<string, object?> { ["xs"] = new List<object?> { 1L, 2L, 3L } };
             Assert.Throws<InvalidOperationException>(() => Run("binarySearch(xs, 'b')", numbers));
-            var texts = new Dictionary<string, object> { ["xs"] = new List<object?> { "a", "b" } };
+            var texts = new Dictionary<string, object?> { ["xs"] = new List<object?> { "a", "b" } };
             Assert.Throws<InvalidOperationException>(() => Run("binarySearch(xs, 1)", texts));
             Assert.Equal(0, Int("bisectLeft([], 5)", numbers));
             Assert.Equal(1d, Run("binarySearch([1, '2', 10], 2)"));
@@ -107,7 +107,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void ToSet_GivesConstantTimeMembership()
         {
-            var vars = new Dictionary<string, object>
+            var vars = new Dictionary<string, object?>
             {
                 ["ids"] = new List<object?> { 3L, 5L, 8L },
                 ["users"] = new List<object?>

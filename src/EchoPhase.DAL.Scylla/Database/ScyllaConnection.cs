@@ -120,7 +120,7 @@ namespace EchoPhase.DAL.Scylla.Database
 
         private ISession Connect(IScyllaOptions settings)
         {
-            var cluster = _cluster!;
+            var cluster = _cluster ?? throw new InvalidOperationException("Only a driver connection connects to a cluster.");
             try
             {
                 return cluster.Connect(settings.Keyspace);
@@ -174,7 +174,7 @@ namespace EchoPhase.DAL.Scylla.Database
                 .Distinct()
                 .SelectMany(a => a.GetTypes())
                 .Where(t => typeof(IMigration).IsAssignableFrom(t) && t is { IsAbstract: false, IsInterface: false })
-                .Select(t => (IMigration)Activator.CreateInstance(t)!)
+                .Select(t => Reflect.Create<IMigration>(t))
                 .ToList();
 
             var duplicate = migrations.GroupBy(m => m.Id).FirstOrDefault(g => g.Count() > 1);

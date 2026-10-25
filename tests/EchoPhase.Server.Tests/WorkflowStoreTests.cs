@@ -44,8 +44,8 @@ namespace EchoPhase.Server.Tests
             var value = new Dictionary<string, object?> { ["n"] = 3L, ["tags"] = new List<object?> { "a", "b" } };
             await store.SetAsync(_slot, "k", value, null, Ct);
 
-            var item = await store.GetAsync(_slot, "k", Ct);
-            var read = Assert.IsType<Dictionary<string, object?>>(item!.Value);
+            var item = Must.Present(await store.GetAsync(_slot, "k", Ct));
+            var read = Assert.IsType<Dictionary<string, object?>>(item.Value);
             Assert.Equal(3L, read["n"]);
             Assert.Equal(["a", "b"], Assert.IsType<List<object?>>(read["tags"]));
             Assert.Equal("""{"n":3,"tags":["a","b"]}""".Length, item.Size);
@@ -62,9 +62,9 @@ namespace EchoPhase.Server.Tests
             await store.SetAsync(shared, "k", "shared", null, Ct);
             await store.SetAsync(otherUser, "k", "other", null, Ct);
 
-            Assert.Equal("workflow", (await store.GetAsync(_slot, "k", Ct))!.Value);
-            Assert.Equal("shared", (await store.GetAsync(shared, "k", Ct))!.Value);
-            Assert.Equal("other", (await store.GetAsync(otherUser, "k", Ct))!.Value);
+            Assert.Equal("workflow", Must.Present(await store.GetAsync(_slot, "k", Ct)).Value);
+            Assert.Equal("shared", Must.Present(await store.GetAsync(shared, "k", Ct)).Value);
+            Assert.Equal("other", Must.Present(await store.GetAsync(otherUser, "k", Ct)).Value);
             Assert.Single(await store.ListAsync(shared, null, null, 10, values: false, Ct));
         }
 
@@ -73,7 +73,7 @@ namespace EchoPhase.Server.Tests
         {
             var store = Store();
             await store.SetAsync(_slot, "k", 1L, TimeSpan.FromMinutes(1), Ct);
-            Assert.NotNull(await store.GetAsync(_slot, "k", Ct));
+            Must.Present(await store.GetAsync(_slot, "k", Ct));
 
             _time.Advance(TimeSpan.FromSeconds(61));
             Assert.Null(await store.GetAsync(_slot, "k", Ct));
@@ -86,7 +86,7 @@ namespace EchoPhase.Server.Tests
             object? seen = "not called";
             await store.UpdateAsync(_slot, "k", current => { seen = current; return 1L; }, null, Ct);
             Assert.Null(seen);
-            Assert.Null((await store.GetAsync(_slot, "k", Ct))!.ExpiresAt);
+            Assert.Null(Must.Present(await store.GetAsync(_slot, "k", Ct)).ExpiresAt);
         }
 
         [Fact]
@@ -94,17 +94,17 @@ namespace EchoPhase.Server.Tests
         {
             var store = Store();
             await store.SetAsync(_slot, "n", 1L, TimeSpan.FromHours(1), Ct);
-            var expires = (await store.GetAsync(_slot, "n", Ct))!.ExpiresAt;
+            var expires = Must.Present(await store.GetAsync(_slot, "n", Ct)).ExpiresAt;
 
-            Assert.Equal(2L, await store.UpdateAsync(_slot, "n", v => (long)v! + 1, null, Ct));
-            Assert.Equal(expires, (await store.GetAsync(_slot, "n", Ct))!.ExpiresAt);
+            Assert.Equal(2L, await store.UpdateAsync(_slot, "n", v => (long)(v ?? 0L) + 1, null, Ct));
+            Assert.Equal(expires, Must.Present(await store.GetAsync(_slot, "n", Ct)).ExpiresAt);
 
             await store.UpdateAsync(_slot, "n", v => v, TimeSpan.FromDays(1), Ct);
-            Assert.Equal(_time.GetUtcNow().UtcDateTime.AddDays(1), (await store.GetAsync(_slot, "n", Ct))!.ExpiresAt);
+            Assert.Equal(_time.GetUtcNow().UtcDateTime.AddDays(1), Must.Present(await store.GetAsync(_slot, "n", Ct)).ExpiresAt);
 
             // Set without a ttl makes it permanent.
             await store.SetAsync(_slot, "n", 9L, null, Ct);
-            Assert.Null((await store.GetAsync(_slot, "n", Ct))!.ExpiresAt);
+            Assert.Null(Must.Present(await store.GetAsync(_slot, "n", Ct)).ExpiresAt);
         }
 
         [Fact]

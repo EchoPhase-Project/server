@@ -26,7 +26,7 @@ namespace EchoPhase.Scripting.Engine
         /// <summary>No holes: plain text.</summary>
         public bool IsText => _parts.All(p => p is string);
 
-        public string Render(IDictionary<string, object> variables)
+        public string Render(IDictionary<string, object?> variables)
         {
             if (_parts is [string only])
                 return only;
@@ -38,7 +38,7 @@ namespace EchoPhase.Scripting.Engine
         }
 
         /// <summary>A single hole's value as is (a list stays a list); otherwise the rendered text.</summary>
-        public object? Evaluate(IDictionary<string, object> variables)
+        public object? Evaluate(IDictionary<string, object?> variables)
             => _parts is [Node node] ? node.Evaluate(variables) : Render(variables);
 
         public static Template Parse(string source)

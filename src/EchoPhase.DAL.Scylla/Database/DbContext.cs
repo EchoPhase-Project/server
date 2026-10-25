@@ -81,8 +81,11 @@ namespace EchoPhase.DAL.Scylla.Database
         public EntityBuilder<TEntity> Entity<TEntity>() where TEntity : class
             => Database.ModelBuilder.Entity<TEntity>();
 
+        private readonly ConcurrentDictionary<Type, object> _sets = new();
+
+        /// <summary>The context's set of <typeparamref name="TEntity"/> (one per context, made on first use).</summary>
         public DbSet<TEntity> Set<TEntity>() where TEntity : class, new()
-            => new DbSet<TEntity>(_queryProviderFactory);
+            => (DbSet<TEntity>)_sets.GetOrAdd(typeof(TEntity), _ => new DbSet<TEntity>(_queryProviderFactory));
 
         public IQueryable<T> Query<T>() where T : class, new()
         {
@@ -97,7 +100,7 @@ namespace EchoPhase.DAL.Scylla.Database
         {
             var properties = SetProperties.GetOrAdd(GetType(), type => type
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.PropertyType.IsGenericType &&
+                .Where(p => p.CanWrite && p.PropertyType.IsGenericType &&
                             p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
                 .ToArray());
 

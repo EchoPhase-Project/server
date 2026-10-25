@@ -78,7 +78,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Connections
             if (!result.Successful)
                 return Failure(result.Error);
 
-            Response.Cookies.Append(NonceCookie, result.Value!.Nonce, new CookieOptions
+            Response.Cookies.Append(NonceCookie, result.Value.Nonce, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = Request.IsHttps,
@@ -118,7 +118,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Connections
             var result = await _oauth.CompleteAsync(provider, code, state, nonce, ct);
 
             return result.Successful
-                ? ReturnToApp("connected", null, result.Value!.Name)
+                ? ReturnToApp("connected", null, result.Value.Name)
                 : ReturnToApp("error", result.Error.Code);
         }
 

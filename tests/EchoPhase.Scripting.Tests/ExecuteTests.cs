@@ -23,7 +23,7 @@ namespace EchoPhase.Scripting.Tests
         [InlineData("user.name == 'Alice' ? 8 : 4", 8)]
         public void Execute_VariablesAndNestedProperties_ReturnsCorrectResult(string expr, double expected)
         {
-            var variables = new Dictionary<string, object>
+            var variables = new Dictionary<string, object?>
             {
                 ["x"] = 2,
                 ["items"] = new List<object?> { 2, 5, 3 },
@@ -44,7 +44,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Execute_NestedJsonPropertyAccess_ReturnsCorrectValue()
         {
-            var variables = new Dictionary<string, object>
+            var variables = new Dictionary<string, object?>
             {
                 ["user"] = new Dictionary<string, object?>
                 {
@@ -59,7 +59,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Execute_DeeplyNestedJson_ReturnsCorrectValue()
         {
-            var variables = new Dictionary<string, object>
+            var variables = new Dictionary<string, object?>
             {
                 ["env"] = new Dictionary<string, object?>
                 {
@@ -77,7 +77,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Execute_NullDotPath_ThrowsFriendlyError()
         {
-            var variables = new Dictionary<string, object>
+            var variables = new Dictionary<string, object?>
             {
                 ["data"] = new Dictionary<string, object?> { ["info"] = null }
             };
@@ -91,7 +91,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Execute_ArithmeticWithDotVariablePath_ReturnsCorrectResult()
         {
-            var vars = new Dictionary<string, object>
+            var vars = new Dictionary<string, object?>
             {
                 ["user"] = new Dictionary<string, object?>
                 {
@@ -107,7 +107,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Execute_MixedVariableTypesArithmetic_ReturnsCorrectResult()
         {
-            var vars = new Dictionary<string, object>
+            var vars = new Dictionary<string, object?>
             {
                 ["x"] = 5,
                 ["user"] = new Dictionary<string, object?> { ["multiplier"] = 4 }

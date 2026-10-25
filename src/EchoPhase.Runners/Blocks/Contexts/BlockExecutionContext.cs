@@ -18,7 +18,7 @@ namespace EchoPhase.Runners.Blocks.Contexts
 
         public BlockGraph Graph { get; }
         public BlockProgramSettings Settings { get; }
-        public IDictionary<string, object> Variables { get; init; } = new Dictionary<string, object>();
+        public IDictionary<string, object?> Variables { get; init; } = new Dictionary<string, object?>();
         public IDictionary<string, object?> BlockOutputs { get; } = new Dictionary<string, object?>();
         public IList<string> Output { get; } = [];
         public IList<BlockError> Errors { get; } = [];

@@ -13,7 +13,7 @@ namespace EchoPhase.Runners.Blocks.Contexts
         BlockProgramSettings Settings { get; }
 
         /// <summary>Named values: Set writes them, expressions read them.</summary>
-        IDictionary<string, object> Variables { get; }
+        IDictionary<string, object?> Variables { get; }
 
         /// <summary>Each block's latest output by "b{id}"; expressions read it as blocks.b3.</summary>
         IDictionary<string, object?> BlockOutputs { get; }

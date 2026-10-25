@@ -14,7 +14,7 @@ namespace EchoPhase.Scripting.Engine
     /// </summary>
     internal abstract class Node
     {
-        public abstract object? Evaluate(IDictionary<string, object> variables);
+        public abstract object? Evaluate(IDictionary<string, object?> variables);
 
         /// <summary>
         /// Known when parsed to give a number (number literals and arithmetic
@@ -30,7 +30,7 @@ namespace EchoPhase.Scripting.Engine
         public virtual bool IsConstant => false;
 
         /// <summary>The value as a number, without boxing where the node knows how.</summary>
-        public virtual double EvaluateNumber(IDictionary<string, object> variables) => Values.ToNumber(Evaluate(variables));
+        public virtual double EvaluateNumber(IDictionary<string, object?> variables) => Values.ToNumber(Evaluate(variables));
     }
 
     internal sealed class Literal(object? value) : Node
@@ -39,13 +39,13 @@ namespace EchoPhase.Scripting.Engine
 
         public object? Value { get; } = value;
 
-        public override object? Evaluate(IDictionary<string, object> variables) => Value;
+        public override object? Evaluate(IDictionary<string, object?> variables) => Value;
 
         public override bool IsConstant => true;
 
         public override bool IsNumeric => Value is double;
 
-        public override double EvaluateNumber(IDictionary<string, object> variables)
+        public override double EvaluateNumber(IDictionary<string, object?> variables)
             => Value is double ? _number : Values.ToNumber(Value);
     }
 
@@ -61,12 +61,12 @@ namespace EchoPhase.Scripting.Engine
 
         public override bool IsConstant => operand.IsConstant;
 
-        public override object? Evaluate(IDictionary<string, object> variables)
+        public override object? Evaluate(IDictionary<string, object?> variables)
             => op == UnaryOp.Negate
                 ? -operand.EvaluateNumber(variables)
                 : Boxes.Bool(!Values.ToBool(operand.Evaluate(variables)));
 
-        public override double EvaluateNumber(IDictionary<string, object> variables)
+        public override double EvaluateNumber(IDictionary<string, object?> variables)
             => op == UnaryOp.Negate ? -operand.EvaluateNumber(variables) : base.EvaluateNumber(variables);
     }
 
@@ -93,7 +93,7 @@ namespace EchoPhase.Scripting.Engine
 
         public override bool IsConstant => left.IsConstant && right.IsConstant;
 
-        public override double EvaluateNumber(IDictionary<string, object> variables)
+        public override double EvaluateNumber(IDictionary<string, object?> variables)
         {
             if (!_numeric)
                 return base.EvaluateNumber(variables);
@@ -109,7 +109,7 @@ namespace EchoPhase.Scripting.Engine
             };
         }
 
-        public override object? Evaluate(IDictionary<string, object> variables)
+        public override object? Evaluate(IDictionary<string, object?> variables)
         {
             if (_numeric)
                 return EvaluateNumber(variables);
@@ -147,7 +147,7 @@ namespace EchoPhase.Scripting.Engine
         }
 
         // Operands in source order: left, then right.
-        private bool CompareNumbers(IDictionary<string, object> variables)
+        private bool CompareNumbers(IDictionary<string, object?> variables)
         {
             if (left.IsNumeric && right.IsNumeric)
                 return CompareDoubles(op, left.EvaluateNumber(variables), right.EvaluateNumber(variables));
@@ -213,22 +213,22 @@ namespace EchoPhase.Scripting.Engine
 
         public override bool IsConstant => condition.IsConstant && whenTrue.IsConstant && whenFalse.IsConstant;
 
-        public override object? Evaluate(IDictionary<string, object> variables)
+        public override object? Evaluate(IDictionary<string, object?> variables)
             => Values.ToBool(condition.Evaluate(variables))
                 ? whenTrue.Evaluate(variables)
                 : whenFalse.Evaluate(variables);
 
-        public override double EvaluateNumber(IDictionary<string, object> variables)
+        public override double EvaluateNumber(IDictionary<string, object?> variables)
             => Values.ToBool(condition.Evaluate(variables))
                 ? whenTrue.EvaluateNumber(variables)
                 : whenFalse.EvaluateNumber(variables);
     }
 
-    internal sealed class Call(string name, Func<object?[], IDictionary<string, object>, object?> function, bool pure, Node[] arguments) : Node
+    internal sealed class Call(string name, Func<object?[], IDictionary<string, object?>, object?> function, bool pure, Node[] arguments) : Node
     {
         public string Name { get; } = name;
 
-        public Func<object?[], IDictionary<string, object>, object?> Function => function;
+        public Func<object?[], IDictionary<string, object?>, object?> Function => function;
 
         public Node[] Arguments => arguments;
 
@@ -237,7 +237,7 @@ namespace EchoPhase.Scripting.Engine
         // Argument arrays come from a per-thread pool and go back after the
         // call: functions read their arguments during the call only, and every
         // result they return is built anew, never a view of the array.
-        public override object? Evaluate(IDictionary<string, object> variables)
+        public override object? Evaluate(IDictionary<string, object?> variables)
         {
             var values = ArgumentArrays.Rent(arguments.Length);
             try
@@ -256,7 +256,7 @@ namespace EchoPhase.Scripting.Engine
     /// <summary><c>[a, b, c]</c>: a new list on every evaluation (all-constant ones are folded when parsed).</summary>
     internal sealed class ListLiteral(Node[] items) : Node
     {
-        public override object? Evaluate(IDictionary<string, object> variables)
+        public override object? Evaluate(IDictionary<string, object?> variables)
         {
             Budget.Spend(items.Length);
             var list = new List<object?>(items.Length);
@@ -269,7 +269,7 @@ namespace EchoPhase.Scripting.Engine
     /// <summary><c>{ name: value, 'any key': value }</c>: a new dictionary on every evaluation.</summary>
     internal sealed class ObjectLiteral((string Key, Node Value)[] members) : Node
     {
-        public override object? Evaluate(IDictionary<string, object> variables)
+        public override object? Evaluate(IDictionary<string, object?> variables)
         {
             Budget.Spend(members.Length);
             var dict = new Dictionary<string, object?>(members.Length);
@@ -295,7 +295,7 @@ namespace EchoPhase.Scripting.Engine
     /// <param name="reusable">No lambda inside: each clause's scope can be rebound per item, not made anew.</param>
     internal sealed class Comprehension(Node element, ComprehensionClause[] clauses, bool reusable) : Node
     {
-        public override object? Evaluate(IDictionary<string, object> variables)
+        public override object? Evaluate(IDictionary<string, object?> variables)
         {
             var result = new List<object?>();
             // Per evaluation (the node is shared between threads), one slot per clause.
@@ -303,7 +303,7 @@ namespace EchoPhase.Scripting.Engine
             return result;
         }
 
-        private void Walk(int clause, IDictionary<string, object> scope, List<object?> result, BoundScope?[]? frames)
+        private void Walk(int clause, IDictionary<string, object?> scope, List<object?> result, BoundScope?[]? frames)
         {
             if (clause == clauses.Length)
             {
@@ -347,8 +347,8 @@ namespace EchoPhase.Scripting.Engine
             var v => throw new InvalidOperationException($"Cannot iterate over {Values.Describe(v)}.")
         };
 
-        private static IDictionary<string, object> Bind(
-            string[] names, object? item, IDictionary<string, object> outer, BoundScope?[]? frames, int clause)
+        private static IDictionary<string, object?> Bind(
+            string[] names, object? item, IDictionary<string, object?> outer, BoundScope?[]? frames, int clause)
         {
             if (names.Length == 1)
             {
@@ -394,7 +394,7 @@ namespace EchoPhase.Scripting.Engine
 
         public bool Reusable { get; } = reusable;
 
-        public override object? Evaluate(IDictionary<string, object> variables) => new ScriptFunction(this, variables);
+        public override object? Evaluate(IDictionary<string, object?> variables) => new ScriptFunction(this, variables);
     }
 
     /// <summary>
@@ -407,7 +407,7 @@ namespace EchoPhase.Scripting.Engine
         // The lambda's own node: its parameters, body and whether a scope can be reused.
         // One reference instead of three keeps a function value small: many are made, once per outer call.
         private readonly Lambda _lambda;
-        private readonly IDictionary<string, object> _variables;
+        private readonly IDictionary<string, object?> _variables;
 
         // One scope rebound on every call when the body holds no lambda (none
         // can capture it); a call while one is running (recursion through a
@@ -416,7 +416,7 @@ namespace EchoPhase.Scripting.Engine
         private bool _busy;
         private BoundScope? _cached; // a Scope1 or a Scope2, by arity
 
-        internal ScriptFunction(Lambda lambda, IDictionary<string, object> variables)
+        internal ScriptFunction(Lambda lambda, IDictionary<string, object?> variables)
         {
             _lambda = lambda;
             _variables = variables;
@@ -507,7 +507,7 @@ namespace EchoPhase.Scripting.Engine
             return Run(new ScopeN(Parameters, values, _variables));
         }
 
-        private object? Run(IDictionary<string, object> scope)
+        private object? Run(IDictionary<string, object?> scope)
         {
             Enter();
             try
@@ -520,7 +520,7 @@ namespace EchoPhase.Scripting.Engine
             }
         }
 
-        private double RunNumber(IDictionary<string, object> scope)
+        private double RunNumber(IDictionary<string, object?> scope)
         {
             Enter();
             try
@@ -653,7 +653,7 @@ namespace EchoPhase.Scripting.Engine
             _ => false
         });
 
-        public override object? Evaluate(IDictionary<string, object> variables)
+        public override object? Evaluate(IDictionary<string, object?> variables)
         {
             var current = target.Evaluate(variables);
             // for over an array: foreach over the interface would allocate an enumerator per read.
@@ -691,7 +691,7 @@ namespace EchoPhase.Scripting.Engine
 
         public PathSegment[] Segments { get; } = segments;
 
-        public override object? Evaluate(IDictionary<string, object> variables)
+        public override object? Evaluate(IDictionary<string, object?> variables)
         {
             var current = Lookup(variables, Root);
 
@@ -708,10 +708,10 @@ namespace EchoPhase.Scripting.Engine
         }
 
         /// <summary>A variable by name; an unknown one is an error (a typo should not pass silently).</summary>
-        internal static object? Lookup(IDictionary<string, object> variables, string name)
+        internal static object? Lookup(IDictionary<string, object?> variables, string name)
             => BoundScope.Find(variables, name, out var value) ? value : throw new KeyNotFoundException($"Variable '{name}' not found.");
 
-        internal static object? Step(object current, PathSegment segment, IDictionary<string, object> variables) => segment switch
+        internal static object? Step(object current, PathSegment segment, IDictionary<string, object?> variables) => segment switch
         {
             MemberSegment m => Member(current, m.Name),
             IndexSegment ix => Index(current, ix.Index.Evaluate(variables)),

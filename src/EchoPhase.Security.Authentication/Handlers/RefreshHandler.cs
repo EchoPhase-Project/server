@@ -113,7 +113,8 @@ namespace EchoPhase.Security.Authentication.Handlers
                 return tokenValidatedContext.Result;
 
             tokenValidatedContext.Success();
-            return tokenValidatedContext.Result!;
+            return tokenValidatedContext.Result
+                   ?? throw new InvalidOperationException("A validated token gave no authentication result.");
         }
 
         private async Task<ClaimsPrincipal?> TrySilentRefreshAsync()
@@ -132,7 +133,7 @@ namespace EchoPhase.Security.Authentication.Handlers
                     return null;
                 }
 
-                var pair = result.Value!;
+                var pair = result.Value;
                 TokenCookieHelper.WriteRefreshed(Response, Request, pair);
 
                 return await _jwt.ValidateTokenAsync(pair.AccessToken, Context.RequestAborted);

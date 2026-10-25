@@ -31,7 +31,7 @@ namespace EchoPhase.DAL.Scylla.InMemory
 
         public long Tombstone { get; set; } = long.MinValue;
 
-        public SortedList<object?[], StoredRow> Rows { get; init; } = null!;
+        public required SortedList<object?[], StoredRow> Rows { get; init; }
     }
 
     internal sealed class InMemoryTable

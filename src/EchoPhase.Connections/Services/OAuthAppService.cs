@@ -99,7 +99,7 @@ namespace EchoPhase.Connections.Services
                 var platform = oauth.PlatformApp;
                 return platform.IsConfigured
                     ? ServiceResult<OAuthClient>.Success(
-                        new OAuthClient(null, platform.ClientId!, platform.ClientSecret))
+                        new OAuthClient(null, platform.ClientId, platform.ClientSecret))
                     : Fail(ConnectionErrors.NotConfigured, $"The platform {oauth.Name} app is not configured.");
             }
 
@@ -142,7 +142,7 @@ namespace EchoPhase.Connections.Services
             // lets refresh with the client id alone.
             var saved = await SaveAsync(userId, oauth.Name, existing?.Name ?? clientId, clientId, clientSecret, ct);
             return saved.Successful
-                ? ServiceResult<Guid?>.Success(saved.Value!.Id)
+                ? ServiceResult<Guid?>.Success(saved.Value.Id)
                 : ServiceResult<Guid?>.Failure(saved.Error);
         }
 

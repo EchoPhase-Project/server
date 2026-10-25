@@ -60,7 +60,7 @@ namespace EchoPhase.Projection.Tests
                     .Include(x => x.Address.City)
                     .Build());
 
-            var address = AsDictionary(result["Address"]!);
+            var address = AsDictionary(Must.Present(result["Address"]));
             Assert.True(address.ContainsKey("City"));
             Assert.False(address.ContainsKey("Country"));
         }

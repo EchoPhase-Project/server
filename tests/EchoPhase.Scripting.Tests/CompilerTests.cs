@@ -12,7 +12,7 @@ namespace EchoPhase.Scripting.Tests
     /// </summary>
     public class CompilerTests
     {
-        private static Dictionary<string, object> Vars() => new()
+        private static Dictionary<string, object?> Vars() => new()
         {
             ["n"] = 7d,
             ["zero"] = 0d,
@@ -97,7 +97,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void ALambdaBody_IsCompiledWhenHot()
         {
-            var vars = new Dictionary<string, object>
+            var vars = new Dictionary<string, object?>
             {
                 ["xs"] = Enumerable.Range(0, 1000).Select(i => (object?)(double)i).ToList()
             };

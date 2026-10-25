@@ -209,7 +209,7 @@ namespace EchoPhase.DAL.Scylla.Database
                 var builder = GetBuilder(tracked.EntityType);
                 var changed = tracked.Original
                     .Where(o => !builder.GetPrimaryKey().Contains(o.Key)
-                                && !Same(o.Value, tracked.EntityType.GetProperty(o.Key)!.GetValue(tracked.Entity)))
+                                && !Same(o.Value, Reflect.Property(tracked.EntityType, o.Key).GetValue(tracked.Entity)))
                     .Select(o => o.Key)
                     .ToHashSet(StringComparer.Ordinal);
                 if (changed.Count == 0)
@@ -256,7 +256,7 @@ namespace EchoPhase.DAL.Scylla.Database
         }
 
         private static string KeyOf(object entity, IEntityBuilder builder)
-            => string.Join('\u001f', builder.GetPrimaryKey().Select(name => entity.GetType().GetProperty(name)!.GetValue(entity) switch
+            => string.Join('\u001f', builder.GetPrimaryKey().Select(name => Reflect.Property(entity.GetType(), name).GetValue(entity) switch
             {
                 null => "\u0000",
                 DateTimeOffset moment => moment.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture),

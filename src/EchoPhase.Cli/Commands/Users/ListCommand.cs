@@ -90,9 +90,9 @@ namespace EchoPhase.Cli.Commands.Users
             {
                 var pattern = Listing.Contains(settings.Search.Trim());
                 users = users.Where(u =>
-                    EF.Functions.ILike(u.UserName!, pattern) ||
+                    (u.UserName != null && EF.Functions.ILike(u.UserName, pattern)) ||
                     EF.Functions.ILike(u.Name, pattern) ||
-                    EF.Functions.ILike(u.Email!, pattern));
+                    (u.Email != null && EF.Functions.ILike(u.Email, pattern)));
             }
             if (!string.IsNullOrWhiteSpace(settings.Role))
             {

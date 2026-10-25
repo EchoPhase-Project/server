@@ -25,8 +25,8 @@ namespace EchoPhase.DAL.Scylla.Tests
 
     internal sealed class DocContext : DbContext
     {
-        public DbSet<Doc> Docs { get; set; } = null!;
-        public DbSet<Counted> CountedRows { get; set; } = null!;
+        public DbSet<Doc> Docs => Set<Doc>();
+        public DbSet<Counted> CountedRows => Set<Counted>();
 
         public DocContext(ScyllaConnection connection) : base(connection)
         {
@@ -67,11 +67,13 @@ namespace EchoPhase.DAL.Scylla.Tests
 
         private DocContext Context() => new(_connection);
 
-        private async Task<Doc> Read(Guid id)
+        private async Task<Doc?> Find(Guid id)
         {
             using var db = Context();
-            return (await db.Docs.Where(d => d.Id == id).FirstOrDefaultAsync(Ct))!;
+            return await db.Docs.Where(d => d.Id == id).FirstOrDefaultAsync(Ct);
         }
+
+        private async Task<Doc> Read(Guid id) => Must.Present(await Find(id));
 
         [Fact]
         public async Task Add_SetsAToken_AndASecondAddOfTheSameRowConflicts()
@@ -144,7 +146,7 @@ namespace EchoPhase.DAL.Scylla.Tests
             using var winner = Context();
             winner.Docs.Remove(fresh);
             await winner.SaveChangesAsync(Ct);
-            Assert.Null(await Read(id));
+            Assert.Null(await Find(id));
         }
 
         [Fact]
@@ -191,7 +193,7 @@ namespace EchoPhase.DAL.Scylla.Tests
 
             Assert.False(await db.Docs.RemoveIfAsync(new Doc { Id = Guid.NewGuid() }, ct: Ct));
             Assert.True(await db.Docs.RemoveIfAsync(await Read(id), ct: Ct));
-            Assert.Null(await Read(id));
+            Assert.Null(await Find(id));
         }
     }
 }

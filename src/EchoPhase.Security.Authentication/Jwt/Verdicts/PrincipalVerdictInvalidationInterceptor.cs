@@ -48,9 +48,9 @@ namespace EchoPhase.Security.Authentication.Jwt.Verdicts
         public override async ValueTask<int> SavedChangesAsync(
             SaveChangesCompletedEventData eventData, int result, CancellationToken ct = default)
         {
-            if (Take(eventData.Context) is { } pending)
+            if (eventData.Context is { } context && Take(context) is { } pending)
             {
-                pending.Users.UnionWith(await ActiveTargetsAsync(eventData.Context!, pending.Actors, ct));
+                pending.Users.UnionWith(await ActiveTargetsAsync(context, pending.Actors, ct));
                 await _cache.InvalidateAsync(pending.Users);
             }
 
@@ -59,9 +59,9 @@ namespace EchoPhase.Security.Authentication.Jwt.Verdicts
 
         public override int SavedChanges(SaveChangesCompletedEventData eventData, int result)
         {
-            if (Take(eventData.Context) is { } pending)
+            if (eventData.Context is { } context && Take(context) is { } pending)
             {
-                pending.Users.UnionWith(ActiveTargetsAsync(eventData.Context!, pending.Actors, default).GetAwaiter().GetResult());
+                pending.Users.UnionWith(ActiveTargetsAsync(context, pending.Actors, default).GetAwaiter().GetResult());
                 _cache.InvalidateAsync(pending.Users).GetAwaiter().GetResult();
             }
 

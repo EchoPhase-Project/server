@@ -42,7 +42,7 @@ namespace EchoPhase.Runners.Blocks.Handlers
         /// Variables plus input, blocks and errors, for evaluating this block's
         /// expressions. One per call: it reads the run's live state, so it never goes stale.
         /// </summary>
-        public IDictionary<string, object> Scope
+        public IDictionary<string, object?> Scope
             => _scope ??= new ExpressionScope(Context.Variables, Input, Context.BlockOutputs, Context.Failures, Context.Settings.TimeZone);
 
         /// <summary>

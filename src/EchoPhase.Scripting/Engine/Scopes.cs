@@ -11,10 +11,10 @@ namespace EchoPhase.Scripting.Engine
     /// around them; read-only. One object per call: the names are the
     /// lambda's own array, so binding one or two of them allocates nothing else.
     /// </summary>
-    internal abstract class BoundScope(IDictionary<string, object> outer) : IDictionary<string, object>
+    internal abstract class BoundScope(IDictionary<string, object?> outer) : IDictionary<string, object?>
     {
         /// <summary>Settable: a reused scope is pointed at the current enclosing one.</summary>
-        public IDictionary<string, object> Outer = outer;
+        public IDictionary<string, object?> Outer = outer;
 
         internal abstract bool TryGetBound(string key, out object? value);
 
@@ -25,7 +25,7 @@ namespace EchoPhase.Scripting.Engine
         /// parameter may be null), else in the scopes around. False only for a
         /// name bound nowhere.
         /// </summary>
-        public static bool Find(IDictionary<string, object> variables, string key, out object? value)
+        public static bool Find(IDictionary<string, object?> variables, string key, out object? value)
         {
             var scope = variables;
             while (scope is BoundScope bound)
@@ -49,7 +49,7 @@ namespace EchoPhase.Scripting.Engine
         /// null, so a name bound to null reads as absent here (it still hides an
         /// outer one). The engine reads names with <see cref="Find"/>.
         /// </summary>
-        public bool TryGetValue(string key, [MaybeNullWhen(false)] out object value)
+        public bool TryGetValue(string key, [MaybeNullWhen(false)] out object? value)
         {
             if (TryGetBound(key, out var bound))
             {
@@ -59,7 +59,7 @@ namespace EchoPhase.Scripting.Engine
             return Outer.TryGetValue(key, out value);
         }
 
-        public object this[string key]
+        public object? this[string key]
         {
             get => TryGetValue(key, out var value) ? value : throw new KeyNotFoundException(key);
             set => throw ReadOnly();
@@ -69,32 +69,32 @@ namespace EchoPhase.Scripting.Engine
 
         public ICollection<string> Keys => [.. BoundNames.Union(Outer.Keys)];
 
-        public ICollection<object> Values => [.. Keys.Select(k => this[k])];
+        public ICollection<object?> Values => [.. Keys.Select(k => this[k])];
 
         public int Count => Keys.Count;
 
         public bool IsReadOnly => true;
 
-        public void Add(string key, object value) => throw ReadOnly();
+        public void Add(string key, object? value) => throw ReadOnly();
 
-        public void Add(KeyValuePair<string, object> item) => throw ReadOnly();
+        public void Add(KeyValuePair<string, object?> item) => throw ReadOnly();
 
         public bool Remove(string key) => throw ReadOnly();
 
-        public bool Remove(KeyValuePair<string, object> item) => throw ReadOnly();
+        public bool Remove(KeyValuePair<string, object?> item) => throw ReadOnly();
 
         public void Clear() => throw ReadOnly();
 
-        public bool Contains(KeyValuePair<string, object> item) => TryGetValue(item.Key, out var v) && Equals(v, item.Value);
+        public bool Contains(KeyValuePair<string, object?> item) => TryGetValue(item.Key, out var v) && Equals(v, item.Value);
 
-        public void CopyTo(KeyValuePair<string, object>[] array, int arrayIndex)
+        public void CopyTo(KeyValuePair<string, object?>[] array, int arrayIndex)
         {
             foreach (var pair in this)
                 array[arrayIndex++] = pair;
         }
 
-        public IEnumerator<KeyValuePair<string, object>> GetEnumerator()
-            => Keys.Select(k => new KeyValuePair<string, object>(k, this[k])).GetEnumerator();
+        public IEnumerator<KeyValuePair<string, object?>> GetEnumerator()
+            => Keys.Select(k => new KeyValuePair<string, object?>(k, this[k])).GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
@@ -103,7 +103,7 @@ namespace EchoPhase.Scripting.Engine
 
     // Values are fields, not constructor captures, so a scope can be reused:
     // a lambda without lambdas inside rebinds one scope on every call.
-    internal sealed class Scope1(string name, object? value, IDictionary<string, object> outer) : BoundScope(outer)
+    internal sealed class Scope1(string name, object? value, IDictionary<string, object?> outer) : BoundScope(outer)
     {
         public object? Value = value;
 
@@ -116,7 +116,7 @@ namespace EchoPhase.Scripting.Engine
         protected override IEnumerable<string> BoundNames => [name];
     }
 
-    internal sealed class Scope2(string name1, object? value1, string name2, object? value2, IDictionary<string, object> outer)
+    internal sealed class Scope2(string name1, object? value1, string name2, object? value2, IDictionary<string, object?> outer)
         : BoundScope(outer)
     {
         public object? Value1 = value1;
@@ -136,7 +136,7 @@ namespace EchoPhase.Scripting.Engine
         protected override IEnumerable<string> BoundNames => [name1, name2];
     }
 
-    internal sealed class ScopeN(string[] names, object?[] values, IDictionary<string, object> outer) : BoundScope(outer)
+    internal sealed class ScopeN(string[] names, object?[] values, IDictionary<string, object?> outer) : BoundScope(outer)
     {
         internal override bool TryGetBound(string key, out object? bound)
         {

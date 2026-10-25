@@ -44,7 +44,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
                 return Failure(result.Error);
 
             // The worker may already be updating the run; at this point it is queued.
-            var runId = result.Value!.RunId;
+            var runId = result.Value.RunId;
             return AcceptedAtAction(nameof(Get), new { runId }, new { runId, status = BlockRunStatus.Queued });
         }
 
@@ -58,7 +58,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
             if (!result.Successful)
                 return Failure(result.Error);
 
-            var page = result.Value!;
+            var page = result.Value;
             return Ok(new { data = page.Items.Select(View), nextCursor = page.NextCursor });
         }
 
@@ -74,7 +74,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
             if (!result.Successful)
                 return Failure(result.Error);
 
-            var details = result.Value!;
+            var details = result.Value;
             return Ok(new { run = View(details.Run), result = details.Result });
         }
 

@@ -39,7 +39,7 @@ namespace EchoPhase.Projection.Tests
         [Fact]
         public void NullSource_ReturnsNull()
         {
-            Assert.Null(_projector.For<SimpleModel>(null!).Build());
+            Assert.Null(_projector.For<SimpleModel?>(null).Build());
         }
 
         [Fact]

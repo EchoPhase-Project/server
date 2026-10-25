@@ -91,7 +91,7 @@ namespace EchoPhase.DAL.Scylla.Database
                 var concrete = target.IsInterface
                     ? typeof(Dictionary<,>).MakeGenericType(target.GetGenericArguments())
                     : target;
-                var result = (System.Collections.IDictionary)Activator.CreateInstance(concrete)!;
+                var result = Reflect.Create<System.Collections.IDictionary>(concrete);
                 foreach (var key in map.Keys)
                     result[key] = map[key];
                 return result;
@@ -99,8 +99,8 @@ namespace EchoPhase.DAL.Scylla.Database
 
             if (value is System.Collections.IEnumerable items)
             {
-                var element = target.IsArray ? target.GetElementType()! : target.IsGenericType ? target.GetGenericArguments()[0] : typeof(object);
-                var list = (System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(element))!;
+                var element = target.GetElementType() ?? (target.IsGenericType ? target.GetGenericArguments()[0] : typeof(object));
+                var list = Reflect.Create<System.Collections.IList>(typeof(List<>).MakeGenericType(element));
                 foreach (var item in items)
                     list.Add(item);
                 if (target.IsArray)

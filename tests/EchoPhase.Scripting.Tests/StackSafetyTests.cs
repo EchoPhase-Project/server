@@ -28,15 +28,15 @@ namespace EchoPhase.Scripting.Tests
 
         [Fact]
         public void ReasonableNesting_StillParses()
-            => Assert.Equal(1d, Eval.TypedExecute<double>(new string('(', 150) + "1" + new string(')', 150), new Dictionary<string, object>()));
+            => Assert.Equal(1d, Eval.TypedExecute<double>(new string('(', 150) + "1" + new string(')', 150), new Dictionary<string, object?>()));
 
         [Fact]
         public void ALambdaPassedToItself_StopsWithAnError()
         {
-            var vars = new Dictionary<string, object>();
+            var vars = new Dictionary<string, object?>();
             Eval.Set(vars, "f", Eval.Evaluate("@(x => map([1], f))", vars));
 
-            var ex = Assert.Throws<InvalidOperationException>(() => Eval.TypedExecute<object>("map([1], f)", vars));
+            var ex = Assert.Throws<InvalidOperationException>(() => Eval.EvaluateExpression("map([1], f)", vars));
             Assert.Contains("more than", ex.Message);
 
             // The depth is per evaluation: the next one starts from zero.

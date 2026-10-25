@@ -29,7 +29,9 @@ namespace EchoPhase.Security.Authentication.Jwt.Helpers
         public static void WriteInitial(HttpResponse response, HttpRequest request, TokenInitial initial)
         {
             response.Cookies.Append(CookieNames.AccessToken, initial.Tokens.AccessToken, Session(request));
-            response.Cookies.Append(CookieNames.RefreshToken, initial.Tokens.RefreshToken!, LongLived(request));
+            response.Cookies.Append(CookieNames.RefreshToken,
+                initial.Tokens.RefreshToken ?? throw new InvalidOperationException("A sign-in issued no refresh token."),
+                LongLived(request));
         }
 
         public static void WriteRefreshed(HttpResponse response, HttpRequest request, TokenPair pair)

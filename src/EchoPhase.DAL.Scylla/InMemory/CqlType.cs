@@ -184,9 +184,10 @@ namespace EchoPhase.DAL.Scylla.InMemory
                     case "map":
                         if (value is not System.Collections.IDictionary pairs)
                             throw Mismatch(value);
-                        var map = (System.Collections.IDictionary)Activator.CreateInstance(type.ClrType, type.Arguments[0].Comparer)!;
+                        var map = Reflect.Create<System.Collections.IDictionary>(type.ClrType, type.Arguments[0].Comparer);
                         foreach (System.Collections.DictionaryEntry pair in pairs)
-                            map[type.Arguments[0].Normalize(pair.Key)!] = type.Arguments[1].Normalize(pair.Value);
+                            map[type.Arguments[0].Normalize(pair.Key) ?? throw new InvalidQueryException("A map key cannot be null.")]
+                                = type.Arguments[1].Normalize(pair.Value);
                         return map;
                 }
             }

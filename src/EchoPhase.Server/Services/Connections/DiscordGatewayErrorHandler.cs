@@ -49,7 +49,7 @@ namespace EchoPhase.Server.Services.Connections
                 var reference = new ConnectionRef(failure.UserId, failure.TokenName);
                 var current = await connections.ResolveAsync(reference, ConnectionProviders.Discord, ct);
                 if (current.Successful)
-                    await connections.RecoverAsync(reference, ConnectionProviders.Discord, current.Value!.AccessToken, ct);
+                    await connections.RecoverAsync(reference, ConnectionProviders.Discord, current.Value.AccessToken, ct);
                 return;
             }
 

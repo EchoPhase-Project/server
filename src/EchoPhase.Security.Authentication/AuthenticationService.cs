@@ -34,7 +34,7 @@ namespace EchoPhase.Security.Authentication
 
         public async Task<IServiceResult> LogoutAsync(Guid userId, CancellationToken ct = default)
         {
-            var context = _httpContext.HttpContext!;
+            var context = Request();
 
             if (context.Request.Cookies.TryGetValue(CookieNames.RefreshToken, out var refreshToken)
                 && !string.IsNullOrEmpty(refreshToken))
@@ -60,6 +60,11 @@ namespace EchoPhase.Security.Authentication
         }
 
         private string ResolveDeviceId()
-            => _httpContext.HttpContext!.Request.Headers.UserAgent.ToString();
+            => Request().Request.Headers.UserAgent.ToString();
+
+        // Sign-in and sign-out set cookies: they only make sense inside a request.
+        private HttpContext Request()
+            => _httpContext.HttpContext
+               ?? throw new InvalidOperationException("Signing in or out needs an HTTP request; there is none.");
     }
 }

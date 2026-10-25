@@ -46,7 +46,7 @@ namespace EchoPhase.DAL.Postgres.Models
     {
         public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
         public Guid ApiClientId { get; set; }
-        public ApiClient ApiClient { get; set; } = default!;
+        public ApiClient? ApiClient { get; set; }
         [Expose] public string Resource { get; set; } = string.Empty;
         [Expose] public string[] Permissions { get; set; } = [];
     }

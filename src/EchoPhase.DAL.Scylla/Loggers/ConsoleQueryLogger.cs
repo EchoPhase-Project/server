@@ -22,7 +22,7 @@ namespace EchoPhase.DAL.Scylla.Loggers
             _includeParameterValues = includeParameterValues;
         }
 
-        public void LogQuery(string cql, Type resultType, object[] parameters)
+        public void LogQuery(string cql, Type resultType, object?[] parameters)
         {
             var timestamp = DateTime.Now.ToString("HH:mm:ss");
             Console.WriteLine($"[{timestamp}] Executing query (returning {resultType.Name})");

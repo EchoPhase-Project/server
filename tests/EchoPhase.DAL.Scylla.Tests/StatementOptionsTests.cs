@@ -38,7 +38,7 @@ namespace EchoPhase.DAL.Scylla.Tests
                 .WithTimeout(TimeSpan.FromSeconds(2))
                 .ToListAsync(Ct);
 
-            var options = Last("SELECT").Options!;
+            var options = Must.Present(Last("SELECT").Options);
             Assert.Equal(ConsistencyLevel.LocalQuorum, options.Consistency);
             Assert.Equal(TimeSpan.FromSeconds(2), options.Timeout);
         }
@@ -50,7 +50,7 @@ namespace EchoPhase.DAL.Scylla.Tests
             db.Profiles.Add(new Profile { Id = Guid.NewGuid(), Name = "a" },
                 new WriteOptions(Statement: new StatementOptions(Consistency: ConsistencyLevel.All)));
             await db.SaveChangesAsync(Ct);
-            Assert.Equal(ConsistencyLevel.All, Last("INSERT").Options!.Consistency);
+            Assert.Equal(ConsistencyLevel.All, Must.Present(Last("INSERT").Options).Consistency);
 
             db.Profiles.Add(new Profile { Id = Guid.NewGuid() },
                 new WriteOptions(Statement: new StatementOptions(Consistency: ConsistencyLevel.Serial)));

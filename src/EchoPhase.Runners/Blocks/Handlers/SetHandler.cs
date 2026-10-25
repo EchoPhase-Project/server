@@ -54,7 +54,7 @@ namespace EchoPhase.Runners.Blocks.Handlers
             return Task.FromResult(BlockResult.Main(value));
         }
 
-        private object TryParsePrimitive(string input)
+        private object? TryParsePrimitive(string input)
         {
             if (string.IsNullOrEmpty(input))
                 return input;
@@ -69,7 +69,7 @@ namespace EchoPhase.Runners.Blocks.Handlers
                 return b;
 
             if (input.Trim().ToLowerInvariant() == "null")
-                return null!;
+                return null;
 
             return input;
         }

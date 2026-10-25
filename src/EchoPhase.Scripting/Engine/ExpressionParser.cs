@@ -260,7 +260,7 @@ namespace EchoPhase.Scripting.Engine
         private const int FoldMaxItems = 64;
         private const int FoldMaxText = 4096;
 
-        private static readonly Dictionary<string, object> NoVariables = [];
+        private static readonly Dictionary<string, object?> NoVariables = [];
 
         // A constant expression (60 * 60 * 24, upper('x'), [1, 2][0]) computed
         // now, once, as a literal. Not when it fails (1 / 0 in a branch never

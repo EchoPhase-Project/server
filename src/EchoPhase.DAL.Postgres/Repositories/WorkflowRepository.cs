@@ -26,7 +26,7 @@ namespace EchoPhase.DAL.Postgres.Repositories
         public Task<List<WorkflowSchedule>> DueSchedulesAsync(DateTime now, int limit, CancellationToken ct = default)
             => _context.WorkflowSchedules
                 .Include(s => s.Workflow)
-                .Where(s => s.NextRunAt <= now && s.Workflow!.Active)
+                .Where(s => s.NextRunAt <= now && s.Workflow != null && s.Workflow.Active)
                 .OrderBy(s => s.NextRunAt)
                 .Take(limit)
                 .ToListAsync(ct);

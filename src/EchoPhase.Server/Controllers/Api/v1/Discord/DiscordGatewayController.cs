@@ -43,7 +43,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Discord
                 return Failure(credential.Error);
 
             var connectionId = await _manager.ConnectAsync(
-                userId, dto.Name, credential.Value!.AccessToken, dto.Intents ?? DiscordGatewayIntents.Default, ct);
+                userId, dto.Name, credential.Value.AccessToken, dto.Intents ?? DiscordGatewayIntents.Default, ct);
 
             return Ok(new { connectionId });
         }

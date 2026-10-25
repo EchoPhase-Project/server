@@ -45,7 +45,7 @@ namespace EchoPhase.Server.Tests
                 }));
 
                 await using var check = Context();
-                Assert.Equal(20L, (await Store(check).GetAsync(slot, "counter", Ct))!.Value);
+                Assert.Equal(20L, Must.Present(await Store(check).GetAsync(slot, "counter", Ct)).Value);
                 // One row for the shared scope, though its WorkflowId is null.
                 Assert.Equal(1, await check.StorageEntries.CountAsync(e => e.UserId == userId && e.Key == "counter", Ct));
             }

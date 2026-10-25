@@ -14,7 +14,7 @@ namespace EchoPhase.Scripting.Tests
     {
         private const int Items = 20_000;
 
-        private static readonly Dictionary<string, object> Vars = new()
+        private static readonly Dictionary<string, object?> Vars = new()
         {
             ["xs"] = Enumerable.Range(0, Items).Select(i => (object?)(double)(i * 7 % 1000)).ToList(),
             ["users"] = Enumerable.Range(0, Items).Select(i => (object?)new Dictionary<string, object?>
@@ -44,13 +44,13 @@ namespace EchoPhase.Scripting.Tests
         {
             // Warm up: parse once, let the JIT settle.
             for (int i = 0; i < 20; i++)
-                Eval.TypedExecute<object>(expression, Vars);
+                Eval.EvaluateExpression(expression, Vars);
 
             long least = long.MaxValue;
             for (int run = 0; run < 3; run++)
             {
                 long before = GC.GetAllocatedBytesForCurrentThread();
-                Eval.TypedExecute<object>(expression, Vars);
+                Eval.EvaluateExpression(expression, Vars);
                 least = Math.Min(least, GC.GetAllocatedBytesForCurrentThread() - before);
             }
 

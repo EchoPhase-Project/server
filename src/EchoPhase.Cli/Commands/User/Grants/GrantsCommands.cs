@@ -126,7 +126,7 @@ namespace EchoPhase.Cli.Commands.User.Grants
 
             if (settings.Verbose)
                 AnsiConsole.MarkupLineInterpolated(
-                    $"[green]'{settings.Username}' may now {string.Join(", ", result.Value!.Permissions)} on {result.Value.Resource}{(expiresAt is { } at ? $" until {at.UtcDateTime:u}" : "")}.[/]");
+                    $"[green]'{settings.Username}' may now {string.Join(", ", result.Value.Permissions)} on {result.Value.Resource}{(expiresAt is { } at ? $" until {at.UtcDateTime:u}" : "")}.[/]");
             return settings.Continue ? CliExit.StartServer : CliExit.Success;
         }
     }

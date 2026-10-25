@@ -21,11 +21,11 @@ namespace EchoPhase.DAL.Scylla.Cql
         }
 
         private static readonly MethodInfo MapMethod =
-            typeof(EntityMapper).GetMethod(nameof(EntityMapper.Map), new[] { typeof(Row), typeof(Type), typeof(IEntityBuilder) })!;
+            Reflect.Method(typeof(EntityMapper), nameof(EntityMapper.Map), typeof(Row), typeof(Type), typeof(IEntityBuilder));
 
         private readonly Func<Type, IEntityBuilder> _getBuilder;
         private readonly List<string> _where = new();
-        private readonly List<object> _parameters = new();
+        private readonly List<object?> _parameters = new();
         private readonly Dictionary<string, Restriction> _restrictions = new();
         private readonly List<string> _orderByColumns = new();
         private readonly List<string> _orderBy = new();
@@ -39,7 +39,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             _getBuilder = getBuilder ?? throw new ArgumentNullException(nameof(getBuilder));
         }
 
-        public object[] Parameters => _parameters.ToArray();
+        public object?[] Parameters => _parameters.ToArray();
 
         public int? Limit
         {
@@ -138,7 +138,9 @@ namespace EchoPhase.DAL.Scylla.Cql
                 && node.Method.GetGenericMethodDefinition() == Linq.ScyllaQueryableExtensions.WithOptionsMethod)
             {
                 Visit(node.Arguments[0]);
-                var options = (Database.StatementOptions)((ConstantExpression)node.Arguments[1]).Value!;
+                var options = node.Arguments[1] is ConstantExpression { Value: Database.StatementOptions given }
+                    ? given
+                    : throw new NotSupportedException("WithOptions takes the options as a value.");
                 // Later calls refine earlier ones: WithConsistency(..).WithTimeout(..).
                 Options = Options is null ? options : new Database.StatementOptions(
                     options.Consistency ?? Options.Consistency,
@@ -231,7 +233,9 @@ namespace EchoPhase.DAL.Scylla.Cql
             if (node.Arguments[1].Type != typeof(int))
                 throw new NotSupportedException("Take(Range) cannot be translated to CQL");
 
-            var count = Math.Max(0, (int)Evaluate(node.Arguments[1])!);
+            var count = Evaluate(node.Arguments[1]) is int taken
+                ? Math.Max(0, taken)
+                : throw new NotSupportedException("Take needs a count.");
             Limit = Limit.HasValue ? Math.Min(Limit.Value, count) : count;
         }
 
@@ -318,7 +322,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             var value = Evaluate(valueExpr)
                 ?? throw new NotSupportedException("CQL cannot filter rows by null");
 
-            AddClause(column, ToCqlOperator(nodeType)!, value,
+            AddClause(column, ToCqlOperator(nodeType) ?? throw new NotSupportedException($"Unsupported comparison: {be}"), value,
                 nodeType == ExpressionType.Equal ? Restriction.Equality : Restriction.Range);
         }
 
@@ -350,7 +354,7 @@ namespace EchoPhase.DAL.Scylla.Cql
                     throw new NotSupportedException("Contains() requires a non-null collection of values");
 
                 // The driver serializes IN ? as list<T>, so the bound value must be strongly typed.
-                var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(itemType))!;
+                var list = Reflect.Create<IList>(typeof(List<>).MakeGenericType(itemType));
                 foreach (var value in values)
                     list.Add(value);
 
@@ -375,7 +379,7 @@ namespace EchoPhase.DAL.Scylla.Cql
         private void AddClause(string column, string op, object value, Restriction restriction)
         {
             _where.Add($"{column} {op} ?");
-            _parameters.Add(value is IList list && op == "IN" ? ConvertList(column, list) : Provider(column, value)!);
+            _parameters.Add(value is IList list && op == "IN" ? ConvertList(column, list) : Provider(column, value));
 
             if (!_restrictions.TryGetValue(column, out var existing) || existing == Restriction.Range)
                 _restrictions[column] = restriction;
@@ -396,7 +400,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             var property = PropertyOf(column);
             if (property is null || Builder.GetConverter(property) is not { } converter)
                 return values;
-            var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(converter.ProviderType))!;
+            var list = Reflect.Create<IList>(typeof(List<>).MakeGenericType(converter.ProviderType));
             foreach (var value in values)
                 list.Add(converter.ToProvider(value));
             return list;
@@ -540,13 +544,14 @@ namespace EchoPhase.DAL.Scylla.Cql
 
         private Func<Row, TResult> CompileProjector()
         {
+            var entityType = _entityType ?? throw new InvalidOperationException("Query root must be a DbSet");
             var row = Expression.Parameter(typeof(Row), "row");
-            var entity = Expression.Variable(_entityType!, "entity");
+            var entity = Expression.Variable(entityType, "entity");
             var map = Expression.Convert(
                 Expression.Call(MapMethod, row,
-                    Expression.Constant(_entityType, typeof(Type)),
+                    Expression.Constant(entityType, typeof(Type)),
                     Expression.Constant(Builder, typeof(IEntityBuilder))),
-                _entityType!);
+                entityType);
 
             Expression result = _selector == null
                 ? entity

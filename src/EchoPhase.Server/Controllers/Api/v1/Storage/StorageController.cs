@@ -99,7 +99,9 @@ namespace EchoPhase.Server.Controllers.Api.v1.Storage
             {
                 return Error(StorageLimit, ex.Message, StatusCodes.Status400BadRequest);
             }
-            return Ok(View((await _store.GetAsync(slot, key, ct))!, withValue: true));
+            return await _store.GetAsync(slot, key, ct) is { } item
+                ? Ok(View(item, withValue: true))
+                : Error(ErrorCodes.NotFound, "The value expired or was deleted meanwhile.", StatusCodes.Status404NotFound);
         }
 
         [HttpDelete("value")]

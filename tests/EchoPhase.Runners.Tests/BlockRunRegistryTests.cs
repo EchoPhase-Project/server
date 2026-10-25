@@ -30,7 +30,7 @@ namespace EchoPhase.Runners.Tests
         public void Cancel_SignalsTheRunsToken()
         {
             var runId = Guid.NewGuid();
-            var token = _registry.TryReserve(_alice, runId, maxPerUser: 1)!.Value;
+            var token = Assert.NotNull(_registry.TryReserve(_alice, runId, maxPerUser: 1));
 
             Assert.True(_registry.TryCancel(_alice, runId));
             Assert.True(token.IsCancellationRequested);
@@ -40,7 +40,7 @@ namespace EchoPhase.Runners.Tests
         public void Cancel_ByAnotherUser_LooksLikeAnUnknownRun()
         {
             var runId = Guid.NewGuid();
-            var token = _registry.TryReserve(_alice, runId, maxPerUser: 1)!.Value;
+            var token = Assert.NotNull(_registry.TryReserve(_alice, runId, maxPerUser: 1));
 
             Assert.False(_registry.TryCancel(_bob, runId));
             Assert.False(_registry.TryCancel(_alice, Guid.NewGuid()));

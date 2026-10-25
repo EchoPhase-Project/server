@@ -59,7 +59,9 @@ namespace EchoPhase.Server.Services.Workflows
 
             foreach (var schedule in due)
             {
-                var workflow = schedule.Workflow!;
+                // Loaded with the schedule (Include); gone only if deleted meanwhile.
+                if (schedule.Workflow is not { } workflow)
+                    continue;
                 var input = new Dictionary<string, object?>
                 {
                     ["scheduledAt"] = new DateTimeOffset(DateTime.SpecifyKind(schedule.NextRunAt, DateTimeKind.Utc)).ToString("O")

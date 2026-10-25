@@ -99,15 +99,17 @@ namespace EchoPhase.Server.Services.Storage
 
             var now = Now;
             var entry = await In(slot).Where(e => e.Key == key).FirstOrDefaultAsync(ct);
-            var live = entry is not null && !Expired(entry, now);
+            // The stored entry while it has not expired; null otherwise.
+            var current = entry is not null && !Expired(entry, now) ? entry : null;
+            var live = current is not null;
 
-            var value = update(live ? Parse(entry!.Value) : null);
+            var value = update(current is not null ? Parse(current.Value) : null);
             var json = Eval.ToJson(value);
             var size = Encoding.UTF8.GetByteCount(json);
             if (size > _options.MaxValueBytes)
                 throw new StorageLimitException($"The value is {size} bytes as JSON; at most {_options.MaxValueBytes}.");
 
-            await CheckQuotaAsync(slot.UserId, live ? entry!.Size : 0, size, isNew: !live, now, ct);
+            await CheckQuotaAsync(slot.UserId, current?.Size ?? 0, size, isNew: !live, now, ct);
 
             if (entry is null)
             {

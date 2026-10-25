@@ -47,7 +47,8 @@ namespace EchoPhase.Runners.Tests
         public BlockTypeRegistry Registry => _provider.GetRequiredService<BlockTypeRegistry>();
 
         public static BlockProgram Parse(string json)
-            => JsonSerializer.Deserialize<BlockProgram>(json, BlockParamsBinder.Options)!;
+            => JsonSerializer.Deserialize<BlockProgram>(json, BlockParamsBinder.Options)
+               ?? throw new InvalidOperationException("The program JSON is null.");
 
         public async Task<IBlockExecutionContext> RunAsync(
             string programJson, BlockLimits? limits = null, object? input = null, CancellationToken? ct = null,

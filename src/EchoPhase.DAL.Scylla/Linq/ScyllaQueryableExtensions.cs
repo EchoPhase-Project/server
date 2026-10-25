@@ -15,10 +15,10 @@ namespace EchoPhase.DAL.Scylla.Linq
     public static class ScyllaQueryableExtensions
     {
         internal static readonly MethodInfo AllowFilteringMethod =
-            typeof(ScyllaQueryableExtensions).GetMethod(nameof(AllowFiltering))!;
+            Reflect.Method(typeof(ScyllaQueryableExtensions), nameof(AllowFiltering));
 
         internal static readonly MethodInfo WithOptionsMethod =
-            typeof(ScyllaQueryableExtensions).GetMethod(nameof(WithOptions))!;
+            Reflect.Method(typeof(ScyllaQueryableExtensions), nameof(WithOptions));
 
         /// <summary>Runs the query with these options (consistency, timeout) instead of the connection's.</summary>
         public static IQueryable<T> WithOptions<T>(this IQueryable<T> source, StatementOptions options)
@@ -39,7 +39,7 @@ namespace EchoPhase.DAL.Scylla.Linq
             => source.WithOptions(new StatementOptions(Timeout: timeout));
 
         internal static readonly MethodInfo AsNoTrackingMethod =
-            typeof(ScyllaQueryableExtensions).GetMethod(nameof(AsNoTracking))!;
+            Reflect.Method(typeof(ScyllaQueryableExtensions), nameof(AsNoTracking));
 
         /// <summary>
         /// Returns fresh, untracked entities: changes to them are not saved

@@ -6,13 +6,13 @@ namespace EchoPhase.Scripting.Tests
     /// <summary>Behaviour of the compiled engine, including what the old one got wrong.</summary>
     public class EngineTests
     {
-        private static Dictionary<string, object> Vars(params (string Key, object Value)[] pairs)
-            => pairs.ToDictionary(p => p.Key, p => p.Value);
+        private static Dictionary<string, object?> Vars(params (string Key, object Value)[] pairs)
+            => pairs.ToDictionary(p => p.Key, p => (object?)p.Value);
 
-        private static object? Run(string expression, Dictionary<string, object>? vars = null)
-            => Eval.TypedExecute<object>(expression, vars ?? []);
+        private static object? Run(string expression, Dictionary<string, object?>? vars = null)
+            => Eval.EvaluateExpression(expression, vars ?? []);
 
-        private static string Render(string template, Dictionary<string, object>? vars = null)
+        private static string Render(string template, Dictionary<string, object?>? vars = null)
             => Eval.TypedProcess<string>(template, vars ?? []);
 
         [Fact]
@@ -58,9 +58,9 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void DivisionByZero_IsAnError()
         {
-            var result = Eval.Execute<double>("1 / 0", new Dictionary<string, object>());
+            var result = Eval.Execute<double>("1 / 0", new Dictionary<string, object?>());
             Assert.True(result.TryGetError(out var error));
-            Assert.Equal("DivideByZeroException", error!.Code);
+            Assert.Equal("DivideByZeroException", Must.Present(error).Code);
         }
 
         [Fact]
@@ -132,11 +132,11 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Set_CreatesTheStructureOnTheWay()
         {
-            var vars = new Dictionary<string, object>();
+            var vars = new Dictionary<string, object?>();
             Eval.Set(vars, "a.b[2].c", 5L);
 
             Assert.Equal(5L, Eval.Resolve(vars, "a.b[2].c"));
-            Assert.Equal(3, ((List<object?>)Eval.Resolve(vars, "a.b")!).Count);
+            Assert.Equal(3, Assert.IsType<List<object?>>(Eval.Resolve(vars, "a.b")).Count);
         }
 
         [Fact]

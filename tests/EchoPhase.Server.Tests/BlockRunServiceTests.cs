@@ -48,13 +48,13 @@ namespace EchoPhase.Server.Tests
             { "blocks": [ { "id": 1, "type": "ManualTrigger", "params": {} },
                           { "id": 2, "type": "Print", "params": { "text": "hi" } } ],
               "connections": [ { "from": 1, "to": 2 } ] }
-            """, BlockParamsBinder.Options)!;
+            """, BlockParamsBinder.Options) ?? throw new InvalidOperationException("The test program did not parse.");
 
         private async Task<BlockRun> Start()
         {
             var result = await Service().StartAsync(_user, null, new BlockRunStart(Program()), Ct);
             Assert.True(result.Successful, result.Error.Message);
-            return result.Value!;
+            return result.Ok();
         }
 
         [Fact]
@@ -63,8 +63,8 @@ namespace EchoPhase.Server.Tests
             var run = await Start();
 
             using var db = _scylla.Context();
-            var stored = await db.BlockRuns.Where(r => r.UserId == _user && r.RunId == run.RunId).FirstOrDefaultAsync(Ct);
-            Assert.Equal(BlockRunStatus.Queued, stored!.Status);
+            var stored = Must.Present(await db.BlockRuns.Where(r => r.UserId == _user && r.RunId == run.RunId).FirstOrDefaultAsync(Ct));
+            Assert.Equal(BlockRunStatus.Queued, stored.Status);
             Assert.Equal(2, stored.BlockCount);
             Assert.NotNull(await db.ActiveBlockRuns.Where(a => a.RunId == run.RunId).FirstOrDefaultAsync(Ct));
         }
@@ -88,8 +88,8 @@ namespace EchoPhase.Server.Tests
             _time.Advance(TimeSpan.FromSeconds(1));
             var second = await Start();
 
-            var page = (await Service().ListAsync(_user, 1, null, Ct)).Value!;
-            var next = (await Service().ListAsync(_user, 1, page.NextCursor, Ct)).Value!;
+            var page = (await Service().ListAsync(_user, 1, null, Ct)).Ok();
+            var next = (await Service().ListAsync(_user, 1, page.NextCursor, Ct)).Ok();
 
             Assert.Equal(second.RunId, Assert.Single(page.Items).RunId);
             Assert.Equal(first.RunId, Assert.Single(next.Items).RunId);
@@ -110,7 +110,7 @@ namespace EchoPhase.Server.Tests
         {
             var run = await Start();
 
-            var details = (await Service().GetAsync(_user, run.RunId, Ct)).Value!;
+            var details = (await Service().GetAsync(_user, run.RunId, Ct)).Ok();
 
             Assert.Equal(run.RunId, details.Run.RunId);
             Assert.Null(details.Result);

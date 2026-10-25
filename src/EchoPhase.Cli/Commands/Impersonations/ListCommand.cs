@@ -49,7 +49,7 @@ namespace EchoPhase.Cli.Commands.Impersonations
             if (!string.IsNullOrWhiteSpace(settings.User))
             {
                 var name = settings.User.Trim();
-                records = records.Where(i => i.Actor!.UserName == name || i.Target!.UserName == name);
+                records = records.Where(i => (i.Actor != null && i.Actor.UserName == name) || (i.Target != null && i.Target.UserName == name));
             }
             if (settings.Active)
                 records = records.Where(i => i.EndedAt == null && i.ExpiresAt > now);
@@ -64,7 +64,7 @@ namespace EchoPhase.Cli.Commands.Impersonations
                         page = page.Where(i => i.CreatedAt < before);
                     return page.OrderByDescending(i => i.CreatedAt).Take(take)
                         .Select(i => new ImpersonationRow(
-                            i.Id, i.Actor!.UserName, i.Target!.UserName, i.Reason, i.CreatedAt, i.ExpiresAt, i.EndedAt))
+                            i.Id, i.Actor != null ? i.Actor.UserName : null, i.Target != null ? i.Target.UserName : null, i.Reason, i.CreatedAt, i.ExpiresAt, i.EndedAt))
                         .ToListAsync(ct);
                 },
                 r => Cursors.Time(r.StartedAt),

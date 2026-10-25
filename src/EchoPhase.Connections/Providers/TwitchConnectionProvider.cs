@@ -48,7 +48,7 @@ namespace EchoPhase.Connections.Providers
 
             if (result.IsSuccess)
             {
-                var v = result.Value!;
+                var v = result.Value;
                 return TokenValidation.Valid(new TokenIdentity(
                     v.ClientId, v.UserId, v.Login, v.Scopes, v.ExpiresIn > 0 ? v.ExpiresIn : null));
             }
@@ -80,7 +80,7 @@ namespace EchoPhase.Connections.Providers
         {
             if (result.IsSuccess)
             {
-                var t = result.Value!;
+                var t = result.Value;
                 return TokenGrant.Granted(new OAuthTokenSet(t.AccessToken, t.RefreshToken, t.Scopes, t.ExpiresIn));
             }
 

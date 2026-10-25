@@ -6,10 +6,10 @@ namespace EchoPhase.Scripting.Tests
     /// <summary>median, percentile, mode, variance, stdev; rand, randInt, choice, shuffle, randomBytes, uuid4, uuid7.</summary>
     public class StatisticsAndRandomTests
     {
-        private static object? Run(string expression, Dictionary<string, object>? vars = null)
-            => Eval.TypedExecute<object>(expression, vars ?? []);
+        private static object? Run(string expression, Dictionary<string, object?>? vars = null)
+            => Eval.EvaluateExpression(expression, vars ?? []);
 
-        private static string Text(string expression, Dictionary<string, object>? vars = null)
+        private static string Text(string expression, Dictionary<string, object?>? vars = null)
             => Eval.TypedExecute<string>(expression, vars ?? []);
 
         // Python's statistics docs: [2, 4, 4, 4, 5, 5, 7, 9] has pvariance 4, pstdev 2.
@@ -27,7 +27,7 @@ namespace EchoPhase.Scripting.Tests
         [InlineData("median([{ a: 3 }, { a: 1 }, { a: 2 }], x => x.a)", 2)]
         [InlineData("variance([1e9 + 4, 1e9 + 7, 1e9 + 13, 1e9 + 16])", 30)]
         public void Statistics_MatchKnownValues(string expression, double expected)
-            => Assert.Equal(expected, Eval.TypedExecute<double>(expression, new Dictionary<string, object>()), 9);
+            => Assert.Equal(expected, Eval.TypedExecute<double>(expression, new Dictionary<string, object?>()), 9);
 
         [Fact]
         public void Statistics_OfTooFewValues_AreNull()
@@ -63,7 +63,7 @@ namespace EchoPhase.Scripting.Tests
                     return lo + 1 < sorted.Count ? sorted[lo] + (sorted[lo + 1] - sorted[lo]) * (pos - lo) : sorted[lo];
                 }
 
-                var vars = new Dictionary<string, object> { ["xs"] = xs.Select(x => (object?)x).ToList() };
+                var vars = new Dictionary<string, object?> { ["xs"] = xs.Select(x => (object?)x).ToList() };
                 Assert.Equal(Expected(0.5), Eval.TypedExecute<double>("median(xs)", vars), 9);
                 Assert.Equal(Expected(0.9), Eval.TypedExecute<double>("percentile(xs, 90)", vars), 9);
                 Assert.Equal(Expected(0.05), Eval.TypedExecute<double>("percentile(xs, 5)", vars), 9);
@@ -77,9 +77,9 @@ namespace EchoPhase.Scripting.Tests
             var seen = new HashSet<double>();
             for (int i = 0; i < 2000; i++)
             {
-                var unit = Eval.TypedExecute<double>("rand()", new Dictionary<string, object>());
+                var unit = Eval.TypedExecute<double>("rand()", new Dictionary<string, object?>());
                 Assert.InRange(unit, 0, 0.9999999999999999);
-                seen.Add(Eval.TypedExecute<double>("randInt(1, 6)", new Dictionary<string, object>()));
+                seen.Add(Eval.TypedExecute<double>("randInt(1, 6)", new Dictionary<string, object?>()));
             }
             Assert.Equal([1d, 2d, 3d, 4d, 5d, 6d], seen.Order());
             Assert.Equal(-3d, Run("randInt(-3, -3)"));
@@ -90,7 +90,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void ChoiceAndShuffle_UseTheList()
         {
-            var vars = new Dictionary<string, object> { ["xs"] = Enumerable.Range(0, 50).Select(i => (object?)(double)i).ToList() };
+            var vars = new Dictionary<string, object?> { ["xs"] = Enumerable.Range(0, 50).Select(i => (object?)(double)i).ToList() };
             Assert.InRange(Eval.TypedExecute<double>("choice(xs)", vars), 0, 49);
             Assert.Null(Run("choice([])"));
 

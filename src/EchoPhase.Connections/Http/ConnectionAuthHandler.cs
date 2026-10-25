@@ -48,7 +48,7 @@ namespace EchoPhase.Connections.Http
                 if (!resolved.Successful)
                     return ErrorResponse(request, resolved.Error);
 
-                credential = resolved.Value!;
+                credential = resolved.Value;
                 Provider(scope).Apply(request, credential);
             }
 
@@ -78,7 +78,7 @@ namespace EchoPhase.Connections.Http
                 }
 
                 var retry = await CloneAsync(request, ct);
-                Provider(scope).Apply(retry, recovered.Value!);
+                Provider(scope).Apply(retry, recovered.Value);
 
                 response.Dispose();
                 return await base.SendAsync(retry, ct);

@@ -6,8 +6,8 @@ namespace EchoPhase.Scripting.Tests
     /// <summary>Scopes rebound across calls instead of made anew must never be seen by more than one call.</summary>
     public class ScopeReuseTests
     {
-        private static string Text(string expression, Dictionary<string, object>? vars = null)
-            => Eval.TypedExecute<string>(expression, vars ?? new Dictionary<string, object>());
+        private static string Text(string expression, Dictionary<string, object?>? vars = null)
+            => Eval.TypedExecute<string>(expression, vars ?? new Dictionary<string, object?>());
 
         [Theory]
         // Lambdas made inside a lambda or a comprehension keep their own x.
@@ -33,13 +33,13 @@ namespace EchoPhase.Scripting.Tests
         // A null parameter hides a variable of the same name; it does not show it through.
         [InlineData("map([null], n => n)", "[null]")]
         public void NullParameters_ReadAsNull(string expression, string expected)
-            => Assert.Equal(expected, Text(expression, new Dictionary<string, object> { ["n"] = 5d }));
+            => Assert.Equal(expected, Text(expression, new Dictionary<string, object?> { ["n"] = 5d }));
 
         [Fact]
         public void ALambdaReenteringItself_KeepsEachCallsValue()
         {
             // g(n) = g(n - 1) + 1, through a variable: the inner call must not overwrite the outer's x.
-            var vars = new Dictionary<string, object>();
+            var vars = new Dictionary<string, object?>();
             Eval.Set(vars, "g", Eval.Evaluate("@(x => x > 0 ? sum(map([x - 1], g)) + x * 0 + 1 : 0)", vars));
             Assert.Equal("[5,7]", Text("map([5, 7], g)", vars));
             Assert.Equal("[0,1,2]", Text("map([0, 1, 2], g)", vars));
@@ -48,7 +48,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void AFailingCall_DoesNotPoisonTheNext()
         {
-            var vars = new Dictionary<string, object> { ["xs"] = new List<object?> { 1d, "x", 3d } };
+            var vars = new Dictionary<string, object?> { ["xs"] = new List<object?> { 1d, "x", 3d } };
             Eval.Set(vars, "f", Eval.Evaluate("@(x => x * 2)", vars));
             Assert.Throws<InvalidOperationException>(() => Text("map(xs, f)", vars));
             Assert.Equal("[2,6]", Text("map([1, 3], f)", vars));

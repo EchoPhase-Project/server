@@ -9,7 +9,7 @@ namespace EchoPhase.DAL.Scylla.Loggers
     {
         public static readonly NullQueryLogger Instance = new();
 
-        public void LogQuery(string cql, Type resultType, object[] parameters) { }
+        public void LogQuery(string cql, Type resultType, object?[] parameters) { }
 
         public void LogQueryTiming(long elapsedMs) { }
 

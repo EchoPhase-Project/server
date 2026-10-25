@@ -34,12 +34,13 @@ namespace EchoPhase.DAL.Scylla.Tests
         /// <summary>Same as <c>.AllowFiltering()</c> on a real Scylla query.</summary>
         public static IQueryable<T> AllowFiltering<T>(IQueryable<T> source)
         {
-            var method = typeof(ScyllaQueryableExtensions).GetMethod(nameof(ScyllaQueryableExtensions.AllowFiltering))!
+            var method = (typeof(ScyllaQueryableExtensions).GetMethod(nameof(ScyllaQueryableExtensions.AllowFiltering))
+                ?? throw new InvalidOperationException("AllowFiltering not found."))
                 .MakeGenericMethod(typeof(T));
             return source.Provider.CreateQuery<T>(Expression.Call(null, method, source.Expression));
         }
 
-        public static (string Cql, object[] Parameters) Translate<T>(IQueryable<T> query, IEntityBuilder builder)
+        public static (string Cql, object?[] Parameters) Translate<T>(IQueryable<T> query, IEntityBuilder builder)
         {
             var visitor = new ExpressionVisitor<T>(_ => builder);
             var cql = visitor.VisitExpression(query.Expression);

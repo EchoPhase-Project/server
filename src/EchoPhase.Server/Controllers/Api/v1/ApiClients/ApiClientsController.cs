@@ -53,7 +53,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.ApiClients
 
             return Ok(new
             {
-                client = _projector.For(result.Value!.Client).Build(),
+                client = _projector.For(result.Value.Client).Build(),
                 clientSecret = result.Value.ClientSecret
             });
         }

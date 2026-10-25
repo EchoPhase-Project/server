@@ -17,7 +17,8 @@ namespace EchoPhase.DAL.Scylla.Linq
             .Single(m => m.Name == nameof(Execute) && m.IsGenericMethodDefinition);
 
         private static readonly MethodInfo ExecuteSequenceMethod = typeof(QueryProvider)
-            .GetMethod(nameof(ExecuteSequence), BindingFlags.NonPublic | BindingFlags.Instance)!;
+            .GetMethod(nameof(ExecuteSequence), BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new MissingMethodException(nameof(QueryProvider), nameof(ExecuteSequence));
 
         private static readonly HashSet<string> PredicateMethods = new()
         {
@@ -35,9 +36,7 @@ namespace EchoPhase.DAL.Scylla.Linq
         IQueryable IQueryProvider.CreateQuery(Expression expression)
         {
             var elementType = GetElementType(expression.Type);
-            return (IQueryable)Activator.CreateInstance(
-                typeof(ScyllaQueryable<>).MakeGenericType(elementType),
-                this, expression)!;
+            return Reflect.Create<IQueryable>(typeof(ScyllaQueryable<>).MakeGenericType(elementType), this, expression);
         }
 
         IQueryable<TElement> IQueryProvider.CreateQuery<TElement>(Expression expression)
@@ -109,7 +108,8 @@ namespace EchoPhase.DAL.Scylla.Linq
         }
 
         private IEnumerable ExecuteSequence(Type elementType, Expression expression) =>
-            (IEnumerable)ExecuteSequenceMethod.MakeGenericMethod(elementType).Invoke(this, new object[] { expression })!;
+            ExecuteSequenceMethod.MakeGenericMethod(elementType).Invoke(this, [expression]) as IEnumerable
+            ?? throw new InvalidOperationException("The query returned no sequence.");
 
         private List<T> ExecuteSequence<T>(Expression expression)
         {
@@ -119,7 +119,7 @@ namespace EchoPhase.DAL.Scylla.Linq
             if (visitor.Limit == 0)
                 return new List<T>();
 
-            var rows = Database.Executor.Run(Statement(cql, visitor), typeof(T)).Rows.Select(visitor.Projector!).ToList();
+            var rows = Database.Executor.Run(Statement(cql, visitor), typeof(T)).Rows.Select(Projector(visitor)).ToList();
             return visitor.ReturnsTrackedEntities ? Database.AttachAll(rows) : rows;
         }
 
@@ -131,7 +131,7 @@ namespace EchoPhase.DAL.Scylla.Linq
             if (visitor.Limit == 0)
                 return new List<T>();
 
-            var rows = (await Database.Executor.RunAsync(Statement(cql, visitor), typeof(T), ct)).Rows.Select(visitor.Projector!).ToList();
+            var rows = (await Database.Executor.RunAsync(Statement(cql, visitor), typeof(T), ct)).Rows.Select(Projector(visitor)).ToList();
             return visitor.ReturnsTrackedEntities ? Database.AttachAll(rows) : rows;
         }
 
@@ -160,7 +160,7 @@ namespace EchoPhase.DAL.Scylla.Linq
                 throw new ArgumentOutOfRangeException(nameof(pageSize), "Page size must be positive.");
             var result = await Database.Executor.RunAsync(
                 Statement(cql, visitor) with { PageSize = pageSize, PagingState = pagingState }, typeof(T), ct);
-            var items = result.Rows.Select(visitor.Projector!).ToList();
+            var items = result.Rows.Select(Projector(visitor)).ToList();
             return new ScyllaPage<T>(visitor.ReturnsTrackedEntities ? Database.AttachAll(items) : items, result.PagingState);
         }
 
@@ -199,6 +199,9 @@ namespace EchoPhase.DAL.Scylla.Linq
         // LINQ produces plain SELECTs, which are always safe to retry.
         private static CqlStatement Statement<T>(string cql, ExpressionVisitor<T> visitor)
             => new(cql, visitor.Parameters, Idempotent: true, Options: visitor.Options);
+
+        private static Func<Cassandra.Row, T> Projector<T>(ExpressionVisitor<T> visitor)
+            => visitor.Projector ?? throw new InvalidOperationException("The query was not translated before running.");
 
         private static Type GetElementType(Type sequenceType)
         {

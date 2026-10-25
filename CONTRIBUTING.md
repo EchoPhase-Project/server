@@ -92,6 +92,24 @@ ones that surprise most:
   records, `/// <param>` becomes the field's description in the OpenAPI
   contract.
 
+### Null
+
+Nullable reference types are on everywhere, and their warnings fail the
+build. Ignoring null is not allowed: no null-forgiving operator (`x!`,
+`null!`, `default!`), which `NullForgivingTests` checks across `src` and
+`tests`. Instead:
+
+- check it, with an exception that says what was missing:
+  `entity ?? throw new InvalidOperationException("…")`, or a pattern
+  (`if (result is not { } value) return …;`);
+- let the compiler know: `[MemberNotNullWhen(true, nameof(Value))]` on
+  `IServiceResult<T>.Successful`, `[NotNullWhen]` / `[MaybeNullWhen]` on
+  `Try…` methods, so that a checked result needs no `!`;
+- make the type honest: a value that may be missing is `T?`; a member that
+  must be set is `required`; a `DbSet` is `=> Set<T>()`;
+- in tests, `Assert.NotNull(x)` (or the project's `Must.Present(x)`) and
+  `result.Ok()`, which fail with the reason.
+
 Packages are versioned centrally: `src/Directory.Packages.props` and
 `tests/Directory.Packages.props`, never in a project file. Read the time from
 an injected `TimeProvider`, not `DateTime.UtcNow`, so tests can control it.

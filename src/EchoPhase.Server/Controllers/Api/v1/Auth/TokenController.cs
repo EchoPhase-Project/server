@@ -64,7 +64,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
 
             return Ok(new
             {
-                access_token = result.Value!.AccessToken,
+                access_token = result.Value.AccessToken,
                 token_type = "Bearer",
                 expires_in = result.Value.ExpiresIn
             });

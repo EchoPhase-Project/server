@@ -10,10 +10,10 @@ namespace EchoPhase.DAL.Scylla
 {
     public class ScyllaContext : DbContext
     {
-        public DbSet<BlockRun> BlockRuns { get; set; } = null!;
-        public DbSet<BlockRunResult> BlockRunResults { get; set; } = null!;
-        public DbSet<ActiveBlockRun> ActiveBlockRuns { get; set; } = null!;
-        public DbSet<Notification> Notifications { get; set; } = null!;
+        public DbSet<BlockRun> BlockRuns => Set<BlockRun>();
+        public DbSet<BlockRunResult> BlockRunResults => Set<BlockRunResult>();
+        public DbSet<ActiveBlockRun> ActiveBlockRuns => Set<ActiveBlockRun>();
+        public DbSet<Notification> Notifications => Set<Notification>();
 
         public ScyllaContext(ScyllaConnection connection) : base(connection)
         {

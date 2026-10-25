@@ -4,6 +4,6 @@
 namespace EchoPhase.Server.Controllers.Api.v1.ApiClients
 {
     public sealed record ApiClientClaims(
-        IReadOnlyDictionary<string, string[]> Permissions = default!
+        IReadOnlyDictionary<string, string[]>? Permissions = null
     );
 }

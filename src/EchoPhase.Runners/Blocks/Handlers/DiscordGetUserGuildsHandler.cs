@@ -27,9 +27,9 @@ namespace EchoPhase.Runners.Blocks.Handlers
                 param.Query, new ConnectionRef(context.UserId, param.Connection), context.CancellationToken);
 
             if (!result.IsSuccess)
-                throw new InvalidOperationException(result.Error!.Message);
+                throw new InvalidOperationException(result.Error.Message);
 
-            var value = result.Value!
+            var value = result.Value
                 .Select(item => ToVariable(item))
                 .ToList();
 

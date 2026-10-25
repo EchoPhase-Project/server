@@ -49,7 +49,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Common
                 entries.RemoveAll(entry => requestKeys.Contains(entry.Key));
 
             return entries
-                .SelectMany(entry => entry.Value!.Errors.Select(error => new ErrorBody(
+                .SelectMany(entry => (entry.Value?.Errors ?? []).Select(error => new ErrorBody(
                     InvalidCode,
                     string.IsNullOrEmpty(error.ErrorMessage) ? "The value is not valid." : error.ErrorMessage,
                     requestKeys.Contains(entry.Key) ? null : FieldName(entry.Key))))

@@ -45,7 +45,7 @@ namespace EchoPhase.DAL.Scylla.Tests
         public void CollectionContains_RequiresAllowFiltering()
         {
             var query = QueryHarness.Query<AuditEntry>()
-                .Where(x => x.ImpersonationId == _id && x.Tags!.Contains("admin"));
+                .Where(x => x.ImpersonationId == _id && x.Tags.Contains("admin"));
 
             Assert.Throws<NotSupportedException>(() => QueryHarness.Translate(query, QueryHarness.AuditModel()));
         }

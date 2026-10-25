@@ -25,8 +25,8 @@ namespace EchoPhase.DAL.Scylla.Tests
 
     internal sealed class UpdateContext : DbContext
     {
-        public DbSet<PageHits> Hits { get; set; } = null!;
-        public DbSet<Bag> Bags { get; set; } = null!;
+        public DbSet<PageHits> Hits => Set<PageHits>();
+        public DbSet<Bag> Bags => Set<Bag>();
 
         public UpdateContext(ScyllaConnection connection) : base(connection)
         {
@@ -84,7 +84,7 @@ namespace EchoPhase.DAL.Scylla.Tests
                 .RemoveKeys(b => b.Meta, ["k"]), ct: Ct);
 
             var bag = await db.Bags.Where(b => b.Id == 1).AsNoTracking().FirstAsync(Ct);
-            Assert.Equal(["b"], bag.Tags!);
+            Assert.Equal(["b"], Must.Present(bag.Tags));
             Assert.Equal(["w", "x", "y"], bag.Log);
             Assert.Equal(new Dictionary<string, int> { ["j"] = 2 }, bag.Meta);
             Assert.Null(bag.Note);

@@ -59,7 +59,7 @@ namespace EchoPhase.DAL.Scylla.Database
             => Execute<Row>(cql, null, parameters);
 
         public TResult? ExecuteScalar<TResult>(string cql, params object[] parameters)
-            => Execute<TResult>(cql, row => MapScalar<TResult>(row), parameters).FirstOrDefault();
+            => Execute<TResult?>(cql, row => MapScalar<TResult>(row), parameters).FirstOrDefault();
 
         public void ExecuteNonQuery(string cql, params object[] parameters)
             => Execute<Row>(cql, null, parameters);
@@ -123,7 +123,7 @@ namespace EchoPhase.DAL.Scylla.Database
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                Logger?.LogQuery(statement.Cql, resultType ?? typeof(Row), statement.Values!);
+                Logger?.LogQuery(statement.Cql, resultType ?? typeof(Row), statement.Values);
                 var result = await Engine.ExecuteAsync(statement, ct);
                 Logger?.LogQueryTiming(stopwatch.ElapsedMilliseconds);
                 return result;
@@ -146,7 +146,7 @@ namespace EchoPhase.DAL.Scylla.Database
 
         public async Task<TResult?> ExecuteScalarAsync<TResult>(string cql, object[] parameters, CancellationToken ct)
         {
-            var result = await ExecuteAsync<TResult>(cql, row => MapScalar<TResult>(row), parameters, ct);
+            var result = await ExecuteAsync<TResult?>(cql, row => MapScalar<TResult>(row), parameters, ct);
             return result.FirstOrDefault();
         }
 
@@ -186,7 +186,7 @@ namespace EchoPhase.DAL.Scylla.Database
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                Logger?.LogQuery(statement.Cql, resultType ?? typeof(Row), statement.Values!);
+                Logger?.LogQuery(statement.Cql, resultType ?? typeof(Row), statement.Values);
                 var result = run();
                 Logger?.LogQueryTiming(stopwatch.ElapsedMilliseconds);
                 return result;
@@ -211,16 +211,18 @@ namespace EchoPhase.DAL.Scylla.Database
                 "Either provide a projector function or use Row as the result type.");
         }
 
-        private static TResult MapScalar<TResult>(Row row)
+        private static TResult? MapScalar<TResult>(Row row)
         {
             if (row == null || row.GetValue<object>(0) == null)
-                return default!;
+                return default;
 
             var value = row.GetValue<object>(0);
             if (value is TResult typedValue)
                 return typedValue;
 
-            return (TResult)Convert.ChangeType(value, typeof(TResult));
+            return Convert.ChangeType(value, typeof(TResult)) is TResult converted
+                ? converted
+                : throw new InvalidCastException($"Cannot read {value.GetType().Name} as {typeof(TResult).Name}.");
         }
 
         #endregion

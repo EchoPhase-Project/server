@@ -69,7 +69,8 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             if (user is null) throw new ArgumentNullException(nameof(user));
 
             var principal = await _principalFactory.CreateAsync(user, context);
-            var identity = (ClaimsIdentity)principal.Identity!;
+            var identity = principal.Identity as ClaimsIdentity
+                ?? throw new InvalidOperationException("The user's principal has no claims identity.");
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var tokenDescriptor = new SecurityTokenDescriptor

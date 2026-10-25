@@ -28,8 +28,7 @@ namespace EchoPhase.Runners.Roslyn.Validators
 
             _allowedAssemblies = _allowedTypes
                 .Select(typeName => Type.GetType(typeName)?.Assembly?.GetName().Name)
-                .Where(name => name != null)
-                .Select(name => name!)
+                .OfType<string>()
                 .ToHashSet();
         }
 
@@ -46,7 +45,7 @@ namespace EchoPhase.Runners.Roslyn.Validators
             var compilation = CSharpCompilation.Create("Validation")
                 .AddReferences(AppDomain.CurrentDomain
                     .GetAssemblies()
-                    .Where(a => _allowedAssemblies.Contains(a.GetName().Name!))
+                    .Where(a => a.GetName().Name is { } name && _allowedAssemblies.Contains(name))
                     .Select(a => MetadataReference.CreateFromFile(a.Location)))
                 .AddSyntaxTrees(tree);
 

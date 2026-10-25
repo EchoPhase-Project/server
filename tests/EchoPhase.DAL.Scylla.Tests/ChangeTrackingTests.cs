@@ -19,7 +19,7 @@ namespace EchoPhase.DAL.Scylla.Tests
 
     internal sealed class ProfileContext : DbContext
     {
-        public DbSet<Profile> Profiles { get; set; } = null!;
+        public DbSet<Profile> Profiles => Set<Profile>();
 
         public ProfileContext(ScyllaConnection connection) : base(connection)
         {
@@ -128,7 +128,7 @@ namespace EchoPhase.DAL.Scylla.Tests
             using var db = Context();
             var profile = await db.Profiles.Where(p => p.Id == _id).FirstAsync(Ct);
 
-            profile.Tags!.Add("b");
+            Must.Present(profile.Tags).Add("b");
             await db.SaveChangesAsync(Ct);
 
             using var other = Context();

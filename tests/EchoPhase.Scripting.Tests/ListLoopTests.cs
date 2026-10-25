@@ -7,7 +7,7 @@ namespace EchoPhase.Scripting.Tests
     public class ListLoopTests
     {
         private static string Text(string expression)
-            => Eval.TypedExecute<string>(expression, new Dictionary<string, object>());
+            => Eval.TypedExecute<string>(expression, new Dictionary<string, object?>());
 
         [Theory]
         [InlineData("unique([3, 1, '3', 2, 1])", "[3,1,2]")]

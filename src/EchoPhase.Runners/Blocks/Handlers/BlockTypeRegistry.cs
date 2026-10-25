@@ -52,7 +52,8 @@ namespace EchoPhase.Runners.Blocks.Handlers
 
         private static BlockTypeDescriptor Describe(Type handler)
         {
-            var attribute = handler.GetCustomAttribute<BlockTypeAttribute>()!;
+            var attribute = handler.GetCustomAttribute<BlockTypeAttribute>()
+                ?? throw new InvalidOperationException($"{handler.Name} has no [BlockType] attribute.");
             var paramsType = FindParamsType(handler)
                 ?? throw new InvalidOperationException($"{handler.Name} does not derive from BlockHandlerBase<TParams>.");
             return new BlockTypeDescriptor(attribute.Type, attribute.Version, handler, paramsType,

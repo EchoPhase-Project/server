@@ -107,7 +107,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Notes
             var result = await _notes.CreateAsync(User.GetUserId(), dto.ToInput(), ct);
             if (!result.Successful)
                 return Failure(result.Error);
-            return CreatedAtAction(nameof(Get), new { id = result.Value!.Note.Id }, NoteResponse.From(result.Value));
+            return CreatedAtAction(nameof(Get), new { id = result.Value.Note.Id }, NoteResponse.From(result.Value));
         }
 
         [HttpGet("{id:guid}")]
@@ -117,7 +117,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Notes
         public async Task<IActionResult> Get(Guid id, CancellationToken ct)
         {
             var result = await _notes.GetAsync(User.GetUserId(), id, ct);
-            return result.Successful ? Ok(NoteResponse.From(result.Value!)) : Failure(result.Error);
+            return result.Successful ? Ok(NoteResponse.From(result.Value)) : Failure(result.Error);
         }
 
         /// <summary>Replaces the note's content. Pinned and RemindAt are the owner's: from others they are ignored.</summary>
@@ -132,7 +132,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Notes
         public async Task<IActionResult> Update(Guid id, [FromBody] NoteRequest dto, CancellationToken ct)
         {
             var result = await _notes.UpdateAsync(User.GetUserId(), id, dto.ToInput(), ct);
-            return result.Successful ? Ok(NoteResponse.From(result.Value!)) : Failure(result.Error);
+            return result.Successful ? Ok(NoteResponse.From(result.Value)) : Failure(result.Error);
         }
 
         /// <summary>Deletes the note: only its owner may.</summary>
@@ -157,7 +157,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Notes
         public async Task<IActionResult> Shares(Guid id, CancellationToken ct)
         {
             var result = await _notes.SharesAsync(User.GetUserId(), id, ct);
-            return result.Successful ? Ok(result.Value!.Select(NoteShareResponse.From)) : Failure(result.Error);
+            return result.Successful ? Ok(result.Value.Select(NoteShareResponse.From)) : Failure(result.Error);
         }
 
         /// <summary>Shares the note with a user, or changes what they may do; they are notified when it is new to them.</summary>
@@ -171,7 +171,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Notes
         public async Task<IActionResult> Share(Guid id, [FromBody] ShareNoteRequest dto, CancellationToken ct)
         {
             var result = await _notes.ShareAsync(User.GetUserId(), id, dto.UserName, dto.CanEdit, ct);
-            return result.Successful ? Ok(NoteShareResponse.From(result.Value!)) : Failure(result.Error);
+            return result.Successful ? Ok(NoteShareResponse.From(result.Value)) : Failure(result.Error);
         }
 
         /// <summary>Stops sharing the note with a user: its owner may, and so may that user (to leave it).</summary>

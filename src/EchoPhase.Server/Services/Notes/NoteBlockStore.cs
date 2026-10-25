@@ -24,7 +24,7 @@ namespace EchoPhase.Server.Services.Notes
         public async Task<BlockNote?> GetAsync(Guid userId, Guid noteId, CancellationToken ct = default)
         {
             var result = await _notes.GetAsync(userId, noteId, ct);
-            return result.Successful ? Of(result.Value!.Note) : null;
+            return result.Successful ? Of(result.Value.Note) : null;
         }
 
         public async Task<BlockNote?> FindByTitleAsync(Guid userId, string title, CancellationToken ct = default)
@@ -55,6 +55,6 @@ namespace EchoPhase.Server.Services.Notes
 
         // A refusal fails the block with the service's own words.
         private static T Require<T>(IServiceResult<T> result) =>
-            result.Successful ? result.Value! : throw new InvalidOperationException(result.Error.Message);
+            result.Successful ? result.Value : throw new InvalidOperationException(result.Error.Message);
     }
 }

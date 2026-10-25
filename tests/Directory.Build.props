@@ -4,6 +4,8 @@
              that MTP extensions such as code coverage load. Unconditional:
              IsTestProject is set later, in the project file. -->
         <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+        <!-- As in src: nullable warnings fail the build. -->
+        <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
     </PropertyGroup>
     <ItemGroup Condition="'$(IsTestProject)' == 'true'">
         <!-- Coverage for mise run test:coverage (Microsoft.Testing.Platform; coverlet.collector is VSTest only) -->

@@ -67,13 +67,13 @@ namespace EchoPhase.Server.Tests
             var result = await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "notes.txt", Text("hello"), 5, Ct);
 
             Assert.True(result.Successful);
-            var file = result.Value!;
+            var file = result.Ok();
             Assert.Equal(FileStatus.Ready, file.Status);
             Assert.Equal(5, file.Size);
             Assert.Equal("text/plain", file.ContentType);
             Assert.Equal("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", file.Sha256);
             Assert.Equal($"files/{file.Id:N}", file.StorageKey);
-            Assert.NotNull(await _storage.HeadAsync(file.StorageKey, Ct));
+            Must.Present(await _storage.HeadAsync(file.StorageKey, Ct));
         }
 
         [Fact]
@@ -81,7 +81,7 @@ namespace EchoPhase.Server.Tests
         {
             var result = await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "../../etc/\u0007passwd", Text("x"), 1, Ct);
 
-            Assert.Equal("passwd", result.Value!.Name);
+            Assert.Equal("passwd", result.Ok().Name);
         }
 
         [Fact]
@@ -89,7 +89,7 @@ namespace EchoPhase.Server.Tests
         {
             var result = await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "page.html", Text("<script>alert(1)</script>"), null, Ct);
 
-            Assert.Equal("text/plain", result.Value!.ContentType);
+            Assert.Equal("text/plain", result.Ok().ContentType);
         }
 
         [Fact]
@@ -142,8 +142,8 @@ namespace EchoPhase.Server.Tests
         [Fact]
         public async Task Get_OwnFilesAndOthersAvatars_ButNotOthersFiles()
         {
-            var attachment = (await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "a.txt", Text("x"), 1, Ct)).Value!;
-            var avatar = (await Files().SetAvatarAsync(_alice.Id, "me.png", new MemoryStream(Png), Png.Length, Ct)).Value!;
+            var attachment = (await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "a.txt", Text("x"), 1, Ct)).Ok();
+            var avatar = (await Files().SetAvatarAsync(_alice.Id, "me.png", new MemoryStream(Png), Png.Length, Ct)).Ok();
 
             Assert.True((await Files().GetAsync(_alice.Id, attachment.Id, Ct)).Successful);
             Assert.True((await Files().GetAsync(_bob.Id, avatar.Id, Ct)).Successful);
@@ -153,8 +153,8 @@ namespace EchoPhase.Server.Tests
         [Fact]
         public async Task SetAvatar_ReplacesAndDeletesThePreviousOne()
         {
-            var first = (await Files().SetAvatarAsync(_alice.Id, "1.png", new MemoryStream(Png), Png.Length, Ct)).Value!;
-            var second = (await Files().SetAvatarAsync(_alice.Id, "2.png", new MemoryStream(Png), Png.Length, Ct)).Value!;
+            var first = (await Files().SetAvatarAsync(_alice.Id, "1.png", new MemoryStream(Png), Png.Length, Ct)).Ok();
+            var second = (await Files().SetAvatarAsync(_alice.Id, "2.png", new MemoryStream(Png), Png.Length, Ct)).Ok();
 
             Assert.Equal(second.Id, (await _db.Users.SingleAsync(u => u.Id == _alice.Id, Ct)).AvatarFileId);
             Assert.False(await _db.StoredFiles.AnyAsync(f => f.Id == first.Id, Ct));
@@ -164,7 +164,7 @@ namespace EchoPhase.Server.Tests
         [Fact]
         public async Task RemoveAvatar_UnsetsAndDeletesIt()
         {
-            var avatar = (await Files().SetAvatarAsync(_alice.Id, "1.png", new MemoryStream(Png), Png.Length, Ct)).Value!;
+            var avatar = (await Files().SetAvatarAsync(_alice.Id, "1.png", new MemoryStream(Png), Png.Length, Ct)).Ok();
 
             Assert.True((await Files().RemoveAvatarAsync(_alice.Id, Ct)).Successful);
             Assert.True((await Files().RemoveAvatarAsync(_alice.Id, Ct)).Successful);
@@ -178,7 +178,7 @@ namespace EchoPhase.Server.Tests
         {
             var ids = new List<Guid>();
             for (var i = 0; i < 3; i++)
-                ids.Add((await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, $"{i}.txt", Text("x"), 1, Ct)).Value!.Id);
+                ids.Add((await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, $"{i}.txt", Text("x"), 1, Ct)).Ok().Id);
             await Files().UploadAsync(_alice.Id, FilePurpose.Import, "data.json", Text("{}"), 2, Ct);
             await Files().UploadAsync(_bob.Id, FilePurpose.Attachment, "bob.txt", Text("x"), 1, Ct);
 
@@ -192,7 +192,7 @@ namespace EchoPhase.Server.Tests
         [Fact]
         public async Task Delete_OnlyTheOwner_RemovesRowAndBytes()
         {
-            var file = (await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "a.txt", Text("x"), 1, Ct)).Value!;
+            var file = (await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "a.txt", Text("x"), 1, Ct)).Ok();
 
             Assert.Equal(FileErrors.NotFound, (await Files().DeleteAsync(_bob.Id, file.Id, Ct)).Error.Code);
             Assert.True((await Files().DeleteAsync(_alice.Id, file.Id, Ct)).Successful);
@@ -204,9 +204,9 @@ namespace EchoPhase.Server.Tests
         [Fact]
         public async Task Open_ASpan_ReturnsThoseBytes()
         {
-            var file = (await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "a.txt", Text("0123456789"), 10, Ct)).Value!;
+            var file = (await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "a.txt", Text("0123456789"), 10, Ct)).Ok();
 
-            await using var stored = (await Files().OpenAsync(file, new ByteSpan(2, 5), Ct)).Value!;
+            await using var stored = (await Files().OpenAsync(file, new ByteSpan(2, 5), Ct)).Ok();
             using var reader = new StreamReader(stored.Content);
 
             Assert.Equal("2345", await reader.ReadToEndAsync(Ct));
@@ -215,7 +215,7 @@ namespace EchoPhase.Server.Tests
         [Fact]
         public async Task Prune_RemovesStaleUploadsAndOrphans_NotRecentOnes()
         {
-            var kept = (await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "kept.txt", Text("x"), 1, Ct)).Value!;
+            var kept = (await Files().UploadAsync(_alice.Id, FilePurpose.Attachment, "kept.txt", Text("x"), 1, Ct)).Ok();
             _db.StoredFiles.Add(new StoredFile { OwnerId = _alice.Id, Name = "stale", StorageKey = "files/stale", CreatedAt = _time.GetUtcNow().UtcDateTime.AddDays(-2) });
             _db.StoredFiles.Add(new StoredFile { OwnerId = _alice.Id, Name = "fresh", StorageKey = "files/fresh", CreatedAt = _time.GetUtcNow().UtcDateTime });
             await _db.SaveChangesAsync(Ct);
@@ -230,7 +230,7 @@ namespace EchoPhase.Server.Tests
             Assert.Equal((2, 1), done);
             Assert.Equal([kept.Id], await _db.StoredFiles.Select(f => f.Id).ToListAsync(Ct));
             Assert.Null(await _storage.HeadAsync("files/orphan", Ct));
-            Assert.NotNull(await _storage.HeadAsync("files/recent-orphan", Ct));
+            Must.Present(await _storage.HeadAsync("files/recent-orphan", Ct));
         }
 
         private sealed class UnconfiguredStorage : IObjectStorage
@@ -252,7 +252,7 @@ namespace EchoPhase.Server.Tests
             Assert.Equal(64L, ((ServiceError)result.Error).Detail<long>(FileService.LimitDetail));
             var body = ErrorBody.From(result.Error);
             Assert.Equal("file", body.Field);
-            Assert.Equal(64L, body.Details![FileService.LimitDetail]);
+            Assert.Equal(64L, Must.Present(body.Details)[FileService.LimitDetail]);
         }
 
         [Fact]

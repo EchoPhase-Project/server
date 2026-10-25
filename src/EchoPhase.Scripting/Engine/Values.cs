@@ -149,7 +149,9 @@ namespace EchoPhase.Scripting.Engine
         {
             var type = typeof(T);
             if (type == typeof(object))
-                return (T)Unwrap(value)!;
+                return Unwrap(value) is T unwrapped
+                    ? unwrapped
+                    : throw new InvalidOperationException("The expression gave null where a value was expected.");
             if (type == typeof(string))
                 return (T)(object)Format(value);
             if (type == typeof(bool))
@@ -162,7 +164,9 @@ namespace EchoPhase.Scripting.Engine
                 return (T)(object)checked((long)Math.Round(ToNumber(value)));
             if (type == typeof(decimal))
                 return (T)(object)(decimal)ToNumber(value);
-            return (T)Convert.ChangeType(Unwrap(value), type, CultureInfo.InvariantCulture)!;
+            return Convert.ChangeType(Unwrap(value), type, CultureInfo.InvariantCulture) is T converted
+                ? converted
+                : throw new InvalidCastException($"Cannot convert {Describe(value)} to {type.Name}.");
         }
 
         internal static string Describe(object? value) => value switch

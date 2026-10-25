@@ -6,18 +6,18 @@ namespace EchoPhase.Scripting.Tests
     /// <summary>xxhash3, sha256, md5, base64 and Bloom filters.</summary>
     public class HashingTests
     {
-        private static object? Run(string expression, Dictionary<string, object>? vars = null)
-            => Eval.TypedExecute<object>(expression, vars ?? []);
+        private static object? Run(string expression, Dictionary<string, object?>? vars = null)
+            => Eval.EvaluateExpression(expression, vars ?? []);
 
         // A value the test stores as a variable: it must exist.
-        private static object Value(string expression, Dictionary<string, object>? vars = null)
+        private static object Value(string expression, Dictionary<string, object?>? vars = null)
         {
             var value = Run(expression, vars);
             Assert.NotNull(value);
             return value;
         }
 
-        private static string Text(string expression, Dictionary<string, object>? vars = null)
+        private static string Text(string expression, Dictionary<string, object?>? vars = null)
             => Eval.TypedExecute<string>(expression, vars ?? []);
 
         [Theory]
@@ -42,7 +42,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Bloom_HasNoFalseNegatives_AndAboutTheAskedFalsePositives()
         {
-            var vars = new Dictionary<string, object>
+            var vars = new Dictionary<string, object?>
             {
                 ["seen"] = Enumerable.Range(0, 2000).Select(i => (object?)$"user-{i}").ToList(),
                 ["other"] = Enumerable.Range(0, 20000).Select(i => (object?)$"guest-{i}").ToList(),
@@ -57,7 +57,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Bloom_IsAPlainValue_ThatSurvivesJson_AndIsNeverChangedInPlace()
         {
-            var vars = new Dictionary<string, object> { ["empty"] = Value("bloom(100)") };
+            var vars = new Dictionary<string, object?> { ["empty"] = Value("bloom(100)") };
             vars["one"] = Value("bloomAdd(empty, 'a')", vars);
             vars["copy"] = Value("parseJson(json(bloomAdd(one, ['b', 'c'])))", vars);
 

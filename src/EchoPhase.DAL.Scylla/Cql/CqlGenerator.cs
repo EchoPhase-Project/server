@@ -17,9 +17,9 @@ namespace EchoPhase.DAL.Scylla.Cql
     /// </remarks>
     public class CqlGenerator : ICqlGenerator
     {
-        public IReadOnlyList<(string cql, object[] parameters)> Generate(TrackedEntity tracked, IEntityBuilder builder)
+        public IReadOnlyList<(string cql, object?[] parameters)> Generate(TrackedEntity tracked, IEntityBuilder builder)
         {
-            var statements = new List<(string, object[])>();
+            var statements = new List<(string, object?[])>();
             var condition = ConditionFor(tracked, builder);
             var overrides = builder.ConcurrencyToken is { } token && tracked.NewToken is not null
                 ? new Dictionary<string, object?> { [token] = tracked.NewToken }
@@ -78,14 +78,14 @@ namespace EchoPhase.DAL.Scylla.Cql
                 return tracked.Condition ?? WriteCondition.NotExists;
 
             var checks = (tracked.Condition?.Checks ?? []).ToList();
-            checks.Add(new ConditionCheck(token, "=", tracked.EntityType.GetProperty(token)!.GetValue(tracked.Entity)));
+            checks.Add(new ConditionCheck(token, "=", Reflect.Property(tracked.EntityType, token).GetValue(tracked.Entity)));
             return new WriteCondition(false, false, checks);
         }
 
-        public (string cql, object[] parameters) GenerateInsert(object entity, IEntityBuilder builder, WriteOptions? options = null)
+        public (string cql, object?[] parameters) GenerateInsert(object entity, IEntityBuilder builder, WriteOptions? options = null)
             => GenerateInsert(entity, builder, options, overrides: null, condition: null);
 
-        public (string cql, object[] parameters) GenerateInsert(object entity, IEntityBuilder builder, WriteOptions? options,
+        public (string cql, object?[] parameters) GenerateInsert(object entity, IEntityBuilder builder, WriteOptions? options,
             IReadOnlyDictionary<string, object?>? overrides, WriteCondition? condition)
         {
             var pkNames = ValidatePrimaryKey(builder, entity.GetType());
@@ -97,7 +97,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             var columns = props.Select(p => builder.GetColumn(p.Name)).ToList();
             var placeholders = Enumerable.Repeat("?", columns.Count);
 
-            var values = new List<object>(props.Select(p => ValueOf(p, entity, overrides, builder)));
+            var values = new List<object?>(props.Select(p => ValueOf(p, entity, overrides, builder)));
             var (usingClause, usingValues) = BuildUsing(options, allowTtl: true, conditional: condition is not null);
             values.AddRange(usingValues);
 
@@ -110,14 +110,14 @@ namespace EchoPhase.DAL.Scylla.Cql
             return (cql, values.ToArray());
         }
 
-        public (string cql, object[] parameters) GenerateUpdate(object entity, IEntityBuilder builder, WriteOptions? options = null)
+        public (string cql, object?[] parameters) GenerateUpdate(object entity, IEntityBuilder builder, WriteOptions? options = null)
             => GenerateUpdate(entity, builder, options, excluded: null, cleared: null, overrides: null, condition: null);
 
-        public (string cql, object[] parameters) GenerateUpdate(object entity, IEntityBuilder builder, WriteOptions? options,
+        public (string cql, object?[] parameters) GenerateUpdate(object entity, IEntityBuilder builder, WriteOptions? options,
             WriteCondition? condition)
             => GenerateUpdate(entity, builder, options, excluded: null, cleared: null, overrides: null, condition);
 
-        private (string cql, object[] parameters) GenerateUpdate(
+        private (string cql, object?[] parameters) GenerateUpdate(
             object entity, IEntityBuilder builder, WriteOptions? options, IReadOnlySet<string>? excluded,
             IReadOnlySet<string>? cleared, IReadOnlyDictionary<string, object?>? overrides, WriteCondition? condition)
         {
@@ -138,8 +138,8 @@ namespace EchoPhase.DAL.Scylla.Cql
             var (usingClause, usingValues) = BuildUsing(options, allowTtl: true, conditional: condition is not null);
 
             // Bind markers are positional: USING comes before SET in the text.
-            var values = new List<object>(usingValues);
-            values.AddRange(props.Select(p => cleared?.Contains(p.Name) == true ? null! : ValueOf(p, entity, overrides, builder)));
+            var values = new List<object?>(usingValues);
+            values.AddRange(props.Select(p => cleared?.Contains(p.Name) == true ? null : ValueOf(p, entity, overrides, builder)));
             values.AddRange(GetPrimaryKeyValues(entity, pkNames, builder));
 
             var setClauses = props.Select(p => $"{builder.GetColumn(p.Name)} = ?");
@@ -151,10 +151,10 @@ namespace EchoPhase.DAL.Scylla.Cql
             return (cql, values.ToArray());
         }
 
-        public (string cql, object[] parameters) GenerateDelete(object entity, IEntityBuilder builder, WriteOptions? options = null)
+        public (string cql, object?[] parameters) GenerateDelete(object entity, IEntityBuilder builder, WriteOptions? options = null)
             => GenerateDelete(entity, builder, options, condition: null);
 
-        public (string cql, object[] parameters) GenerateDelete(object entity, IEntityBuilder builder, WriteOptions? options,
+        public (string cql, object?[] parameters) GenerateDelete(object entity, IEntityBuilder builder, WriteOptions? options,
             WriteCondition? condition)
         {
             var pkNames = ValidatePrimaryKey(builder, entity.GetType());
@@ -162,7 +162,7 @@ namespace EchoPhase.DAL.Scylla.Cql
                 throw new InvalidOperationException("A DELETE cannot be conditional on the row not existing.");
             var (usingClause, usingValues) = BuildUsing(options, allowTtl: false, conditional: condition is not null);
 
-            var values = new List<object>(usingValues);
+            var values = new List<object?>(usingValues);
             values.AddRange(GetPrimaryKeyValues(entity, pkNames, builder));
 
             var cql = $"DELETE FROM {builder.GetFullTableName()}{usingClause} WHERE {BuildWhereClause(builder, pkNames)}" +
@@ -173,7 +173,7 @@ namespace EchoPhase.DAL.Scylla.Cql
         private static readonly HashSet<string> ConditionOperators = ["=", "!=", "<", "<=", ">", ">="];
 
         // " IF EXISTS", " IF col = ? AND ...": the values go last, after WHERE's.
-        private static string IfClause(WriteCondition? condition, IEntityBuilder builder, List<object> values)
+        private static string IfClause(WriteCondition? condition, IEntityBuilder builder, List<object?> values)
         {
             if (condition is null)
                 return string.Empty;
@@ -186,13 +186,13 @@ namespace EchoPhase.DAL.Scylla.Cql
             {
                 if (!ConditionOperators.Contains(check.Operator))
                     throw new InvalidOperationException($"Unsupported condition operator '{check.Operator}'.");
-                values.Add(builder.ToProvider(check.Property, check.Value)!);
+                values.Add(builder.ToProvider(check.Property, check.Value));
                 return $"{builder.GetColumn(check.Property)} {check.Operator} ?";
             });
             return $" IF {string.Join(" AND ", parts)}";
         }
 
-        public (string cql, object[] parameters) GenerateClearColumns(
+        public (string cql, object?[] parameters) GenerateClearColumns(
             object entity, IEntityBuilder builder, IReadOnlyCollection<string> properties, WriteOptions? options = null)
         {
             if (properties.Count == 0)
@@ -207,7 +207,7 @@ namespace EchoPhase.DAL.Scylla.Cql
 
             var (usingClause, usingValues) = BuildUsing(options, allowTtl: false, conditional: false);
 
-            var values = new List<object>(usingValues);
+            var values = new List<object?>(usingValues);
             values.AddRange(GetPrimaryKeyValues(entity, pkNames, builder));
 
             var columns = properties.Select(builder.GetColumn);
@@ -217,7 +217,7 @@ namespace EchoPhase.DAL.Scylla.Cql
             return (cql, values.ToArray());
         }
 
-        private static (string clause, object[] values) BuildUsing(WriteOptions? options, bool allowTtl, bool conditional)
+        private static (string clause, object?[] values) BuildUsing(WriteOptions? options, bool allowTtl, bool conditional)
         {
             if (options is null || options.IsEmpty)
                 return (string.Empty, []);
@@ -231,7 +231,7 @@ namespace EchoPhase.DAL.Scylla.Cql
                 throw new InvalidOperationException("USING TTL applies to inserts and updates only, not to deletes.");
 
             var parts = new List<string>();
-            var values = new List<object>();
+            var values = new List<object?>();
 
             if (options.TtlSeconds is { } ttl)
             {
@@ -269,8 +269,9 @@ namespace EchoPhase.DAL.Scylla.Cql
                 .Concat(builder.GetPrimaryKey())
                 .Distinct()
                 .Select(name => type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance))
-                .Where(p => p is { CanRead: true })
-                .ToList()!;
+                .OfType<PropertyInfo>()
+                .Where(p => p.CanRead)
+                .ToList();
 
         private static IReadOnlyList<string> ValidatePrimaryKey(IEntityBuilder builder, Type entityType)
         {

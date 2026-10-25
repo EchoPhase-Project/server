@@ -56,7 +56,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void ProcessTemplate_NullProperty_ReplacesWithEmpty()
         {
-            var person = new Person { Name = null!, Age = 25 };
+            var person = new Person { Name = null, Age = 25 };
             string input = "Name: @Name";
             var expected = "Name: ";
 

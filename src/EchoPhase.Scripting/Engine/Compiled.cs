@@ -39,11 +39,11 @@ namespace EchoPhase.Scripting.Engine
         /// dictionaries and lists on the way: <c>a.b[2].c</c> on empty
         /// variables makes a = { b: [null, null, { c: value }] }.
         /// </summary>
-        public static void Assign(PathNode path, IDictionary<string, object> variables, object? value)
+        public static void Assign(PathNode path, IDictionary<string, object?> variables, object? value)
         {
             if (path.Segments.Length == 0)
             {
-                variables[path.Root] = value!;
+                variables[path.Root] = value;
                 return;
             }
 
@@ -58,10 +58,16 @@ namespace EchoPhase.Scripting.Engine
                 bool last = i == path.Segments.Length - 1;
                 object? key = segment is IndexSegment ix ? Values.Unwrap(ix.Index.Evaluate(variables)) : ((MemberSegment)segment).Name;
 
+                if (last)
+                {
+                    Write(current, key, value);
+                    break;
+                }
+
                 // A shared constant on the way is copied, never written into.
-                var child = last ? value : Frozen.Thaw(Read(current, key)) ?? NewContainer(path.Segments[i + 1]);
+                var child = Frozen.Thaw(Read(current, key)) ?? NewContainer(path.Segments[i + 1]);
                 Write(current, key, child);
-                current = child!;
+                current = child;
             }
         }
 

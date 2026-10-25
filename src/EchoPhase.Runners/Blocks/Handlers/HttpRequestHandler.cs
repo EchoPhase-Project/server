@@ -88,7 +88,7 @@ namespace EchoPhase.Runners.Blocks.Handlers
             }
         }
 
-        private static Uri Url(HttpRequestParams param, IDictionary<string, object> scope)
+        private static Uri Url(HttpRequestParams param, IDictionary<string, object?> scope)
         {
             var url = Eval.TypedProcess<string>(param.Url, scope).Trim();
             if (param.Query.Count > 0)

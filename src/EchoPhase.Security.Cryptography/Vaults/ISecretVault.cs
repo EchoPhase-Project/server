@@ -48,7 +48,7 @@ namespace EchoPhase.Security.Cryptography.Vaults
 
         Task<IServiceResult<T>> GetOrSetAsync<T>(
             string key,
-            Func<Task<T>>? generator = null,
+            Func<Task<T>> generator,
             TimeSpan? expiry = null,
             bool keepTtl = false,
             CommandFlags flags = CommandFlags.None);
@@ -60,7 +60,7 @@ namespace EchoPhase.Security.Cryptography.Vaults
             CommandFlags flags = CommandFlags.None);
         IServiceResult<T> GetOrSet<T>(
             string key,
-            Func<T>? generator = null,
+            Func<T> generator,
             TimeSpan? expiry = null,
             bool keepTtl = false,
             CommandFlags flags = CommandFlags.None);

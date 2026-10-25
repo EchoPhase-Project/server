@@ -27,7 +27,7 @@ namespace EchoPhase.DAL.Scylla.Database
             _database.PushActiveBatch(this);
         }
 
-        internal void AddStatement(string cql, object[] parameters, bool idempotent)
+        internal void AddStatement(string cql, object?[] parameters, bool idempotent)
         {
             if (_committed)
                 throw new InvalidOperationException("Cannot add statements to a committed batch");

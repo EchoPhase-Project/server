@@ -15,7 +15,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Process_ReplacesVariableSubstitution_ReturnsCorrectResult()
         {
-            var variables = new Dictionary<string, object>
+            var variables = new Dictionary<string, object?>
             {
                 ["name"] = "Alice",
                 ["age"] = 30
@@ -33,7 +33,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Process_EvaluatesExpression_ReturnsCorrectResult()
         {
-            var variables = new Dictionary<string, object>
+            var variables = new Dictionary<string, object?>
             {
                 ["a"] = 5,
                 ["b"] = 10
@@ -51,7 +51,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Process_MixedVariableAndExpressionSubstitution_ReturnsCorrectResult()
         {
-            var variables = new Dictionary<string, object>
+            var variables = new Dictionary<string, object?>
             {
                 ["x"] = 2,
                 ["y"] = 3
@@ -69,7 +69,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Process_HandlesNestedExpressionInAtParentheses_ReturnsCorrectResult()
         {
-            var variables = new Dictionary<string, object> { ["val"] = 4 };
+            var variables = new Dictionary<string, object?> { ["val"] = 4 };
             var input = "Square plus one: @((val * val) + 1)";
             var expected = "Square plus one: 17";
 
@@ -82,7 +82,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Process_EscapesAtSymbols_ReturnsCorrectResult()
         {
-            var variables = new Dictionary<string, object> { ["test"] = "value" };
+            var variables = new Dictionary<string, object?> { ["test"] = "value" };
             var input = "This is @@escaped and \\@also escaped, real: @test";
             var expected = "This is @escaped and @also escaped, real: value";
 
@@ -95,7 +95,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Process_UnknownVariable_ReturnsError()
         {
-            var variables = new Dictionary<string, object>();
+            var variables = new Dictionary<string, object?>();
             var input = "Unknown variable: @unknown";
             var expected = "KeyNotFound";
 
@@ -108,7 +108,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void Process_InvalidExpression_ReturnsError()
         {
-            var variables = new Dictionary<string, object>();
+            var variables = new Dictionary<string, object?>();
             var input = "Invalid expression: @(1 + )";
             var expected = "ScriptSyntax";
 
@@ -123,7 +123,7 @@ namespace EchoPhase.Scripting.Tests
         [InlineData("Secret: @test", "Secret: @(secret)", "@(secret)")]
         public void Process_VariableExpressionInjection_ReturnsShieldedString(string expr, string expected, string inj)
         {
-            var variables = new Dictionary<string, object>
+            var variables = new Dictionary<string, object?>
             {
                 ["secret"] = "qwerty",
                 ["test"] = inj,

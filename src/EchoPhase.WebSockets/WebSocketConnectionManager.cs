@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.WebSockets;
 using System.Security.Claims;
 using EchoPhase.Configuration.WebSocket;
@@ -71,8 +72,8 @@ namespace EchoPhase.WebSockets
         public IReadOnlyList<WebSocketConnection> GetConnections(Guid userId)
             => _byUser.TryGetValue(userId, out var list) ? list : [];
 
-        public bool TryGetConnection(WebSocket webSocket, out WebSocketConnection connection)
-            => _bySocket.TryGetValue(webSocket, out connection!);
+        public bool TryGetConnection(WebSocket webSocket, [MaybeNullWhen(false)] out WebSocketConnection connection)
+            => _bySocket.TryGetValue(webSocket, out connection);
 
         public IEnumerable<WebSocketConnection> GetAllConnections() => _bySocket.Values;
 

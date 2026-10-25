@@ -27,7 +27,7 @@ namespace EchoPhase.DAL.Scylla.Tests
 
     internal sealed class JobContext : DbContext
     {
-        public DbSet<Job> Jobs { get; set; } = null!;
+        public DbSet<Job> Jobs => Set<Job>();
 
         public JobContext(ScyllaConnection connection) : base(connection)
         {
@@ -76,7 +76,7 @@ namespace EchoPhase.DAL.Scylla.Tests
 
             using var other = new JobContext(_connection);
             var job = await other.Jobs.Where(j => j.Owner == _owner).FirstAsync(Ct);
-            Assert.Equal((JobState.Running, JobState.Queued, 2), (job.State, job.Previous, job.Meta!["tries"]));
+            Assert.Equal((JobState.Running, JobState.Queued, 2), (job.State, job.Previous, Must.Present(job.Meta)["tries"]));
         }
 
         [Fact]

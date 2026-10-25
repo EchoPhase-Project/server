@@ -15,8 +15,10 @@ namespace EchoPhase.Types.Extensions
             params Expression<Func<T, object>>[] overrideFields
         )
         {
-            if (target == null || source == null)
-                throw new ArgumentNullException();
+            if (target is null)
+                throw new ArgumentNullException(nameof(target));
+            if (source is null)
+                throw new ArgumentNullException(nameof(source));
 
             var visited = new HashSet<object>();
 
@@ -32,7 +34,7 @@ namespace EchoPhase.Types.Extensions
                 })
                 .ToHashSet();
 
-            MergeRecursive(target!, source!, visited, overrideNames);
+            MergeRecursive(target, source, visited, overrideNames);
         }
 
         private static void MergeRecursive(

@@ -239,7 +239,7 @@ namespace EchoPhase.Connections.Services
             if (!client.Successful)
                 return ServiceResult<ResolvedCredential>.Failure(client.Error);
 
-            var grant = await oauth.RefreshAsync(client.Value!, secret.RefreshToken, ct);
+            var grant = await oauth.RefreshAsync(client.Value, secret.RefreshToken, ct);
 
             switch (grant.Status)
             {
@@ -253,7 +253,9 @@ namespace EchoPhase.Connections.Services
                     return Failure<ResolvedCredential>(ConnectionErrors.Upstream, connection.LastError);
             }
 
-            var tokens = grant.Tokens!;
+            if (!grant.IsGranted)
+                return Failure<ResolvedCredential>(ConnectionErrors.Upstream, "The provider granted no tokens.");
+            var tokens = grant.Tokens;
             var next = new ConnectionSecret(tokens.AccessToken, tokens.RefreshToken ?? secret.RefreshToken);
 
             connection.Secret = _protector.Protect(next);
@@ -270,7 +272,7 @@ namespace EchoPhase.Connections.Services
                 provider, connection.Id, connection.UserId);
 
             return ServiceResult<ResolvedCredential>.Success(new ResolvedCredential(
-                connection.Id, connection.Provider, connection.AuthType, next.AccessToken, client.Value!.ClientId));
+                connection.Id, connection.Provider, connection.AuthType, next.AccessToken, client.Value.ClientId));
         }
 
         private async Task<IServiceResult<ResolvedCredential>> ToCredentialAsync(
@@ -284,7 +286,7 @@ namespace EchoPhase.Connections.Services
                 if (!client.Successful)
                     return ServiceResult<ResolvedCredential>.Failure(client.Error);
 
-                clientId = client.Value!.ClientId;
+                clientId = client.Value.ClientId;
             }
 
             return ServiceResult<ResolvedCredential>.Success(new ResolvedCredential(

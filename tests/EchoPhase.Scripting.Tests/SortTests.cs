@@ -15,7 +15,7 @@ namespace EchoPhase.Scripting.Tests
 
         private static List<string> Sort(List<object?> items, bool descending)
         {
-            var vars = new Dictionary<string, object> { ["xs"] = items };
+            var vars = new Dictionary<string, object?> { ["xs"] = items };
             var sorted = Eval.TypedExecute<List<object?>>(
                 descending ? "sortDesc(xs, x => x.k)" : "sort(xs, x => x.k)", vars);
             return sorted.Select(x => Assert.IsType<string>(Assert.IsType<Dictionary<string, object?>>(x)["id"])).ToList();
@@ -107,7 +107,7 @@ namespace EchoPhase.Scripting.Tests
             // x.k * 1 takes the unboxed path; x.k the general one: same order, ties included.
             var random = new Random(size + 1);
             double[] pool = [double.NaN, -0.0, 0.0, 1.5, -1.5, 2, 2, 3, double.PositiveInfinity, double.NegativeInfinity];
-            var vars = new Dictionary<string, object> { ["xs"] = Items(Enumerable.Range(0, size).Select(_ => pool[random.Next(pool.Length)])) };
+            var vars = new Dictionary<string, object?> { ["xs"] = Items(Enumerable.Range(0, size).Select(_ => pool[random.Next(pool.Length)])) };
 
             foreach (var sort in new[] { "sort", "sortDesc" })
                 Assert.Equal(
@@ -118,7 +118,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void PlainLists_SortByValue()
         {
-            var vars = new Dictionary<string, object>();
+            var vars = new Dictionary<string, object?>();
             Assert.Equal("[null,-1,0,2.5,10]", Eval.TypedExecute<string>("sort([10, null, 2.5, -1, 0])", vars));
             Assert.Equal("[\"b\",\"a\",\"B\",null]", Eval.TypedExecute<string>("sortDesc(['a', null, 'B', 'b'])", vars));
         }

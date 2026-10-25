@@ -177,7 +177,7 @@ namespace EchoPhase.Server.Services.Workflows
                     }
 
                     var intents = DiscordGatewayIntents.For(list.SelectMany(t => t.Params.Events));
-                    var id = await _gateway.ConnectAsync(userId, name, credential.Value!.AccessToken, intents, ct);
+                    var id = await _gateway.ConnectAsync(userId, name, credential.Value.AccessToken, intents, ct);
                     _open[(userId, name)] = new OpenConnection(id, intents);
                     _logger.LogInformation("Opened Discord gateway {ConnectionId} for triggers of user {UserId} ({Connection}).",
                         id, userId, name);

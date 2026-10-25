@@ -138,9 +138,12 @@ namespace EchoPhase.Types.Result
         /// A successful result containing the transformed value, or this failure.
         /// </returns>
         public IServiceResult<TOut> Map<TOut>(Func<T, TOut> mapper)
-            => Successful
-                ? ServiceResult<TOut>.Success(mapper(Value!))
+            => Self.Successful
+                ? ServiceResult<TOut>.Success(mapper(Self.Value))
                 : ServiceResult<TOut>.Failure(Error);
+
+        // Through the interface, whose Successful says Value is set.
+        private IServiceResult<T> Self => this;
 
         // ── Bind ──────────────────────────────────────────────────────────────
 
@@ -157,7 +160,7 @@ namespace EchoPhase.Types.Result
         /// The result produced by <paramref name="binder"/>, or this failure.
         /// </returns>
         public IServiceResult<TOut> Bind<TOut>(Func<T, IServiceResult<TOut>> binder)
-            => Successful ? binder(Value!) : ServiceResult<TOut>.Failure(Error);
+            => Self.Successful ? binder(Self.Value) : ServiceResult<TOut>.Failure(Error);
 
         // ── BindAsync ─────────────────────────────────────────────────────────
 
@@ -175,8 +178,8 @@ namespace EchoPhase.Types.Result
         /// </returns>
         public Task<IServiceResult<TOut>> BindAsync<TOut>(
             Func<T, Task<IServiceResult<TOut>>> binder)
-            => Successful
-                ? binder(Value!)
+            => Self.Successful
+                ? binder(Self.Value)
                 : Task.FromResult(ServiceResult<TOut>.Failure(Error));
 
         // ── Static factory ────────────────────────────────────────────────────

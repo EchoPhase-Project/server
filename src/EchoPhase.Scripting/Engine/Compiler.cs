@@ -17,7 +17,7 @@ namespace EchoPhase.Scripting.Engine
     /// </summary>
     internal static class Compiler
     {
-        private static readonly ParameterExpression Variables = Expression.Parameter(typeof(IDictionary<string, object>), "variables");
+        private static readonly ParameterExpression Variables = Expression.Parameter(typeof(IDictionary<string, object?>), "variables");
 
         private static readonly MethodInfo EvaluateMethod = typeof(Node).GetMethod(nameof(Node.Evaluate))
             ?? throw new MissingMethodException(nameof(Node), nameof(Node.Evaluate));
@@ -35,11 +35,11 @@ namespace EchoPhase.Scripting.Engine
         private static readonly MethodInfo RentMethod = Helper(typeof(ArgumentArrays), nameof(ArgumentArrays.Rent));
         private static readonly MethodInfo ReturnMethod = Helper(typeof(ArgumentArrays), nameof(ArgumentArrays.Return));
 
-        public static Func<IDictionary<string, object>, object?> CompileValue(Node node)
-            => Expression.Lambda<Func<IDictionary<string, object>, object?>>(Value(node), Variables).Compile();
+        public static Func<IDictionary<string, object?>, object?> CompileValue(Node node)
+            => Expression.Lambda<Func<IDictionary<string, object?>, object?>>(Value(node), Variables).Compile();
 
-        public static Func<IDictionary<string, object>, double> CompileNumber(Node node)
-            => Expression.Lambda<Func<IDictionary<string, object>, double>>(Number(node), Variables).Compile();
+        public static Func<IDictionary<string, object?>, double> CompileNumber(Node node)
+            => Expression.Lambda<Func<IDictionary<string, object?>, double>>(Number(node), Variables).Compile();
 
         // The node's value, as object.
         private static Expression Value(Node node) => node switch
@@ -156,8 +156,8 @@ namespace EchoPhase.Scripting.Engine
         private int _numberCalls;
         private int _compiling;
         private int _compilingNumber;
-        private Func<IDictionary<string, object>, object?>? _value;
-        private Func<IDictionary<string, object>, double>? _number;
+        private Func<IDictionary<string, object?>, object?>? _value;
+        private Func<IDictionary<string, object?>, double>? _number;
 
         public Node Inner => inner;
 
@@ -169,7 +169,7 @@ namespace EchoPhase.Scripting.Engine
 
         public override bool IsConstant => inner.IsConstant;
 
-        public override object? Evaluate(IDictionary<string, object> variables)
+        public override object? Evaluate(IDictionary<string, object?> variables)
         {
             var compiled = Volatile.Read(ref _value);
             if (compiled is not null)
@@ -179,7 +179,7 @@ namespace EchoPhase.Scripting.Engine
             return inner.Evaluate(variables);
         }
 
-        public override double EvaluateNumber(IDictionary<string, object> variables)
+        public override double EvaluateNumber(IDictionary<string, object?> variables)
         {
             var compiled = Volatile.Read(ref _number);
             if (compiled is not null)

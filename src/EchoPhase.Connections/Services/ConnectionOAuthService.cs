@@ -55,7 +55,7 @@ namespace EchoPhase.Connections.Services
             if (!client.Successful)
                 return ServiceResult<OAuthAuthorization>.Failure(client.Error);
 
-            if (string.IsNullOrEmpty(client.Value!.ClientSecret))
+            if (string.IsNullOrEmpty(client.Value.ClientSecret))
                 return Failure<OAuthAuthorization>(ConnectionErrors.Invalid,
                     "The OAuth app needs a client secret to complete the authorisation-code flow.");
 
@@ -98,14 +98,18 @@ namespace EchoPhase.Connections.Services
             if (!client.Successful)
                 return ServiceResult<ConnectionSummary>.Failure(client.Error);
 
-            var grant = await oauth.ExchangeCodeAsync(client.Value!, code, oauth.PlatformApp.RedirectUri!, ct);
-            if (grant.Status != TokenGrantStatus.Granted)
+            if (oauth.PlatformApp.RedirectUri is not { } redirectUri)
+                return Failure<ConnectionSummary>(ConnectionErrors.NotConfigured,
+                    $"The {oauth.Name} app has no redirect URI configured.");
+
+            var grant = await oauth.ExchangeCodeAsync(client.Value, code, redirectUri, ct);
+            if (!grant.IsGranted)
                 return Failure<ConnectionSummary>(
                     grant.Status == TokenGrantStatus.Rejected ? ConnectionErrors.Invalid : ConnectionErrors.Upstream,
                     $"Could not obtain tokens: {grant.Error}");
 
             // Fetch the account identity; a failure here is not fatal.
-            var validation = await oauth.ValidateAsync(grant.Tokens!.AccessToken, ct);
+            var validation = await oauth.ValidateAsync(grant.Tokens.AccessToken, ct);
             var identity = validation.Status == TokenValidationStatus.Valid ? validation.Identity : null;
 
             return await _connections.SaveOAuthAsync(

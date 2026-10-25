@@ -63,6 +63,11 @@ Tests need no database or Docker. Do not start services to run them.
 - New CLI command: register it in `Server/Extensions/HostExtensions.cs` with
   description and examples; output on stdout, logs on stderr.
 - Read time from an injected `TimeProvider`, not `DateTime.UtcNow`.
+- Never ignore null: no `x!`, `null!` or `default!` (nullable warnings are
+  errors, and `NullForgivingTests` fails on any). Check (`?? throw` with a
+  message, patterns), annotate (`[MemberNotNullWhen]`, `[NotNullWhen]`) or
+  make the type honest (`T?`, `required`). In tests: `Assert.NotNull`,
+  `Must.Present`, `result.Ok()`.
 - Never edit a released migration (Postgres or Scylla); add a new one. Scylla
   migrations are hand-written in `DAL.Scylla/Migrations/` and their `Down`
   must survive a half-applied `Up`.

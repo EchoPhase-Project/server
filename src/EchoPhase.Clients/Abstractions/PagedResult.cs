@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 
 namespace EchoPhase.Clients.Abstractions
@@ -11,11 +12,14 @@ namespace EchoPhase.Clients.Abstractions
         public IPageInfo? Page { get; }
         public ApiError? Error { get; }
         public HttpStatusCode StatusCode { get; }
-        public bool IsSuccess => Error is null;
+        /// <summary>Succeeded: Value is set; otherwise Error is.</summary>
+        [MemberNotNullWhen(true, nameof(Value))]
+        [MemberNotNullWhen(false, nameof(Error))]
+        public bool IsSuccess { get; }
 
         private PagedResult(T value, IPageInfo? page, HttpStatusCode code)
         {
-            Value = value; Page = page; StatusCode = code;
+            Value = value; Page = page; StatusCode = code; IsSuccess = true;
         }
 
         private PagedResult(ApiError error, HttpStatusCode code)
@@ -32,11 +36,11 @@ namespace EchoPhase.Clients.Abstractions
         public TOut Match<TOut>(
             Func<T, IPageInfo?, TOut> onSuccess,
             Func<ApiError, TOut> onError) =>
-            IsSuccess ? onSuccess(Value!, Page) : onError(Error!);
+            IsSuccess ? onSuccess(Value, Page) : onError(Error);
 
         public PagedResult<TOut> Map<TOut>(Func<T, TOut> map) =>
             IsSuccess
-                ? PagedResult<TOut>.Ok(map(Value!), Page, StatusCode)
-                : PagedResult<TOut>.Fail(Error!, StatusCode);
+                ? PagedResult<TOut>.Ok(map(Value), Page, StatusCode)
+                : PagedResult<TOut>.Fail(Error, StatusCode);
     }
 }

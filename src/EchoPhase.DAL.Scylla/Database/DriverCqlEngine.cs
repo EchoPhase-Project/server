@@ -48,7 +48,7 @@ namespace EchoPhase.DAL.Scylla.Database
                 await _session.ExecuteAsync(BuildBatch(statements, type)).WaitAsync(ct);
         }
 
-        private PreparedStatement? Prepare(string cql)
+        private PreparedStatement Prepare(string cql)
             => _prepared.GetOrAdd(cql, _session.Prepare);
 
         private async Task<PreparedStatement> PrepareAsync(string cql, CancellationToken ct)
@@ -92,7 +92,7 @@ namespace EchoPhase.DAL.Scylla.Database
             var partitions = new HashSet<string>();
             foreach (var statement in statements)
             {
-                var bound = Prepare(statement.Cql)!.Bind(statement.Values);
+                var bound = Prepare(statement.Cql).Bind(statement.Values);
                 batch.Add(bound);
                 partitions.Add(TableOf(statement.Cql) + ":" +
                     (bound.RoutingKey?.RawRoutingKey is { } key ? Convert.ToBase64String(key) : "?"));

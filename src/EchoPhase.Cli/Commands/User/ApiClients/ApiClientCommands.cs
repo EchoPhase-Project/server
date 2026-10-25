@@ -111,7 +111,7 @@ namespace EchoPhase.Cli.Commands.User.ApiClients
             }
 
             // Plain lines, easy to capture in a script; the secret is not shown again.
-            Console.WriteLine($"client_id={result.Value!.Client.Id}");
+            Console.WriteLine($"client_id={result.Value.Client.Id}");
             Console.WriteLine($"client_secret={result.Value.ClientSecret}");
             return settings.Continue ? CliExit.StartServer : CliExit.Success;
         }

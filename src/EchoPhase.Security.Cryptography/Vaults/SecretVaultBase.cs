@@ -105,7 +105,7 @@ namespace EchoPhase.Security.Cryptography.Vaults
             if (!raw.HasValue)
                 return NotFound<T>(key);
 
-            return Deserialize<T>(key, AesGcm.Decrypt((byte[])raw!));
+            return Deserialize<T>(key, AesGcm.Decrypt((byte[]?)raw ?? throw new InvalidOperationException($"The secret '{key}' is empty.")));
         }
 
         public IServiceResult<T> Get<T>(string key)
@@ -117,7 +117,7 @@ namespace EchoPhase.Security.Cryptography.Vaults
             if (!raw.HasValue)
                 return NotFound<T>(key);
 
-            return Deserialize<T>(key, AesGcm.Decrypt((byte[])raw!));
+            return Deserialize<T>(key, AesGcm.Decrypt((byte[]?)raw ?? throw new InvalidOperationException($"The secret '{key}' is empty.")));
         }
 
         // --------------------------
@@ -154,14 +154,13 @@ namespace EchoPhase.Security.Cryptography.Vaults
 
         public async Task<IServiceResult<T>> GetOrSetAsync<T>(
             string key,
-            Func<Task<T>>? generator = null,
+            Func<Task<T>> generator,
             TimeSpan? expiry = null,
             bool keepTtl = false,
             CommandFlags flags = CommandFlags.None)
         {
             if (await ExistsAsync(key))
                 return await GetAsync<T>(key);
-            generator ??= () => Task.FromResult(default(T)!);
             var value = await generator();
             if (await SetAsync(key, value, expiry, keepTtl, When.NotExists, flags))
                 return ServiceResult<T>.Success(value);
@@ -179,14 +178,13 @@ namespace EchoPhase.Security.Cryptography.Vaults
 
         public IServiceResult<T> GetOrSet<T>(
             string key,
-            Func<T>? generator = null,
+            Func<T> generator,
             TimeSpan? expiry = null,
             bool keepTtl = false,
             CommandFlags flags = CommandFlags.None)
         {
             if (Exists(key))
                 return Get<T>(key);
-            generator ??= () => default!;
             var value = generator();
             if (Set(key, value, expiry, keepTtl, When.NotExists, flags))
                 return ServiceResult<T>.Success(value);

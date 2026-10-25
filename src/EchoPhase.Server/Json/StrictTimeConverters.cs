@@ -26,7 +26,7 @@ namespace EchoPhase.Server.Json
             if (reader.TokenType != JsonTokenType.String)
                 throw new JsonException($"Expected {Expected}.");
 
-            var text = reader.GetString()!;
+            var text = reader.GetString() ?? throw new JsonException($"Expected {Expected}.");
             if (!WithOffset().IsMatch(text)
                 || !DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var value))
                 throw new JsonException($"'{text}' is not {Expected}.");

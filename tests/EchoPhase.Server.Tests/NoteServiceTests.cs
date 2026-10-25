@@ -44,7 +44,7 @@ namespace EchoPhase.Server.Tests
         private NoteService Notes() => new(_db, _events, _time, NullLogger<NoteService>.Instance);
 
         private async Task<Note> Create(User owner, string? title, string body = "text", bool pinned = false)
-            => (await Notes().CreateAsync(owner.Id, new NoteInput(title, body, pinned), Ct)).Value!.Note;
+            => (await Notes().CreateAsync(owner.Id, new NoteInput(title, body, pinned), Ct)).Ok().Note;
 
         [Fact]
         public async Task Create_WithoutATitle_TakesTheFirstLine()
@@ -165,7 +165,7 @@ namespace EchoPhase.Server.Tests
             Assert.Equal(_bob.Id, userId);
             Assert.Equal("alice", by);
             Assert.False(canEdit);
-            var share = Assert.Single((await Notes().SharesAsync(_alice.Id, note.Id, Ct)).Value!);
+            var share = Assert.Single((await Notes().SharesAsync(_alice.Id, note.Id, Ct)).Ok());
             Assert.True(share.CanEdit);
         }
 
@@ -197,14 +197,14 @@ namespace EchoPhase.Server.Tests
 
             var result = await Notes().AppendAsync(_alice.Id, note.Id, "second", Ct);
 
-            Assert.Equal("first\n\nsecond", result.Value!.Note.Body);
+            Assert.Equal("first\n\nsecond", result.Ok().Note.Body);
         }
 
         [Fact]
         public async Task DueReminders_AreSentOnceAndCleared()
         {
             var soon = (await Notes().CreateAsync(_alice.Id,
-                new NoteInput("call", "x", RemindAt: _time.GetUtcNow().AddMinutes(5)), Ct)).Value!.Note;
+                new NoteInput("call", "x", RemindAt: _time.GetUtcNow().AddMinutes(5)), Ct)).Ok().Note;
             await Notes().CreateAsync(_alice.Id, new NoteInput("later", "x", RemindAt: _time.GetUtcNow().AddDays(1)), Ct);
 
             Assert.Equal(0, await Notes().SendDueRemindersAsync(100, Ct));
@@ -249,14 +249,14 @@ namespace EchoPhase.Server.Tests
         [Fact]
         public async Task Update_OverAnOlderStamp_IsAConflict()
         {
-            var created = (await Notes().CreateAsync(_alice.Id, new NoteInput("plan", "v1"), Ct)).Value!.Note;
+            var created = (await Notes().CreateAsync(_alice.Id, new NoteInput("plan", "v1"), Ct)).Ok().Note;
             var stamp = created.ConcurrencyStamp;
             var first = await Notes().UpdateAsync(_alice.Id, created.Id, new NoteInput("plan", "v2", ExpectedStamp: stamp), Ct);
 
             var second = await Notes().UpdateAsync(_alice.Id, created.Id, new NoteInput("plan", "v2b", ExpectedStamp: stamp), Ct);
 
             Assert.True(first.Successful);
-            Assert.NotEqual(stamp, first.Value!.Note.ConcurrencyStamp);
+            Assert.NotEqual(stamp, first.Ok().Note.ConcurrencyStamp);
             Assert.Equal(NoteErrors.Conflict, second.Error.Code);
         }
 

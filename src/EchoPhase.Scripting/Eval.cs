@@ -26,28 +26,32 @@ namespace EchoPhase.Scripting
         public const string TimeZoneVariable = "$timeZone";
 
         /// <summary>An expression's value as T; failures (syntax, unknown variable, bad types) as the result's error.</summary>
-        public static IServiceResult<T> Execute<T>(string expression, IDictionary<string, object> variables)
+        public static IServiceResult<T> Execute<T>(string expression, IDictionary<string, object?> variables)
             => Try(() => TypedExecute<T>(expression, variables));
 
-        public static T TypedExecute<T>(string expression, IDictionary<string, object> variables)
+        /// <summary>The expression's value as it is, null included.</summary>
+        public static object? EvaluateExpression(string expression, IDictionary<string, object?> variables)
+            => Budget.Run(() => Values.Unwrap(Compiled.Expression(expression).Evaluate(variables)));
+
+        public static T TypedExecute<T>(string expression, IDictionary<string, object?> variables)
             => Budget.Run(() => Values.ConvertTo<T>(Compiled.Expression(expression).Evaluate(variables)));
 
         /// <summary>A template rendered to text (then converted to T).</summary>
-        public static IServiceResult<T> Process<T>(string template, IDictionary<string, object> variables)
+        public static IServiceResult<T> Process<T>(string template, IDictionary<string, object?> variables)
             => Try(() => TypedProcess<T>(template, variables));
 
-        public static T TypedProcess<T>(string template, IDictionary<string, object> variables)
+        public static T TypedProcess<T>(string template, IDictionary<string, object?> variables)
             => Budget.Run(() => Values.ConvertTo<T>(Compiled.Template(template).Render(variables)));
 
         /// <summary>
         /// A template's value: a template that is one hole (<c>@items</c>,
         /// <c>@(a + 1)</c>) gives that value with its type; anything else, the text.
         /// </summary>
-        public static IServiceResult<object?> Value(string template, IDictionary<string, object> variables)
+        public static IServiceResult<object?> Value(string template, IDictionary<string, object?> variables)
             => Try(() => Evaluate(template, variables));
 
         /// <summary>Throwing <see cref="Value"/>: for callers that handle failures as exceptions.</summary>
-        public static object? Evaluate(string template, IDictionary<string, object> variables)
+        public static object? Evaluate(string template, IDictionary<string, object?> variables)
             => Budget.Run(() => Compiled.Template(template).Evaluate(variables));
 
         /// <summary>
@@ -61,7 +65,7 @@ namespace EchoPhase.Scripting
         /// Variables with one more name on top (it shadows an outer one of the
         /// same name); the rest are read through.
         /// </summary>
-        public static IDictionary<string, object> With(IDictionary<string, object> variables, string name, object? value)
+        public static IDictionary<string, object?> With(IDictionary<string, object?> variables, string name, object? value)
             => new Scope1(name, value, variables);
 
         /// <summary>
@@ -93,16 +97,16 @@ namespace EchoPhase.Scripting
             var variables = typeof(TM)
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public)
                 .Where(p => p.CanRead)
-                .ToDictionary(p => p.Name, p => p.GetValue(model) ?? string.Empty);
+                .ToDictionary(p => p.Name, p => (object?)(p.GetValue(model) ?? string.Empty));
             return Process<TR>(template, variables);
         }
 
         /// <summary>The value at a path; throws for an unknown variable or bad syntax.</summary>
-        public static object? Resolve(IDictionary<string, object> variables, string path)
+        public static object? Resolve(IDictionary<string, object?> variables, string path)
             => Budget.Run(() => Compiled.Path(path).Evaluate(variables));
 
         /// <summary>Assigns at a path, creating the dictionaries and lists on the way.</summary>
-        public static IDictionary<string, object> Set(IDictionary<string, object> variables, string path, object? value)
+        public static IDictionary<string, object?> Set(IDictionary<string, object?> variables, string path, object? value)
         {
             return Budget.Run(() =>
             {

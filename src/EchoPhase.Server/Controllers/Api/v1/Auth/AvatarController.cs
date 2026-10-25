@@ -1,7 +1,6 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.ComponentModel.DataAnnotations;
 using EchoPhase.Configuration.Storage.Files;
 using EchoPhase.Files;
 using EchoPhase.Security.Antiforgery.Attributes;
@@ -17,8 +16,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
     public sealed class UploadAvatarRequest
     {
         /// <summary>A PNG, JPEG or WebP picture.</summary>
-        [Required]
-        public IFormFile File { get; set; } = default!;
+        public required IFormFile File { get; set; }
     }
 
     /// <summary>
@@ -51,7 +49,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
         {
             await using var content = dto.File.OpenReadStream();
             var result = await _files.SetAvatarAsync(User.GetUserId(), dto.File.FileName, content, dto.File.Length, ct);
-            return result.Successful ? Ok(FileResponse.From(result.Value!)) : Failure(result.Error);
+            return result.Successful ? Ok(FileResponse.From(result.Value)) : Failure(result.Error);
         }
 
         [HttpDelete]

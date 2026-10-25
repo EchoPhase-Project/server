@@ -6,7 +6,7 @@ namespace EchoPhase.Scripting.Tests
     /// <summary>Slices, comprehensions, in, strip, slice() and splice(), as in Python (and JavaScript for splice).</summary>
     public class PythonicTests
     {
-        private static readonly Dictionary<string, object> Vars = new()
+        private static readonly Dictionary<string, object?> Vars = new()
         {
             ["xs"] = new List<object?> { 0L, 1L, 2L, 3L, 4L, 5L },
             ["s"] = "hello",

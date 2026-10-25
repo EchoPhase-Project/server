@@ -56,23 +56,22 @@ namespace EchoPhase.DAL.Postgres
 
         public PostgresContext(DbContextOptions<PostgresContext> options) : base(options) { }
 
-        public override DbSet<User> Users { get; set; } = default!;
-        public DbSet<Connection> Connections { get; set; } = default!;
-        public DbSet<OAuthApp> OAuthApps { get; set; } = default!;
-        public DbSet<Session> Sessions { get; set; } = default!;
-        public DbSet<ApiClient> ApiClients { get; set; } = default!;
-        public DbSet<Impersonation> Impersonations { get; set; } = default!;
-        public DbSet<ApiClientPermissionEntry> ApiClientPermissionEntries { get; set; } = default!;
-        public DbSet<WebHook> WebHooks { get; set; } = default!;
-        public DbSet<SessionAudit> SessionAudits { get; set; } = default!;
-        public DbSet<UserPermissionGrant> UserPermissionGrants { get; set; } = default!;
-        public DbSet<Workflow> Workflows { get; set; } = default!;
-        public DbSet<WorkflowSchedule> WorkflowSchedules { get; set; } = default!;
-        public DbSet<WorkflowVersion> WorkflowVersions { get; set; } = default!;
-        public DbSet<StorageEntry> StorageEntries { get; set; } = default!;
-        public DbSet<StoredFile> StoredFiles { get; set; } = default!;
-        public DbSet<Note> Notes { get; set; } = default!;
-        public DbSet<NoteShare> NoteShares { get; set; } = default!;
+        public DbSet<Connection> Connections => Set<Connection>();
+        public DbSet<OAuthApp> OAuthApps => Set<OAuthApp>();
+        public DbSet<Session> Sessions => Set<Session>();
+        public DbSet<ApiClient> ApiClients => Set<ApiClient>();
+        public DbSet<Impersonation> Impersonations => Set<Impersonation>();
+        public DbSet<ApiClientPermissionEntry> ApiClientPermissionEntries => Set<ApiClientPermissionEntry>();
+        public DbSet<WebHook> WebHooks => Set<WebHook>();
+        public DbSet<SessionAudit> SessionAudits => Set<SessionAudit>();
+        public DbSet<UserPermissionGrant> UserPermissionGrants => Set<UserPermissionGrant>();
+        public DbSet<Workflow> Workflows => Set<Workflow>();
+        public DbSet<WorkflowSchedule> WorkflowSchedules => Set<WorkflowSchedule>();
+        public DbSet<WorkflowVersion> WorkflowVersions => Set<WorkflowVersion>();
+        public DbSet<StorageEntry> StorageEntries => Set<StorageEntry>();
+        public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
+        public DbSet<Note> Notes => Set<Note>();
+        public DbSet<NoteShare> NoteShares => Set<NoteShare>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

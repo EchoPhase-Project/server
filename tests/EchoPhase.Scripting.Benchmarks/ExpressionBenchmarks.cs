@@ -11,13 +11,13 @@ namespace EchoPhase.Scripting.Benchmarks
         [Params(1_000, 100_000)]
         public int Items { get; set; }
 
-        protected Dictionary<string, object> Vars { get; private set; } = [];
+        protected Dictionary<string, object?> Vars { get; private set; } = [];
 
         [GlobalSetup]
         public void Setup()
         {
             var random = new Random(1);
-            Vars = new Dictionary<string, object>
+            Vars = new Dictionary<string, object?>
             {
                 ["xs"] = Enumerable.Range(0, Items).Select(_ => (object?)(double)random.Next(1_000_000)).ToList(),
                 ["users"] = Enumerable.Range(0, Items).Select(i => (object?)new Dictionary<string, object?>
@@ -28,11 +28,11 @@ namespace EchoPhase.Scripting.Benchmarks
                 }).ToList(),
                 ["qs"] = Enumerable.Range(0, 1000).Select(_ => (object?)(double)random.Next(0, 2 * Items)).ToList(),
             };
-            Vars["set"] = Eval.TypedExecute<object>("toSet(xs)", Vars)
+            Vars["set"] = Eval.EvaluateExpression("toSet(xs)", Vars)
                 ?? throw new InvalidOperationException("toSet gave no value.");
         }
 
-        protected object? Run(string expression) => Eval.TypedExecute<object>(expression, Vars);
+        protected object? Run(string expression) => Eval.EvaluateExpression(expression, Vars);
     }
 
     [MemoryDiagnoser]

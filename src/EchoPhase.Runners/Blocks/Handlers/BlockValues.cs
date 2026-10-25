@@ -12,7 +12,7 @@ namespace EchoPhase.Runners.Blocks.Handlers
     /// </summary>
     public static class BlockValues
     {
-        public static object? Evaluate(JsonElement value, IDictionary<string, object> scope) => value.ValueKind switch
+        public static object? Evaluate(JsonElement value, IDictionary<string, object?> scope) => value.ValueKind switch
         {
             JsonValueKind.Undefined or JsonValueKind.Null => null,
             JsonValueKind.String => Eval.Evaluate(value.GetString() ?? string.Empty, scope),

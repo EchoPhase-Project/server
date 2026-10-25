@@ -76,7 +76,7 @@ namespace EchoPhase.Runners.Blocks.Handlers
         private static string? Template(string? template, BlockCall call)
             => string.IsNullOrEmpty(template) ? null : Eval.TypedProcess<string>(template, call.Scope);
 
-        private static object? Evaluate(JsonElement value, IDictionary<string, object> scope)
+        private static object? Evaluate(JsonElement value, IDictionary<string, object?> scope)
             => value.ValueKind == JsonValueKind.Undefined ? null : BlockValues.Evaluate(value, scope);
 
         private static Dictionary<string, object?> List(StorageItem item, bool withValue)

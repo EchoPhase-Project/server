@@ -131,7 +131,9 @@ namespace EchoPhase.Runners.Blocks
                         break;
                     var (mergeId, inputs) = waiting.First();
                     waiting.Remove(mergeId);
-                    await RunBlockAsync(context, context.Graph.Find(mergeId)!, inputs, depth, queue);
+                    await RunBlockAsync(context,
+                        context.Graph.Find(mergeId) ?? throw new InvalidOperationException($"Block {mergeId} is not in the program."),
+                        inputs, depth, queue);
                 }
             }
             finally
@@ -220,7 +222,7 @@ namespace EchoPhase.Runners.Blocks
 
                     if (retry)
                     {
-                        var delay = TimeSpan.FromMilliseconds(Math.Clamp(block.Retry!.DelayMs, 0, 60_000));
+                        var delay = TimeSpan.FromMilliseconds(Math.Clamp(block.Retry?.DelayMs ?? 0, 0, 60_000));
                         if (delay > TimeSpan.Zero)
                             await Task.Delay(delay, _time, context.CancellationToken);
                         continue;

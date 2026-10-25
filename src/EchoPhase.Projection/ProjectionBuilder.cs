@@ -119,14 +119,19 @@ namespace EchoPhase.Projection
         public Dictionary<string, object?> BuildDictionary()
         {
             _options.UseExpando = false;
-            return (Dictionary<string, object?>)Build()!;
+            return Build() switch
+            {
+                Dictionary<string, object?> dictionary => dictionary,
+                null => throw new InvalidOperationException("There is nothing to project: the source is null."),
+                var other => throw new InvalidOperationException($"The projection is a {other.GetType().Name}, not a dictionary."),
+            };
         }
 
         /// <summary>Executes and returns <see cref="System.Dynamic.ExpandoObject"/>.</summary>
         public dynamic BuildExpando()
         {
             _options.UseExpando = true;
-            return Build()!;
+            return Build() ?? throw new InvalidOperationException("There is nothing to project: the source is null.");
         }
     }
 }

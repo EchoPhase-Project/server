@@ -194,8 +194,9 @@ namespace EchoPhase.Server.Services.Workflows
             if (!saved.Successful)
                 return ServiceResult<WorkflowDetails>.Failure(e => e.Set(saved.Error.Code, saved.Error.Message));
 
-            var workflow = (await FindAsync(userId, id, ct))!;
-            return await UpdateAsync(userId, actorId, id, saved.Value!.Version.Name, saved.Value.Program,
+            if (await FindAsync(userId, id, ct) is not { } workflow)
+                return ServiceResult<WorkflowDetails>.Failure(e => e.Set(WorkflowErrors.NotFound, "Workflow not found."));
+            return await UpdateAsync(userId, actorId, id, saved.Value.Version.Name, saved.Value.Program,
                 workflow.Active, expectedVersion, ct);
         }
 
@@ -377,15 +378,16 @@ namespace EchoPhase.Server.Services.Workflows
             return triggers
                 .Select(b => (b.Id, ((ScheduleTriggerParams)BlockParamsBinder.Bind(typeof(ScheduleTriggerParams), b.Params)).Cron))
                 .Select(t => (t.Id, t.Cron, Next: CronSchedule.Next(t.Cron, zone, now)))
-                .Where(t => t.Next is not null)
-                .Select(t => new WorkflowSchedule
-                {
-                    WorkflowId = workflow.Id,
-                    BlockId = t.Id,
-                    Cron = t.Cron,
-                    TimeZone = zone,
-                    NextRunAt = t.Next!.Value.UtcDateTime
-                })
+                .SelectMany(t => t.Next is { } next
+                    ? [new WorkflowSchedule
+                    {
+                        WorkflowId = workflow.Id,
+                        BlockId = t.Id,
+                        Cron = t.Cron,
+                        TimeZone = zone,
+                        NextRunAt = next.UtcDateTime
+                    }]
+                    : Array.Empty<WorkflowSchedule>())
                 .ToList();
         }
 

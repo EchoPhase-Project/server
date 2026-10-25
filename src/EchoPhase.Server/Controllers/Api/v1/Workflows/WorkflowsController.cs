@@ -40,7 +40,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         public async Task<IActionResult> Get(Guid id, CancellationToken ct = default)
         {
             var result = await _workflows.GetAsync(User.GetUserId(), id, ct);
-            return result.Successful ? Ok(View(result.Value!)) : Failure(result.Error);
+            return result.Successful ? Ok(View(result.Value)) : Failure(result.Error);
         }
 
         [HttpPost]
@@ -50,7 +50,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         {
             var result = await _workflows.CreateAsync(User.GetUserId(), User.GetActorId(), dto.Name, dto.Program, dto.Active, ct);
             return result.Successful
-                ? CreatedAtAction(nameof(Get), new { id = result.Value!.Workflow.Id }, View(result.Value))
+                ? CreatedAtAction(nameof(Get), new { id = result.Value.Workflow.Id }, View(result.Value))
                 : Failure(result.Error);
         }
 
@@ -61,7 +61,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         public async Task<IActionResult> Update(Guid id, [FromBody] SaveWorkflowRequest dto, CancellationToken ct = default)
         {
             var result = await _workflows.UpdateAsync(User.GetUserId(), User.GetActorId(), id, dto.Name, dto.Program, dto.Active, dto.Version, ct);
-            return result.Successful ? Ok(View(result.Value!)) : Failure(result.Error);
+            return result.Successful ? Ok(View(result.Value)) : Failure(result.Error);
         }
 
         [HttpDelete("{id:guid}")]
@@ -83,7 +83,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             if (!result.Successful)
                 return Failure(result.Error);
 
-            var runId = result.Value!.RunId;
+            var runId = result.Value.RunId;
             return Accepted($"/api/v1/blocks/runs/{runId}", new { runId, status = BlockRunStatus.Queued });
         }
 
@@ -94,7 +94,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         {
             var result = await _workflows.VersionsAsync(User.GetUserId(), id, ct);
             return result.Successful
-                ? Ok(result.Value!.Select(v => new { version = v.Version, name = v.Name, savedBy = v.SavedBy, createdAt = v.CreatedAt }))
+                ? Ok(result.Value.Select(v => new { version = v.Version, name = v.Name, savedBy = v.SavedBy, createdAt = v.CreatedAt }))
                 : Failure(result.Error);
         }
 
@@ -106,7 +106,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             if (!result.Successful)
                 return Failure(result.Error);
 
-            var v = result.Value!.Version;
+            var v = result.Value.Version;
             return Ok(new { version = v.Version, name = v.Name, savedBy = v.SavedBy, createdAt = v.CreatedAt, program = result.Value.Program });
         }
 
@@ -120,7 +120,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         public async Task<IActionResult> Restore(Guid id, int version, [FromBody] RestoreWorkflowRequest? dto, CancellationToken ct = default)
         {
             var result = await _workflows.RestoreAsync(User.GetUserId(), User.GetActorId(), id, version, dto?.CurrentVersion, ct);
-            return result.Successful ? Ok(View(result.Value!)) : Failure(result.Error);
+            return result.Successful ? Ok(View(result.Value)) : Failure(result.Error);
         }
 
         private static object Summary(Workflow w) => new

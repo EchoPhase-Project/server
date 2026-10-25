@@ -43,7 +43,7 @@ namespace EchoPhase.Projection.Tests
             Assert.True(result.ContainsKey("Address"));
             Assert.False(result.ContainsKey("Hidden"));
 
-            var address = AsDictionary(result["Address"]!);
+            var address = AsDictionary(Must.Present(result["Address"]));
             Assert.True(address.ContainsKey("City"));
             Assert.False(address.ContainsKey("InternalCode"));
         }

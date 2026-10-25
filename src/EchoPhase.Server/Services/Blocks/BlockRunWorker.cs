@@ -79,7 +79,7 @@ namespace EchoPhase.Server.Services.Blocks
         {
             var run = job.Run;
 
-            using var _ = _logger.BeginScope(new Dictionary<string, object>
+            using var _ = _logger.BeginScope(new Dictionary<string, object?>
             {
                 ["RunId"] = run.RunId,
                 ["UserId"] = run.UserId
@@ -289,7 +289,7 @@ namespace EchoPhase.Server.Services.Blocks
                 json = JsonSerializer.Serialize(new
                 {
                     output = context?.Output ?? [],
-                    variables = context?.Variables ?? new Dictionary<string, object>(),
+                    variables = context?.Variables ?? new Dictionary<string, object?>(),
                     errors,
                     execution = recorder?.Records,
                     executionDropped = recorder?.Dropped,
@@ -318,7 +318,7 @@ namespace EchoPhase.Server.Services.Blocks
             var trimmed = JsonSerializer.Serialize(new
             {
                 output = Array.Empty<string>(),
-                variables = new Dictionary<string, object>(),
+                variables = new Dictionary<string, object?>(),
                 errors = errors.Take(100),
                 start
             }, PayloadJson);

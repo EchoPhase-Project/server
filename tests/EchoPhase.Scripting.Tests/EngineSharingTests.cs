@@ -9,7 +9,7 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void ConstantLiterals_AreNeverChangedBySet()
         {
-            var vars = new Dictionary<string, object>();
+            var vars = new Dictionary<string, object?>();
             Eval.Set(vars, "a", Eval.Evaluate("@([1, 2])", vars));
             Eval.Set(vars, "a[0]", 9L);
             Eval.Set(vars, "o", Eval.Evaluate("@({ x: [1, 2], y: { z: 1 } })", vars));
@@ -25,11 +25,11 @@ namespace EchoPhase.Scripting.Tests
         [Fact]
         public void NestedCalls_OfTheSameArity_KeepTheirOwnArguments()
         {
-            var vars = new Dictionary<string, object>();
+            var vars = new Dictionary<string, object?>();
             Assert.Equal("[4,8,12]", Eval.TypedExecute<string>("map([1, 2, 3], x => sum(map([x, x], y => y * 2)))", vars));
             Assert.Equal("[\"a-1\",\"b-2\"]", Eval.TypedExecute<string>(
                 "map(zip(['a', 'b'], [1, 2]), p => join([p[0], str(p[1])], '-'))", vars));
-            Assert.Equal(6d, Eval.TypedExecute<object>("reduce([1, 2, 3], (acc, x) => acc + max(x, min(x, 10)), 0)", vars));
+            Assert.Equal(6d, Eval.EvaluateExpression("reduce([1, 2, 3], (acc, x) => acc + max(x, min(x, 10)), 0)", vars));
         }
 
         [Fact]
@@ -38,7 +38,7 @@ namespace EchoPhase.Scripting.Tests
             var failures = 0;
             Parallel.For(0, 2000, new ParallelOptions { MaxDegreeOfParallelism = 8 }, i =>
             {
-                var vars = new Dictionary<string, object> { ["n"] = (double)i };
+                var vars = new Dictionary<string, object?> { ["n"] = (double)i };
                 var result = Eval.TypedExecute<string>("join(map([n, n + 1, n + 2], x => str(max(x, 0) * 2)), ',')", vars);
                 if (result != $"{2 * i},{2 * i + 2},{2 * i + 4}")
                     Interlocked.Increment(ref failures);

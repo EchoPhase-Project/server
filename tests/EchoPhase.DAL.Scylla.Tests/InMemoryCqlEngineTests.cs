@@ -108,8 +108,8 @@ namespace EchoPhase.DAL.Scylla.Tests
             run.Status = "succeeded";
             db.BlockRuns.Update(run);
             await db.SaveChangesAsync(Ct);
-            var read = await db.BlockRuns.Where(r => r.UserId == run.UserId && r.RunId == run.RunId).FirstOrDefaultAsync(Ct);
-            Assert.Equal("succeeded", read!.Status);
+            var read = Must.Present(await db.BlockRuns.Where(r => r.UserId == run.UserId && r.RunId == run.RunId).FirstOrDefaultAsync(Ct));
+            Assert.Equal("succeeded", read.Status);
             Assert.Equal(2, read.BlockCount);
 
             db.BlockRuns.Remove(run);
