@@ -73,7 +73,7 @@ namespace EchoPhase.DAL.Scylla.Tests
         {
             var entry = new AuditEntry { ImpersonationId = _entry.ImpersonationId, At = _entry.At, Method = "GET" };
             var tracked = new TrackedEntity(typeof(AuditEntry), entry, EntityState.Modified);
-            tracked.ClearedColumns.Add("Method");
+            tracked.Clear(["Method"]);
 
             var statements = _generator.Generate(tracked, QueryHarness.AuditModel());
 
@@ -93,7 +93,7 @@ namespace EchoPhase.DAL.Scylla.Tests
             builder.ToTable("notes", "ks");
             builder.HasPartitionKey<object>(x => x.Id);
             var tracked = new TrackedEntity(typeof(KeyOnlyWithNote), entry, EntityState.Modified);
-            tracked.ClearedColumns.Add("Note");
+            tracked.Clear(["Note"]);
 
             var statements = _generator.Generate(tracked, builder);
 

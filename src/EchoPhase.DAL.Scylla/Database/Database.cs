@@ -31,7 +31,7 @@ namespace EchoPhase.DAL.Scylla.Database
 
         private readonly object _sync = new();
         private readonly Dictionary<object, TrackedEntity> _changeTracker = new(ReferenceEqualityComparer.Instance);
-        private readonly Dictionary<(Type, string), object> _identities = new();
+        private readonly Dictionary<EntityKey, object> _identities = new();
         private readonly Dictionary<Type, IEntityBuilder> _builderCache = new();
         private readonly Stack<Batch> _activeBatches = new();
 
@@ -122,7 +122,7 @@ namespace EchoPhase.DAL.Scylla.Database
                     tracked.State = EntityState.Modified;
                 }
 
-                tracked.ClearedColumns.UnionWith(names);
+                tracked.Clear(names);
             }
         }
 
@@ -170,7 +170,7 @@ namespace EchoPhase.DAL.Scylla.Database
                     var entity = loaded[i];
                     if (entity is null)
                         continue;
-                    var identity = (typeof(T), KeyOf(entity, builder));
+                    var identity = KeyOf(entity, builder);
                     if (_identities.TryGetValue(identity, out var existing))
                     {
                         loaded[i] = (T)existing;
@@ -206,29 +206,28 @@ namespace EchoPhase.DAL.Scylla.Database
                                || (tracked.State == EntityState.Modified && tracked.Changed is not null);
                 if (!detected || tracked.Original is null)
                     continue;
-                var builder = GetBuilder(tracked.EntityType);
-                var changed = tracked.Original
-                    .Where(o => !builder.GetPrimaryKey().Contains(o.Key)
-                                && !Same(o.Value, Reflect.Property(tracked.EntityType, o.Key).GetValue(tracked.Entity)))
-                    .Select(o => o.Key)
-                    .ToHashSet(StringComparer.Ordinal);
-                if (changed.Count == 0)
+                var original = tracked.Original;
+                var accessors = EntityAccessors.For(tracked.EntityType, GetBuilder(tracked.EntityType));
+                HashSet<string>? changed = null;
+                for (var i = 0; i < accessors.Length; i++)
+                {
+                    var property = accessors[i];
+                    if (!property.IsKey && !Same(original[i], property.Get(tracked.Entity)))
+                        (changed ??= new HashSet<string>(StringComparer.Ordinal)).Add(property.Name);
+                }
+                if (changed is null)
                     continue;
                 tracked.State = EntityState.Modified;
                 tracked.Changed = changed;
             }
         }
 
-        private static Dictionary<string, object?> Snapshot(object entity, IEntityBuilder builder)
+        private static object?[] Snapshot(object entity, IEntityBuilder builder)
         {
-            var values = new Dictionary<string, object?>(StringComparer.Ordinal);
-            foreach (var name in builder.GetMappedProperties().Concat(builder.GetPrimaryKey()).Distinct())
-            {
-                var property = entity.GetType().GetProperty(name);
-                if (property is not { CanRead: true })
-                    continue;
-                values[name] = Copy(property.GetValue(entity));
-            }
+            var accessors = EntityAccessors.For(entity.GetType(), builder);
+            var values = new object?[accessors.Length];
+            for (var i = 0; i < accessors.Length; i++)
+                values[i] = Copy(accessors[i].Get(entity));
             return values;
         }
 
@@ -242,27 +241,29 @@ namespace EchoPhase.DAL.Scylla.Database
             _ => value,
         };
 
+        // Scalars compare as they are; only collections are copied to compare.
         private static bool Same(object? original, object? current)
         {
-            var copy = Copy(current);
-            return (original, copy) switch
+            if (current is null || current is string || current is not System.Collections.IEnumerable)
+                return Equals(original, current);
+            return (original, Copy(current)) switch
             {
-                (null, null) => true,
-                (null, _) or (_, null) => false,
                 (List<KeyValuePair<object, object?>> a, List<KeyValuePair<object, object?>> b) => a.SequenceEqual(b),
                 (List<object?> a, List<object?> b) => a.SequenceEqual(b),
-                _ => original.Equals(copy),
+                _ => false,
             };
         }
 
-        private static string KeyOf(object entity, IEntityBuilder builder)
-            => string.Join('\u001f', builder.GetPrimaryKey().Select(name => Reflect.Property(entity.GetType(), name).GetValue(entity) switch
-            {
-                null => "\u0000",
-                DateTimeOffset moment => moment.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
-                var value => value.ToString(),
-            }));
+        // The entity's type and primary key values: who it is, for the identity map.
+        private static EntityKey KeyOf(object entity, IEntityBuilder builder)
+        {
+            var accessors = EntityAccessors.For(entity.GetType(), builder);
+            var keys = builder.GetPrimaryKey().Count;
+            var values = new object?[keys];
+            for (var i = 0; i < keys; i++)
+                values[i] = accessors[i].Get(entity);
+            return new EntityKey(entity.GetType(), values);
+        }
 
         #endregion
 
@@ -283,7 +284,7 @@ namespace EchoPhase.DAL.Scylla.Database
             var builder = ModelBuilder.GetBuilder(tracked.EntityType);
             if (builder is null)
                 return;
-            var key = (tracked.EntityType, KeyOf(tracked.Entity, builder));
+            var key = KeyOf(tracked.Entity, builder);
             if (_identities.TryGetValue(key, out var known) && ReferenceEquals(known, tracked.Entity))
                 _identities.Remove(key);
         }
@@ -464,8 +465,8 @@ namespace EchoPhase.DAL.Scylla.Database
                     tracked.Changed = null;
                     tracked.Options = null;
                     tracked.Condition = null;
-                    tracked.ClearedColumns.Clear();
-                    _identities[(tracked.EntityType, KeyOf(tracked.Entity, builder))] = tracked.Entity;
+                    tracked.ForgetCleared();
+                    _identities[KeyOf(tracked.Entity, builder)] = tracked.Entity;
                 }
             }
         }

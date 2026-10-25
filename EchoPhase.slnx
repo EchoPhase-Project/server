@@ -35,6 +35,7 @@
     <Project Path="tests/EchoPhase.Security.Cryptography.Tests/EchoPhase.Security.Cryptography.Tests.csproj" />
     <Project Path="tests/EchoPhase.Runners.Tests/EchoPhase.Runners.Tests.csproj" />
     <Project Path="tests/EchoPhase.Scripting.Tests/EchoPhase.Scripting.Tests.csproj" />
+    <Project Path="tests/EchoPhase.DAL.Scylla.Benchmarks/EchoPhase.DAL.Scylla.Benchmarks.csproj" />
     <Project Path="tests/EchoPhase.Scripting.Benchmarks/EchoPhase.Scripting.Benchmarks.csproj" />
     <Project Path="tests/EchoPhase.Server.Tests/EchoPhase.Server.Tests.csproj" />
     <Project Path="tests/EchoPhase.Projection.Tests/EchoPhase.Projection.Tests.csproj" />

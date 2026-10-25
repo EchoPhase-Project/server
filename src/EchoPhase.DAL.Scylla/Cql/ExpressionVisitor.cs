@@ -585,10 +585,37 @@ namespace EchoPhase.DAL.Scylla.Cql
         private static bool IsBoolean(Type type) =>
             type == typeof(bool) || type == typeof(bool?);
 
-        private static object? Evaluate(Expression expr) =>
-            expr is ConstantExpression ce
-                ? ce.Value
-                : Expression.Lambda<Func<object?>>(Expression.Convert(expr, typeof(object))).Compile()();
+        // Values in a query are mostly constants and captured variables (fields of
+        // a closure): read those directly; compiling a delegate per value costs
+        // tens of microseconds. Anything else is compiled.
+        private static object? Evaluate(Expression expr)
+        {
+            switch (expr)
+            {
+                case ConstantExpression constant:
+                    return constant.Value;
+                case MemberExpression { Member: FieldInfo field } member
+                    when member.Expression is null || IsDirect(member.Expression):
+                    return field.GetValue(member.Expression is null ? null : Evaluate(member.Expression));
+                case MemberExpression { Member: PropertyInfo property } member
+                    when member.Expression is null || IsDirect(member.Expression):
+                    return property.GetValue(member.Expression is null ? null : Evaluate(member.Expression));
+                case UnaryExpression { NodeType: ExpressionType.Convert } convert when convert.Type == typeof(object):
+                    return Evaluate(convert.Operand);
+                default:
+                    return Expression.Lambda<Func<object?>>(Expression.Convert(expr, typeof(object))).Compile()();
+            }
+        }
+
+        // A constant, or fields and properties on one: readable without compiling.
+        private static bool IsDirect(Expression expr)
+            => expr switch
+            {
+                ConstantExpression => true,
+                MemberExpression { Member: FieldInfo or PropertyInfo } member
+                    => member.Expression is null || IsDirect(member.Expression),
+                _ => false,
+            };
 
         private static bool DependsOnParameter(Expression expr)
         {

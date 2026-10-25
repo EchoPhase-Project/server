@@ -33,6 +33,10 @@ run = "dotnet test --solution EchoPhase.slnx --output Detailed"
 description = "Benchmark the expression engine (pass --filter '*Lambdas*' for one group)"
 run = "dotnet run -c Release --project tests/EchoPhase.Scripting.Benchmarks -- --filter '*'"
 
+["bench:scylla"]
+description = "Benchmark the Scylla ORM's own cost per query and save (canned rows, no database)"
+run = "dotnet run -c Release --project tests/EchoPhase.DAL.Scylla.Benchmarks -- --filter '*'"
+
 [format]
 description = "Apply code style fixes (style first: its fixes may need re-wrapping)"
 run = [

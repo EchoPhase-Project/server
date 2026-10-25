@@ -46,7 +46,8 @@ namespace EchoPhase.DAL.Scylla.Models
         internal bool Conflicted { get; set; }
 
         /// <summary>The values it was read (or last saved) with; null for an entity never loaded or saved.</summary>
-        internal Dictionary<string, object?>? Original { get; set; }
+        /// <remarks>One value per accessor of <see cref="EntityAccessors.For"/>, in its order.</remarks>
+        internal object?[]? Original { get; set; }
 
         /// <summary>
         /// The properties found changed since <see cref="Original"/>: only these
@@ -59,7 +60,17 @@ namespace EchoPhase.DAL.Scylla.Models
         /// Properties whose stored values should be deleted. Separate from null
         /// values, which mean "leave unchanged" on both insert and update.
         /// </summary>
-        public HashSet<string> ClearedColumns { get; } = new(StringComparer.Ordinal);
+        public IReadOnlySet<string> ClearedColumns => (IReadOnlySet<string>?)_cleared ?? NoColumns;
+
+        private static readonly HashSet<string> NoColumns = [];
+
+        // Made on the first ClearColumns: most tracked entities never need it.
+        private HashSet<string>? _cleared;
+
+        internal void Clear(IEnumerable<string> properties)
+            => (_cleared ??= new HashSet<string>(StringComparer.Ordinal)).UnionWith(properties);
+
+        internal void ForgetCleared() => _cleared = null;
 
         public TrackedEntity(object entity, EntityState state)
         {
@@ -78,7 +89,7 @@ namespace EchoPhase.DAL.Scylla.Models
         public TrackedEntity Clone()
         {
             var clone = new TrackedEntity(EntityType, Entity, State) { Options = Options, Condition = Condition };
-            clone.ClearedColumns.UnionWith(ClearedColumns);
+            clone.Clear(ClearedColumns);
             return clone;
         }
     }
