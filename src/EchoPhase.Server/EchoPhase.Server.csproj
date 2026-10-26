@@ -12,7 +12,19 @@
       keep everything else moving, not more CPU.
     -->
     <ThreadPoolMinThreads>32</ThreadPoolMinThreads>
+    <!--
+      What the server calls itself (ServerVersion: GET /api/v1/version, error
+      reports, telemetry): the image tag, which the Docker build passes as
+      EchoPhaseVersion. Kept as assembly metadata: a tag such as
+      "dev-0.6.0-dirty.2026…" is no valid NuGet version, which
+      InformationalVersion must be. A local build is 0.0.0-local.
+    -->
+    <EchoPhaseVersion Condition="'$(EchoPhaseVersion)' == ''">0.0.0-local</EchoPhaseVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="EchoPhaseVersion" Value="$(EchoPhaseVersion)" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AutoMapper" />

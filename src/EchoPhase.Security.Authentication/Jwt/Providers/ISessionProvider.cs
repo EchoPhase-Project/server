@@ -30,6 +30,12 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
 
         Task RevokeAllAsync(Guid userId, CancellationToken ct = default);
 
+        /// <summary>
+        /// Revokes every session of the user but the one this refresh token
+        /// belongs to (all of them when it is null or none of theirs).
+        /// </summary>
+        Task RevokeOthersAsync(Guid userId, string? keepRefreshToken, CancellationToken ct = default);
+
         Task<CursorPage<Session>> GetSessionsAsync(
             Guid userId, CursorOptions? cursor = null, CancellationToken ct = default);
     }

@@ -75,6 +75,34 @@ namespace EchoPhase.Security.Authentication.Jwt
             return ServiceResult.Success();
         }
 
+        /// <summary>
+        /// Changes the user's password when the current one is right, then
+        /// signs out their other devices (this one keeps its session: the
+        /// changed security stamp makes it refresh its access token). A wrong
+        /// current password counts as a failed sign-in, towards the lockout.
+        /// </summary>
+        public async Task<IdentityResult> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword,
+            string? keepRefreshToken, CancellationToken ct = default)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString())
+                ?? throw new InvalidOperationException("Missing user.");
+            if (await _userManager.IsLockedOutAsync(user))
+                return IdentityResult.Failed(new IdentityError { Code = AuthErrors.LockedOut, Description = "Account locked out." });
+
+            var result = await _hashing.RunAsync(
+                () => _userManager.ChangePasswordAsync(user, currentPassword, newPassword), ct);
+            if (!result.Succeeded)
+            {
+                if (result.Errors.Any(e => e.Code == nameof(IdentityErrorDescriber.PasswordMismatch)))
+                    await _userManager.AccessFailedAsync(user);
+                return result;
+            }
+
+            await _userManager.ResetAccessFailedCountAsync(user);
+            await _refresh.RevokeOthersAsync(userId, keepRefreshToken, ct);
+            return result;
+        }
+
         private static IServiceResult InvalidCredentials()
             => ServiceResult.Failure(e => e.Set(AuthErrors.InvalidCredentials, "Invalid credentials."));
 

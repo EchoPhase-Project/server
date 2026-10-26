@@ -7,7 +7,12 @@ run = "scripts/image-tag.sh"
 
 ["docker:build"]
 description = "Build the server image"
-run = 'docker build -t "$SERVER_IMAGE" ./src'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+. scripts/lib.sh
+docker build --build-arg ECHOPHASE_VERSION="$(image_tag)" -t "$SERVER_IMAGE" ./src
+'''
 
 ["docker:push"]
 description = "Tag the built image with the image tag and latest, and push it"

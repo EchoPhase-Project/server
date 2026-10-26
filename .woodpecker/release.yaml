@@ -54,6 +54,7 @@ steps:
       - >
         buildctl-daemonless.sh build
         --frontend dockerfile.v0 --local context=src --local dockerfile=src
+        --opt build-arg:ECHOPHASE_VERSION=$${TAG}
         --import-cache type=registry,ref=$${IMAGE}:buildcache,registry.insecure=true
         --export-cache type=registry,ref=$${IMAGE}:buildcache,mode=max,registry.insecure=true
         --output "type=image,\"name=$${IMAGE}:$${TAG},$${IMAGE}:latest\",push=true,registry.insecure=true"

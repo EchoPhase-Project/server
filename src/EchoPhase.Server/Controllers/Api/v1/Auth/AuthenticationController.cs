@@ -104,7 +104,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
             return MeResponse.From(user);
         }
 
-        /// <summary>Changes the caller's own profile: name and/or time zone.</summary>
+        /// <summary>Changes the caller's own profile: name, time zone and/or username.</summary>
         [HttpPatch("me")]
         [ValidateAntiForgery]
         [RequirePrincipal(PrincipalKind.Session)]
@@ -117,11 +117,46 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
             if (user is null)
                 return Unauthorized();
 
-            var result = await _userService.UpdateProfileAsync(user, dto.Name, dto.TimeZone);
+            var result = await _userService.UpdateProfileAsync(user, dto.Name, dto.TimeZone, dto.Username);
             if (!result.Succeeded)
                 return BadRequest(result.Errors.Select(ErrorBody.From).ToList());
 
             return MeResponse.From(user);
+        }
+
+        /// <summary>
+        /// Changes the caller's password; the current one must be right (a wrong
+        /// one counts towards the lockout, as at sign-in). Every other device is
+        /// signed out; this one stays signed in.
+        /// </summary>
+        [HttpPost("me/password")]
+        [ValidateAntiForgery]
+        [RequirePrincipal(PrincipalKind.Session)]
+        [EnableRateLimiting(RateLimitPolicies.Auth)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType<IReadOnlyList<ErrorBody>>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest dto, CancellationToken ct = default)
+        {
+            var user = await _userService.GetAsync(User);
+            if (user is null)
+                return Unauthorized();
+
+            var result = await _authService.ChangePasswordAsync(user.Id, dto.CurrentPassword, dto.NewPassword, ct);
+            if (!result.Succeeded)
+                return BadRequest(result.Errors.Select(PasswordError).ToList());
+
+            return NoContent();
+        }
+
+        // Identity's errors name "password"; here there are two: a wrong
+        // current one, and rules the new one breaks.
+        private static ErrorBody PasswordError(IdentityError error)
+        {
+            var body = ErrorBody.From(error);
+            return error.Code == nameof(IdentityErrorDescriber.PasswordMismatch)
+                ? body with { Field = "currentPassword" }
+                : body.Field == "password" ? body with { Field = "newPassword" } : body;
         }
     }
 }

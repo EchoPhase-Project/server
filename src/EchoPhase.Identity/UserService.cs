@@ -108,7 +108,7 @@ namespace EchoPhase.Identity
             return problems;
         }
 
-        public async Task<IdentityResult> UpdateProfileAsync(User user, string? name, string? timeZone)
+        public async Task<IdentityResult> UpdateProfileAsync(User user, string? name, string? timeZone, string? username = null)
         {
             var problems = new List<IdentityError>();
             if (name is not null && name.Trim().Length < MinNameLength)
@@ -122,12 +122,19 @@ namespace EchoPhase.Identity
             if (problems.Count > 0)
                 return IdentityResult.Failed(problems.ToArray());
 
+            var previousUserName = user.UserName;
             if (name is not null)
                 user.Name = name.Trim();
             if (timeZone is not null)
                 user.TimeZone = timeZone;
+            // UpdateAsync validates it (characters, uniqueness) and normalizes it.
+            if (username is not null)
+                user.UserName = username.Trim();
 
-            return await _userManager.UpdateAsync(user);
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+                user.UserName = previousUserName;
+            return result;
         }
 
         public Task<IdentityResult> DeleteUserAsync(User user)

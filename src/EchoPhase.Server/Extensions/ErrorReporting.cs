@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Reflection;
+using EchoPhase.Server.Services.Diagnostics;
 using Sentry.AspNetCore;
 
 namespace EchoPhase.Server.Extensions
@@ -22,8 +22,7 @@ namespace EchoPhase.Server.Extensions
             // UseSentry throws on a missing DSN; an empty one turns it off.
             if (string.IsNullOrWhiteSpace(options.Dsn))
                 options.Dsn = dsn?.Trim() ?? string.Empty;
-            options.Release = typeof(ErrorReporting).Assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            options.Release = ServerVersion.Current;
             options.TracesSampleRate = 0;
             options.SendDefaultPii = false;
             options.MaxRequestBodySize = Sentry.Extensibility.RequestSize.None;

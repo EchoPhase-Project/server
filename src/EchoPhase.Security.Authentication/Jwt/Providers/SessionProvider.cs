@@ -211,6 +211,22 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             await _db.SaveChangesAsync(ct);
         }
 
+        public async Task RevokeOthersAsync(Guid userId, string? keepRefreshToken, CancellationToken ct = default)
+        {
+            Guid? keep = null;
+            if (!string.IsNullOrEmpty(keepRefreshToken))
+                keep = (await _repository.Query()
+                    .WithRefreshTokenHashes(_hasher.Hash(keepRefreshToken))
+                    .WithUserIds(userId)
+                    .FirstOrDefaultAsync(ct))?.Id;
+
+            var others = await _repository.Query()
+                .WithUserIds(userId)
+                .ToListAsync(ct);
+            _db.Sessions.RemoveRange(others.Where(s => s.Id != keep));
+            await _db.SaveChangesAsync(ct);
+        }
+
         public Task<CursorPage<Session>> GetSessionsAsync(
             Guid userId, CursorOptions? cursor = null, CancellationToken ct = default)
         {

@@ -5,6 +5,7 @@ using EchoPhase.Security.Antiforgery;
 using EchoPhase.Security.Authentication.Jwt;
 using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 
 namespace EchoPhase.Security.Authentication
 {
@@ -57,6 +58,13 @@ namespace EchoPhase.Security.Authentication
         {
             await _signInManager.RevokeSessionAsync(userId, sessionId, ct);
             return ServiceResult.Success();
+        }
+
+        public Task<IdentityResult> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword,
+            CancellationToken ct = default)
+        {
+            Request().Request.Cookies.TryGetValue(CookieNames.RefreshToken, out var refreshToken);
+            return _signInManager.ChangePasswordAsync(userId, currentPassword, newPassword, refreshToken, ct);
         }
 
         private string ResolveDeviceId()

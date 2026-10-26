@@ -60,7 +60,7 @@ jobs:
         id: server
         run: |
           version="${GITHUB_REF_NAME#v}"
-          docker build -t "$REGISTRY/server:$version" -t "$REGISTRY/server:latest" ./src
+          docker build --build-arg ECHOPHASE_VERSION="$version" -t "$REGISTRY/server:$version" -t "$REGISTRY/server:latest" ./src
           docker push "$REGISTRY/server:$version"
           docker push "$REGISTRY/server:latest"
           digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$REGISTRY/server:$version")

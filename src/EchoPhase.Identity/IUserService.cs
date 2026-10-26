@@ -18,9 +18,11 @@ namespace EchoPhase.Identity
             string? timeZone = null,
             params string[] roles);
         /// <summary>
-        /// Changes the given profile fields; null leaves a field as it is.
+        /// Changes the given profile fields; null leaves a field as it is. A new
+        /// username is checked like one at registration (allowed characters,
+        /// not taken); sessions survive it, tokens carry the user's id.
         /// </summary>
-        Task<IdentityResult> UpdateProfileAsync(User user, string? name, string? timeZone);
+        Task<IdentityResult> UpdateProfileAsync(User user, string? name, string? timeZone, string? username = null);
         Task<IdentityResult> DeleteUserAsync(User user);
         Task<User?> GetAsync(ClaimsPrincipal userPrincipal);
         Task<string> GetOrSetCodeAsync(User user);

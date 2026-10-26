@@ -13,7 +13,13 @@ RUN dotnet restore EchoPhase.slnx
 
 COPY . .
 
-RUN dotnet publish EchoPhase.Server/EchoPhase.Server.csproj -c Release -o /app
+# The image tag (scripts/image-tag.sh): the version the server reports. Not
+# named VERSION: a build argument is an environment variable in RUN, and
+# MSBuild would take that one as $(Version), which must be a NuGet version.
+ARG ECHOPHASE_VERSION=0.0.0-local
+# --no-restore: restored above already.
+RUN dotnet publish EchoPhase.Server/EchoPhase.Server.csproj -c Release -o /app --no-restore \
+    -p:EchoPhaseVersion="$ECHOPHASE_VERSION"
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 # Links the published package to its repository (and its visibility) on GHCR.

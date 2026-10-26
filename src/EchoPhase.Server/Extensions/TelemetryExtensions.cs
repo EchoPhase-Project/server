@@ -2,8 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Diagnostics;
-using System.Reflection;
 using EchoPhase.Server.Services.Blocks;
+using EchoPhase.Server.Services.Diagnostics;
 using Npgsql;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
@@ -36,8 +36,7 @@ namespace EchoPhase.Server.Extensions
             if (!Endpoints.Any(name => !string.IsNullOrWhiteSpace(configuration[name])))
                 return services;
 
-            var version = typeof(TelemetryExtensions).Assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            var version = ServerVersion.Current;
 
             services.AddOpenTelemetry()
                 .ConfigureResource(resource => resource.AddService(ServiceName, serviceVersion: version))
