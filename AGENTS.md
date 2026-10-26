@@ -1,88 +1,137 @@
 # AGENTS.md: EchoPhase server
 
-.NET 10 server: REST API, realtime gateway, workflow runner, admin CLI.
-Humans read [CONTRIBUTING.md](CONTRIBUTING.md); this file is the short version
-for coding agents. When the two disagree, CONTRIBUTING.md and the code win:
-fix this file.
+This repository contains the .NET 10 server: the REST API, the realtime
+gateway, the workflow runner, and the admin CLI. The full rules for persons are
+in [CONTRIBUTING.md](CONTRIBUTING.md). This file is the short version for
+coding agents. If this file and CONTRIBUTING.md are different, CONTRIBUTING.md
+and the code are correct. Then correct this file.
 
 ## Commands
 
-Tools come from mise (`mise install --locked`, then `dotnet tool restore`).
+Get the tools from mise. Run `mise install --locked`, then run
+`dotnet tool restore`.
 
-| Goal | Command |
+| Task | Command |
 |---|---|
-| Build | `dotnet build EchoPhase.slnx` |
-| Test everything | `mise run test` |
-| Test some | `mise run test -- --filter-class '*Argon2*'` |
-| Check style | `mise run lint` (fix with `mise run format`) |
+| Build the solution | `dotnet build EchoPhase.slnx` |
+| Run all tests | `mise run test` |
+| Run some tests | `mise run test -- --filter-class '*Argon2*'` |
+| Examine the code style | `mise run lint` (to correct the style, run `mise run format`) |
 | Export the API contract | `mise run openapi` |
-| Check the contract for breaks | `mise run openapi:check` (needs the registry, see CONTRIBUTING) |
-| New Postgres migration | `mise run migrations:add <Name>` |
-| Model covered by migrations | `mise run migrations:check` |
+| Find incompatible changes in the contract | `mise run openapi:check` (this task uses the registry, refer to CONTRIBUTING) |
+| Add a Postgres migration | `mise run migrations:add <Name>` |
+| Make sure that migrations include all model changes | `mise run migrations:check` |
 
-Before you finish: `mise run lint` and `mise run test` pass. If you touched
-the API, `mise run openapi`; if you touched a Postgres model, a migration
-exists and `migrations:check` passes.
+Before you stop, do these steps:
 
-Tests need no database or Docker. Do not start services to run them.
+1. Make sure that `mise run lint` and `mise run test` are successful.
+2. If you changed the API, run `mise run openapi`.
+3. If you changed a Postgres model, add a migration. Make sure that
+   `migrations:check` is successful.
+
+The tests do not use a database or Docker. Do not start services for the tests.
 
 ## Layout
 
-- `src/EchoPhase.*`: `Types`, `Projection`, `Configuration` (foundations),
-  `DAL.*` (Postgres, Scylla, Redis), `Security.*`, `Identity`, `Scripting`,
-  `Runners` (workflow blocks), `Clients`, `Connections`, `WebHooks`,
-  `WebSockets`, `Cli`, `Server` (host: controllers, wiring, OpenAPI).
-- `tests/EchoPhase.<Project>.Tests`: xUnit v3 on Microsoft Testing Platform.
-- Dependencies point down: libraries never reference `Server`; foundations
-  reference nothing above them.
+- `src/EchoPhase.*` contains these projects:
+  - Foundations: `Types`, `Projection`, `Configuration`.
+  - Data access: `DAL.*` (Postgres, Scylla, Redis).
+  - Other libraries: `Security.*`, `Identity`, `Scripting`, `Runners`
+    (workflow blocks), `Clients`, `Connections`, `WebHooks`, `WebSockets`,
+    `Cli`.
+  - The host: `Server` (controllers, service registration, OpenAPI).
+- `tests/EchoPhase.<Project>.Tests` contains the tests. The tests use xUnit v3
+  on Microsoft Testing Platform.
+- Dependencies go in one direction only. Libraries do not refer to `Server`.
+  Foundations do not refer to projects above them.
 
 ## Rules
 
-- Every `.cs` file starts with the licence header (exact text in
-  `.editorconfig`, `file_header_template`). Migrations are exempt.
-- Block-scoped namespaces matching the folder; braces on their own line;
-  explicit constructors with `_camelCase` fields (no primary constructors);
-  no `var` for built-in types. `mise run lint` fails otherwise.
-- Package versions only in `src/Directory.Packages.props` or
-  `tests/Directory.Packages.props`, never in a `.csproj`.
-- Services return `IServiceResult` / `IServiceResult<T>`; do not throw for
-  expected outcomes. Error codes are `const string`s in the area's `*Errors`
-  class; never rename a released code.
-- A new error code that should not answer 400 needs its case in
+### Code style
+
+- Start each `.cs` file with the licence header. The exact text is in
+  `.editorconfig`, in `file_header_template`. Migrations do not have this
+  header.
+- Use block-scoped namespaces. The namespace must agree with the folder.
+- Put each brace on a separate line.
+- Use explicit constructors with `_camelCase` fields. Do not use primary
+  constructors.
+- Do not use `var` for built-in types.
+- If the code does not obey these rules, `mise run lint` fails.
+- Write package versions only in `src/Directory.Packages.props` or
+  `tests/Directory.Packages.props`. Do not write package versions in a
+  `.csproj` file.
+
+### Services and errors
+
+- Services return `IServiceResult` or `IServiceResult<T>`. Do not throw an
+  exception for an expected result.
+- Error codes are `const string` values in the `*Errors` class of the area.
+  Do not change the name of a released error code.
+- If a new error code must not return status 400, add its case to
   `ApiControllerBase.StatusFor`.
-- Controllers: derive from `ApiControllerBase`; every action has
-  `[RequirePermission(...)]`; mutating actions have `[ValidateAntiForgery]`;
-  declare every status with `[ProducesResponseType]`; return entities through
-  the `Projector` (only `[Expose]` properties leave the server).
-- Request/response records get `/// <param>` docs: they become the contract's
-  descriptions. Nullability is part of the contract.
-- Do not break the API contract within a release series. A growing enum gets
+
+### Controllers and the API contract
+
+- Each controller must derive from `ApiControllerBase`.
+- Each action must have `[RequirePermission(...)]`.
+- Each action that changes data must have `[ValidateAntiForgery]`.
+- Declare each status code with `[ProducesResponseType]`.
+- Return entities through the `Projector`. Only `[Expose]` properties go out
+  of the server.
+- Write `/// <param>` docs for request and response records. These docs
+  become the descriptions in the contract.
+- Nullability is part of the contract.
+- Do not make incompatible changes to the API contract in a release series.
+- If more values can be added to an enum in the future, give it
   `[ExtensibleEnum]`.
-- New workflow block: a `BlockTypes` value, `Params/<X>Params.cs`
-  (`IValidatable`), `Handlers/<X>Handler.cs` with `[BlockType(...)]`.
-- New CLI command: it lives in `EchoPhase.Cli`, never in `Server`
-  (`CliCommandPlacementTests` fails). What it needs from `Server` is an
-  interface in `Cli`, implemented in `Server` (see `IWorkflowEditor`).
-  Register it in `Server/Extensions/HostExtensions.cs` with description and
-  examples; output on stdout, logs on stderr.
-- Read time from an injected `TimeProvider`, not `DateTime.UtcNow`.
-- Never ignore null: no `x!`, `null!` or `default!` (nullable warnings are
-  errors, and `NullForgivingTests` fails on any). Check (`?? throw` with a
-  message, patterns), annotate (`[MemberNotNullWhen]`, `[NotNullWhen]`) or
-  make the type honest (`T?`, `required`). In tests: `Assert.NotNull`,
-  `Must.Present`, `result.Ok()`.
-- Never edit a released migration (Postgres or Scylla); add a new one. Scylla
-  migrations are hand-written in `DAL.Scylla/Migrations/` and their `Down`
-  must survive a half-applied `Up`.
-- Changing `Resources` or `Permissions` constants changes the permission
-  encoding in tokens: call it out.
-- Do not commit secrets: `Configurations/secrets.json` and
-  `mise.local.toml` are local and gitignored.
+
+### Workflow blocks and CLI commands
+
+- To add a workflow block, add these items:
+  - A `BlockTypes` value.
+  - `Params/<X>Params.cs`, which implements `IValidatable`.
+  - `Handlers/<X>Handler.cs` with `[BlockType(...)]`.
+- To add a CLI command, put the command in `EchoPhase.Cli`. Do not put a
+  command in `Server`: `CliCommandPlacementTests` fails.
+- If a command needs a service that only `Server` has, define an interface in
+  `Cli` and implement it in `Server` (refer to `IWorkflowEditor`).
+- Register each command in `Server/Extensions/HostExtensions.cs`. Give it a
+  description and examples. Write the output to stdout. Write logs to stderr.
+
+### Time and null values
+
+- Get the time from an injected `TimeProvider`. Do not use
+  `DateTime.UtcNow`.
+- Do not ignore null values. Do not use `x!`, `null!`, or `default!`.
+  Nullable warnings are errors, and `NullForgivingTests` fails if it finds
+  one of these forms.
+- Use one of these methods instead:
+  - Do a check: `?? throw` with a message, or a pattern.
+  - Add an annotation: `[MemberNotNullWhen]` or `[NotNullWhen]`.
+  - Make the type correct: `T?` or `required`.
+- In tests, use `Assert.NotNull`, `Must.Present`, or `result.Ok()`.
+
+### Migrations
+
+- Do not edit a released migration (Postgres or Scylla). Add a new migration.
+- Write Scylla migrations manually in `DAL.Scylla/Migrations/`.
+- The `Down` method of a Scylla migration must work after a partial `Up`.
+
+### Permissions and secrets
+
+- If you change the `Resources` or `Permissions` constants, the permission
+  encoding in tokens changes. Tell the maintainers about this change.
+- Do not commit secrets. `Configurations/secrets.json` and `mise.local.toml`
+  are local files, and git ignores them.
 
 ## Commits
 
-Conventional Commits, checked in CI (cocogitto): `feat:`, `fix:`,
-`refactor:`, `perf:`, `docs:`, `test:`, `ci:`, `build:`, `chore:`, with a scope
-where it helps (`feat(cli): …`). Mark breaking changes with `!`. Before 1.0,
-only a `feat` starts a new API series: a `fix!:` alone fails the contract
-check.
+Use Conventional Commits. CI examines the commit messages with cocogitto.
+
+- Use these types: `feat:`, `fix:`, `refactor:`, `perf:`, `docs:`, `test:`,
+  `ci:`, `build:`, `chore:`.
+- Add a scope if it helps the reader, for example `feat(cli): …`.
+- Mark incompatible changes with `!`.
+- Before version 1.0, only a `feat` commit starts a new API series. If a
+  `fix!:` commit has no `feat` commit with it, the contract check fails.

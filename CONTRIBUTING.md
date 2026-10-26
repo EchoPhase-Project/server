@@ -1,15 +1,15 @@
 # Contributing to the EchoPhase server
 
-Thank you for helping with the server: the API, the realtime gateway, the
-workflow runner and the command line. This guide covers how the code is
-organised and the rules it follows; what is common to every repository
-(issues, licence, security reports) is in the
-[organisation's guide](https://github.com/EchoPhase-Project/.github/blob/main/CONTRIBUTING.md).
+Thank you for your help with the server: the API, the realtime gateway, the
+workflow runner, and the command line. This guide tells how the code is
+organised and which rules it obeys. The rules for all repositories (issues,
+licence, security reports) are in the
+[guide of the organisation](https://github.com/EchoPhase-Project/.github/blob/main/CONTRIBUTING.md).
 
-## Setting up
+## Preparation
 
-Tools are pinned with [mise](https://mise.jdx.dev): the .NET SDK, oras and
-oasdiff, the same versions as in CI.
+The project pins the tools with [mise](https://mise.jdx.dev): the .NET SDK,
+oras, and oasdiff. CI uses the same versions.
 
 ```sh
 mise install --locked
@@ -17,238 +17,275 @@ dotnet tool restore
 mise run test
 ```
 
-The tests need no database or Docker: they use EF InMemory and check the SQL
-and CQL the code would send. One test runs against a real Postgres when
-`ECHOPHASE_TEST_POSTGRES` holds a connection string to a database it may
-migrate; otherwise it is skipped.
+The tests do not need a database or Docker. They use EF InMemory and examine
+the SQL and the CQL that the code sends. One test runs against a real
+Postgres database if `ECHOPHASE_TEST_POSTGRES` contains a connection string.
+The test applies migrations to that database. If the variable is empty, the
+test does not run.
 
-### Running the server
+### Run the server
 
-It needs PostgreSQL, ScyllaDB and Valkey (or Redis). The quickest way is
-`compose.dev.yaml` from [charts](https://github.com/EchoPhase-Project/charts),
-which publishes them on `127.0.0.1`. Then, from `src/EchoPhase.Server` (the
-configuration paths are relative to it):
+The server needs PostgreSQL, ScyllaDB, and Valkey (or Redis). The fastest
+method is `compose.dev.yaml` from
+[charts](https://github.com/EchoPhase-Project/charts). It publishes the
+databases on `127.0.0.1`. Then, run this command from `src/EchoPhase.Server`.
+The configuration paths are relative to this directory.
 
 ```sh
 dotnet run -- migrate --continue    # apply the migrations, then start
 ```
 
-Settings come from `Configurations/appsettings.json`, then
-`appsettings.<Environment>.json`, then `Configurations/secrets.json` (optional,
-gitignored: your local passwords), then the environment (`POSTGRES_*`,
-`VALKEY_*`, `SCYLLA_*`). `dotnet run -- check` validates the settings and
-reaches every service. Run the web client against it with
-`API_TARGET=http://localhost:5000` in [webapp](https://github.com/EchoPhase-Project/webapp).
+The server reads the settings in this sequence:
+
+1. `Configurations/appsettings.json`.
+2. `appsettings.<Environment>.json`.
+3. `Configurations/secrets.json`. This file is optional, and git ignores it.
+   Put your local passwords in it.
+4. The environment variables (`POSTGRES_*`, `VALKEY_*`, `SCYLLA_*`).
+
+`dotnet run -- check` validates the settings and makes a connection to each
+service. To run the web client against this server, set
+`API_TARGET=http://localhost:5000` in
+[webapp](https://github.com/EchoPhase-Project/webapp).
 
 ### Before a pull request
 
 ```sh
-mise run lint             # code style (mise run format fixes it)
+mise run lint             # code style (mise run format corrects it)
 mise run test
 mise run openapi:check    # if you changed the API
 mise run migrations:check # if you changed the database model
 ```
 
-CI runs these on Linux, Windows and macOS, and builds the image.
+CI runs these checks on Linux, Windows, and macOS. CI also builds the image.
 
 ## How the code is organised
 
-The solution is `EchoPhase.slnx`: projects in `src/`, their tests in `tests/`
-(`EchoPhase.<Project>.Tests`).
+The solution is `EchoPhase.slnx`. The projects are in `src/`. Their tests are
+in `tests/` (`EchoPhase.<Project>.Tests`).
 
-| Projects | What |
+| Projects | Contents |
 |---|---|
-| `Types`, `Projection`, `Configuration` | shared foundations: results and error codes, `[Expose]` projection, options and their validation |
-| `DAL.Abstractions`, `DAL.Postgres`, `DAL.Scylla`, `DAL.Redis` | data access: Postgres (EF Core) for accounts and workflows, Scylla for block runs, Redis for shared state |
-| `Security.*`, `Identity` | cryptography, password hashing, authentication, authorisation (permissions), antiforgery, users and roles |
-| `Scripting`, `Runners` | the expression engine and the workflow block runner |
-| `Clients`, `Connections`, `WebHooks`, `WebSockets` | outside services (Discord, Twitch), connected accounts, webhooks, the realtime gateway |
-| `Cli` | the admin commands |
-| `Server` | the host: controllers, services wiring it together, OpenAPI |
+| `Types`, `Projection`, `Configuration` | Shared foundations: results and error codes, `[Expose]` projection, options and their validation |
+| `DAL.Abstractions`, `DAL.Postgres`, `DAL.Scylla`, `DAL.Redis` | Data access: Postgres (EF Core) for accounts and workflows, Scylla for block runs, Redis for shared state |
+| `Security.*`, `Identity` | Cryptography, password hashes, authentication, authorisation (permissions), antiforgery, users and roles |
+| `Scripting`, `Runners` | The expression engine and the workflow block runner |
+| `Clients`, `Connections`, `WebHooks`, `WebSockets` | External services (Discord, Twitch), connected accounts, webhooks, the realtime gateway |
+| `Cli` | The admin commands |
+| `Server` | The host: controllers, the service registration, OpenAPI |
 
-Keep the direction: foundations reference nothing above them, libraries never
-reference `Server`, and only `Server` puts everything together. Nothing checks
-this automatically, so reviewers do.
+Keep the direction of the dependencies. Foundations do not refer to projects
+above them. Libraries do not refer to `Server`. Only `Server` connects all
+parts. No tool examines this rule, so the reviewers examine it.
 
 ## Code style
 
-`.editorconfig` holds the rules, and `mise run lint` checks them in CI. The
-ones that surprise most:
+`.editorconfig` contains the rules. `mise run lint` examines them in CI. These
+rules are frequently unexpected:
 
-- every file starts with the licence header (the IDE adds it from
-  `.editorconfig`):
+- Each file starts with the licence header. The IDE adds it from
+  `.editorconfig`:
 
   ```csharp
   // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
   // See the LICENCE file in the repository root for full licence text.
   ```
 
-- block-scoped namespaces matching the folder, braces on their own line;
-- explicit constructors assigning `_camelCase` fields (no primary
-  constructors), no `this.`;
-- `var` only where the type is apparent, never for built-in types;
-- lines up to 120 characters, LF endings;
-- public members documented with `<summary>`; on API request and response
-  records, `/// <param>` becomes the field's description in the OpenAPI
-  contract.
+- Use block-scoped namespaces. The namespace must agree with the folder. Put
+  each brace on a separate line.
+- Use explicit constructors that set `_camelCase` fields. Do not use primary
+  constructors. Do not use `this.`.
+- Use `var` only where the type is clear. Do not use `var` for built-in
+  types.
+- Lines have a maximum of 120 characters, with LF line endings.
+- Write a `<summary>` for each public member. On API request and response
+  records, the `/// <param>` text becomes the field description in the
+  OpenAPI contract.
 
 ### Null
 
-Nullable reference types are on everywhere, and their warnings fail the
-build. Ignoring null is not allowed: no null-forgiving operator (`x!`,
-`null!`, `default!`), which `NullForgivingTests` checks across `src` and
-`tests`. Instead:
+Nullable reference types are on in all projects, and their warnings cause the
+build to fail. Do not ignore null values. Do not use the null-forgiving
+operator (`x!`, `null!`, `default!`). `NullForgivingTests` examines `src` and
+`tests` for it. Use one of these methods instead:
 
-- check it, with an exception that says what was missing:
-  `entity ?? throw new InvalidOperationException("…")`, or a pattern
-  (`if (result is not { } value) return …;`);
-- let the compiler know: `[MemberNotNullWhen(true, nameof(Value))]` on
-  `IServiceResult<T>.Successful`, `[NotNullWhen]` / `[MaybeNullWhen]` on
-  `Try…` methods, so that a checked result needs no `!`;
-- make the type honest: a value that may be missing is `T?`; a member that
-  must be set is `required`; a `DbSet` is `=> Set<T>()`;
-- in tests, `Assert.NotNull(x)` (or the project's `Must.Present(x)`) and
-  `result.Ok()`, which fail with the reason.
+- Do a check, with an exception that tells what is missing:
+  `entity ?? throw new InvalidOperationException("…")`. You can also use a
+  pattern: `if (result is not { } value) return …;`.
+- Give the information to the compiler. `IServiceResult<T>.Successful` has
+  `[MemberNotNullWhen(true, nameof(Value))]`. `Try…` methods have
+  `[NotNullWhen]` or `[MaybeNullWhen]`. Then a result after a check does not
+  need `!`.
+- Make the type correct. A value that can be missing is `T?`. A member that
+  must have a value is `required`. A `DbSet` is `=> Set<T>()`.
+- In tests, use `Assert.NotNull(x)` (or `Must.Present(x)` of the project) and
+  `result.Ok()`. They fail with the reason.
 
-Packages are versioned centrally: `src/Directory.Packages.props` and
-`tests/Directory.Packages.props`, never in a project file. Read the time from
-an injected `TimeProvider`, not `DateTime.UtcNow`, so tests can control it.
+The project sets package versions centrally, in `src/Directory.Packages.props`
+and `tests/Directory.Packages.props`. Do not set versions in a project file.
+
+Get the time from an injected `TimeProvider`. Do not use `DateTime.UtcNow`.
+Then the tests can control the time.
 
 ## Patterns
 
 ### Results and errors
 
-Services return `IServiceResult` / `IServiceResult<T>`
-(`EchoPhase.Types/Result`) instead of throwing: `Success`, `Failure`, and
-`Map` / `Bind` to chain steps (a failure skips the rest). Exceptions are for
-bugs, not for outcomes a caller should handle.
+Services return `IServiceResult` or `IServiceResult<T>`
+(`EchoPhase.Types/Result`). They do not throw exceptions. Use `Success` and
+`Failure`. Use `Map` and `Bind` to chain steps: after a failure, the
+subsequent steps do not run. Exceptions are for bugs only. Do not use them
+for results that the caller must handle.
 
-An error has a stable code and a message. Codes are `const string`s in the
-area's `*Errors` class (`AuthErrors`, `ApiClientErrors`, `BlockRunErrors`),
-reusing `ErrorCodes` (`NotFound`, `Invalid`, `Conflict`, `Forbidden`…) where
-the meaning is the same. Clients branch on codes, so never rename one that has
-been released.
+An error has a stable code and a message. Codes are `const string` values in
+the `*Errors` class of the area (`AuthErrors`, `ApiClientErrors`,
+`BlockRunErrors`). If a code in `ErrorCodes` (`NotFound`, `Invalid`,
+`Conflict`, `Forbidden`…) has the same meaning, use it again. Clients use the
+codes in their logic. Thus, do not change the name of a released code.
 
 ### An API endpoint
 
-Look at an existing controller (`Controllers/Api/v1/Storage/StorageController.cs`):
+Use an existing controller as the reference
+(`Controllers/Api/v1/Storage/StorageController.cs`):
 
-- a controller deriving from `ApiControllerBase`, under `Controllers/Api/v1/<Area>/`;
-- request and response `sealed record`s with `/// <param>` docs and validation attributes;
-- `[RequirePermission(Resources.X, Permissions.Y)]` on every action, `[ValidateAntiForgery]` on those that change something;
-- `[ProducesResponseType]` for every status, `ErrorBody` for errors;
-- a `CancellationToken` passed down.
+- The controller derives from `ApiControllerBase`. It is in
+  `Controllers/Api/v1/<Area>/`.
+- Request and response types are `sealed record` types with `/// <param>` docs
+  and validation attributes.
+- Each action has `[RequirePermission(Resources.X, Permissions.Y)]`. Each
+  action that changes data also has `[ValidateAntiForgery]`.
+- Each status code has `[ProducesResponseType]`. Errors use `ErrorBody`.
+- Each action gives its `CancellationToken` to the calls that it makes.
 
-`Failure(error)` turns a service failure into a response: the status comes
-from `ApiControllerBase.StatusFor`. **A new error code that is not a 400 needs
-its case there**; otherwise it answers 400. Entities are returned through the
-`Projector`: only properties marked `[Expose]` leave the server.
+`Failure(error)` changes a service failure into a response.
+`ApiControllerBase.StatusFor` sets the status code. **If a new error code must
+not return 400, add its case to `StatusFor`.** If you do not add it, the code
+returns 400.
 
-Permissions are `resource:action` constants (`Security.BitMasks/Constants`),
-given to roles in `RolePermissions.cs`. Adding one changes how permissions are
-encoded in tokens; mention it in the pull request.
+Return entities through the `Projector`. Only the properties with `[Expose]`
+go out of the server.
+
+Permissions are `resource:action` constants (`Security.BitMasks/Constants`).
+`RolePermissions.cs` gives them to roles. A new permission changes the
+permission encoding in tokens. Tell this in the pull request.
 
 ### The API contract
 
-The contract (`artifacts/openapi.json`, `mise run openapi`) is what the web
-client and other clients are built against. Nullability counts: a non-nullable
-reference type is a required field.
+The web client and other clients use the contract (`artifacts/openapi.json`,
+`mise run openapi`). Nullability is important: a reference type that is not
+nullable is a required field.
 
-It may not break clients within a release series: before 1.0, a minor version
-(`0.2.x`). `mise run openapi:check` compares it with the latest release of its
-series and fails on breaking changes. If a break is intended, the commit must
-start a new series (before 1.0, a `feat!:` commit); a deliberate exception goes
-in `openapi.err-ignore` with its reason. The README explains both under
-"Breaking API changes".
+The contract must stay compatible with clients in a release series. Before
+1.0, a series is a minor version (`0.2.x`). `mise run openapi:check` compares
+the contract with the latest release of its series. It fails if it finds an
+incompatible change.
 
-Enums that grow with the product are marked `[ExtensibleEnum]`: adding a value
-is then compatible, and clients must expect values they do not know.
+If you must make an incompatible change, the commit must start a new series.
+Before 1.0, this is a `feat!:` commit. For an intentional exception, add an
+entry with its reason to `openapi.err-ignore`. The README tells about the two
+methods in "Breaking API changes".
+
+If more values can be added to an enum in the future, give it
+`[ExtensibleEnum]`. Then a new value is a compatible change, and clients must
+accept values that they do not know.
 
 ### A workflow block
 
-1. A value in `BlockTypes` (`Runners/Blocks/BlockTypes.cs`).
-2. Its parameters in `Params/<X>Params.cs`, implementing `IValidatable`, with
-   `[JsonPropertyName]` on each property.
-3. Its handler in `Handlers/<X>Handler.cs`, deriving from
-   `BlockHandlerBase<XParams>`, with `[BlockType(...)]` describing it.
+1. Add a value to `BlockTypes` (`Runners/Blocks/BlockTypes.cs`).
+2. Add the parameters in `Params/<X>Params.cs`. The class implements
+   `IValidatable`. Each property has `[JsonPropertyName]`.
+3. Add the handler in `Handlers/<X>Handler.cs`. The class derives from
+   `BlockHandlerBase<XParams>` and has `[BlockType(...)]` with its
+   description.
 
-Handlers register themselves; a test fails when a block type has no handler.
+Handlers register automatically. A test fails if a block type does not have a
+handler.
 
 ### A command
 
 Commands are Spectre.Console `AsyncCommand<TSettings>` classes in
-`Cli/Commands/<Area>/`, registered in `Server/Extensions/HostExtensions.cs`
-with a description and examples (the examples are validated). They return
-`CliExit.Success` or `CliExit.Failure` (exit code 1). Their output goes to
-stdout and logs to stderr, so output can be piped: keep it that way, and offer
-`--json` for lists.
+`Cli/Commands/<Area>/`. Register each command in
+`Server/Extensions/HostExtensions.cs` with a description and examples. A test
+validates the examples.
 
-All commands live in `EchoPhase.Cli`; `CliCommandPlacementTests` fails on a
-command in `Server`. When a command needs a service only `Server` has, define
-an interface in `Cli/Commands/<Area>/` with just the operations the command
-uses, implement it in `Server` and register it in `Startup.cs`
-(`IWorkflowEditor` and `WorkflowEditor`).
+- A command returns `CliExit.Success` or `CliExit.Failure` (exit code 1).
+- A command writes its output to stdout and its logs to stderr. Then users
+  can send the output to other programs. Keep this behaviour.
+- For a list, add the `--json` option.
+
+All commands are in `EchoPhase.Cli`. Do not put a command in `Server`:
+`CliCommandPlacementTests` fails. If a command needs a service that only
+`Server` has, define an interface in `Cli/Commands/<Area>/` with only the
+operations that the command uses. Implement the interface in `Server` and
+register it in `Startup.cs`. `IWorkflowEditor` and `WorkflowEditor` show this
+pattern.
 
 ### Settings
 
-An options class has a `SectionName` and a validator, registered in
-`Configuration/Extensions/ServiceExtensions.cs` so the server refuses to start
-with invalid settings and `check` reports them. A setting a self-hoster needs
-is documented in the chart ([charts](https://github.com/EchoPhase-Project/charts))
-too.
+An options class has a `SectionName` and a validator. Register them in
+`Configuration/Extensions/ServiceExtensions.cs`. Then the server does not
+start with incorrect settings, and `check` shows them.
+
+If a self-hoster needs a setting, also write about it in the chart
+([charts](https://github.com/EchoPhase-Project/charts)).
 
 ### Telemetry
 
-Traces and metrics are on only when an OTLP endpoint is set. New ones use the
-existing source and meter, or register theirs in `TelemetryExtensions.cs`;
-metric names start with `echophase.`, attributes with `echophase.`.
+Traces and metrics are on only when an OTLP endpoint is set. For new traces
+or metrics, use the current source and meter, or register a new one in
+`TelemetryExtensions.cs`. Metric names and attribute names start with
+`echophase.`.
 
 ## Database changes
 
-**Postgres.** Change the model in `DAL.Postgres`, then:
+**Postgres.** Change the model in `DAL.Postgres`. Then run:
 
 ```sh
 mise run migrations:add <Name>
 ```
 
-`migrations:check` fails when the model has changes no migration covers.
-Never edit a migration that has been released: add a new one.
+`migrations:check` fails if the model has changes that no migration includes.
+Do not edit a released migration. Add a new migration.
 
-**Scylla.** Migrations are written by hand in `DAL.Scylla/Migrations/`, one
-class `M<yyyyMMdd><Name>` implementing `IMigration`, with a unique `Id` that
-sorts after the existing ones. CQL schema changes are not transactional:
-`Down` must undo a half-applied `Up` (`IF EXISTS`).
+**Scylla.** Write migrations manually in `DAL.Scylla/Migrations/`. Each
+migration is one class `M<yyyyMMdd><Name>` that implements `IMigration`. Give
+it a unique `Id` that sorts after the current `Id` values. CQL schema changes
+are not transactional. Thus, `Down` must undo a partial `Up` (`IF EXISTS`).
 
-Both are applied by the `migrate` command, which the chart runs before the
-server starts.
+The `migrate` command applies the two types of migrations. The chart runs
+this command before the server starts.
 
 ## Tests
 
-xUnit v3 on Microsoft Testing Platform, one test project per source project.
+The tests use xUnit v3 on Microsoft Testing Platform. Each source project has
+one test project.
 
 ```sh
-mise run test                                   # everything
-mise run test -- --filter-class '*Argon2*'      # some
+mise run test                                   # all tests
+mise run test -- --filter-class '*Argon2*'      # some tests
 mise run test:coverage                          # artifacts/coverage
 ```
 
-Name test classes `<Subject>Tests` and test methods as a sentence:
+Name test classes `<Subject>Tests`. Name test methods as a sentence:
 `Member_Condition_Outcome` (`Failure_SkipsTheStepsAndKeepsItsError`). Test the
-behaviour a caller sees, including failures. The expression engine has
-allocation budgets (`AllocationBudgetTests`): a change that allocates more
-fails them.
+behaviour that a caller sees, including the failures.
+
+The expression engine has allocation budgets (`AllocationBudgetTests`). If a
+change makes more allocations, these tests fail.
 
 ## Commits and pull requests
 
-Commit messages follow Conventional Commits, checked in CI by cocogitto; they
-make the version and the release notes. `cog install-hook commit-msg` checks
-them as you commit.
+Commit messages follow Conventional Commits. CI examines them with cocogitto.
+The version and the release notes come from them. To examine the messages
+when you commit, run `cog install-hook commit-msg`.
 
-- `feat` is a new capability, `fix` a bug fix, `refactor` / `perf` other code
-  changes; `docs`, `test`, `ci`, `build`, `chore` the rest.
-- A breaking change gets a `!` (`feat!: …`). Before 1.0, only a `feat` starts
-  a new series: a `fix!:` alone fails the contract check.
-- Scopes name the area: `feat(cli): …`, `fix(auth): …`.
+- Use `feat` for a new capability and `fix` for a bug fix. Use `refactor` or
+  `perf` for other code changes. Use `docs`, `test`, `ci`, `build`, or
+  `chore` for all other changes.
+- Mark an incompatible change with `!` (`feat!: …`). Before 1.0, only a
+  `feat` commit starts a new series. If a `fix!:` commit is alone, the
+  contract check fails.
+- The scope is the area: `feat(cli): …`, `fix(auth): …`.
 
-Releases are tags `vX.Y.Z` made by the maintainers: they publish the image and
-the API contract to GHCR, with a GitHub release.
+The maintainers make the releases with tags `vX.Y.Z`. A tag publishes the
+image and the API contract to GHCR, and makes a GitHub release.
