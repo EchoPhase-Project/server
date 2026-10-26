@@ -113,7 +113,7 @@ namespace EchoPhase.Server.Services.Storage
 
             if (entry is null)
             {
-                entry = new StorageEntry { UserId = slot.UserId, WorkflowId = slot.WorkflowId, Key = key };
+                entry = new StorageEntry { UserId = slot.UserId, PackageId = slot.PackageId, WorkflowId = slot.WorkflowId, Key = key };
                 _db.StorageEntries.Add(entry);
             }
 
@@ -137,9 +137,9 @@ namespace EchoPhase.Server.Services.Storage
                 throw new StorageLimitException($"Storage holds at most {_options.MaxBytesPerUser} bytes; delete some first.");
         }
 
-        // WorkflowId null (the shared scope) compares as IS NULL.
+        // WorkflowId null (the package's shared scope) compares as IS NULL.
         private IQueryable<StorageEntry> In(StorageSlot slot)
-            => _db.StorageEntries.Where(e => e.UserId == slot.UserId && e.WorkflowId == slot.WorkflowId);
+            => _db.StorageEntries.Where(e => e.UserId == slot.UserId && e.PackageId == slot.PackageId && e.WorkflowId == slot.WorkflowId);
 
         private static bool Expired(StorageEntry entry, DateTime now) => entry.ExpiresAt is { } at && at <= now;
 
@@ -152,10 +152,10 @@ namespace EchoPhase.Server.Services.Storage
             return Eval.Plain(document.RootElement);
         }
 
-        /// <summary>The advisory lock of one key: 64 bits of a hash of user, scope and key.</summary>
+        /// <summary>The advisory lock of one key: 64 bits of a hash of package, scope and key.</summary>
         public static long LockId(StorageSlot slot, string key)
         {
-            var text = $"{slot.UserId:N}/{slot.WorkflowId?.ToString("N") ?? "-"}/{key}";
+            var text = $"{slot.PackageId:N}/{slot.WorkflowId?.ToString("N") ?? "-"}/{key}";
             return BinaryPrimitives.ReadInt64LittleEndian(XxHash64.Hash(Encoding.UTF8.GetBytes(text)));
         }
     }

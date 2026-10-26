@@ -52,7 +52,7 @@ namespace EchoPhase.Runners.Tests
 
         public async Task<IBlockExecutionContext> RunAsync(
             string programJson, BlockLimits? limits = null, object? input = null, CancellationToken? ct = null,
-            WebhookReply? reply = null, string? timeZone = null, Guid? workflowId = null)
+            WebhookReply? reply = null, string? timeZone = null, Guid? workflowId = null, Guid? packageId = null)
         {
             var program = Parse(programJson);
             var issues = Validator.Validate(program, maxBlocks: 200);
@@ -64,7 +64,8 @@ namespace EchoPhase.Runners.Tests
             {
                 Limits = limits ?? new BlockLimits(1_000, 100),
                 Reply = reply,
-                WorkflowId = workflowId
+                WorkflowId = workflowId,
+                PackageId = packageId
             };
 
             return await _provider.GetRequiredService<BlocksRunner>()

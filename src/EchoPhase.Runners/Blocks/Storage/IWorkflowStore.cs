@@ -3,15 +3,18 @@
 
 namespace EchoPhase.Runners.Blocks.Storage
 {
-    /// <summary>Whose values: one workflow's own, or shared by all of the user's workflows.</summary>
+    /// <summary>Whose values: one workflow's own, or shared by the workflows of its package.</summary>
     public enum StorageScope
     {
         Workflow,
-        User
+        Package
     }
 
-    /// <summary>Where a value lives: a user's, in one of their workflows (WorkflowId) or shared (null).</summary>
-    public readonly record struct StorageSlot(Guid UserId, Guid? WorkflowId);
+    /// <summary>
+    /// Where a value lives: a user's package, in one of its workflows
+    /// (WorkflowId) or shared by them (null). The user is whose quota it counts against.
+    /// </summary>
+    public readonly record struct StorageSlot(Guid UserId, Guid PackageId, Guid? WorkflowId);
 
     /// <summary>A stored value; Value is null in listings without values.</summary>
     public sealed record StorageItem(string Key, object? Value, int Size, DateTime UpdatedAt, DateTime? ExpiresAt);

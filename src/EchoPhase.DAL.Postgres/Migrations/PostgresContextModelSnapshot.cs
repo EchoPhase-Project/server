@@ -449,6 +449,9 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<Guid>("PackageId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Size")
                         .HasColumnType("integer");
 
@@ -471,12 +474,14 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.HasIndex("ExpiresAt");
 
+                    b.HasIndex("UserId");
+
                     b.HasIndex("WorkflowId");
 
-                    b.HasIndex("UserId", "WorkflowId", "Key")
+                    b.HasIndex("PackageId", "WorkflowId", "Key")
                         .IsUnique();
 
-                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("UserId", "WorkflowId", "Key"), false);
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("PackageId", "WorkflowId", "Key"), false);
 
                     b.ToTable("StorageEntries", "EchoPhase");
                 });
@@ -816,19 +821,16 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb");
 
+                    b.Property<Guid>("Key")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<Guid?>("SourceKey")
+                    b.Property<Guid>("PackageId")
                         .HasColumnType("uuid");
-
-                    b.Property<Guid?>("SourcePackageId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("SourcePackageVersion")
-                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -845,8 +847,8 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.HasIndex("UserId", "SourcePackageId")
-                        .HasFilter("\"SourcePackageId\" IS NOT NULL");
+                    b.HasIndex("PackageId", "Key")
+                        .IsUnique();
 
                     b.ToTable("Workflows", "EchoPhase");
                 });
@@ -866,6 +868,9 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<Guid?>("ErrorWorkflowKey")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("LatestVersion")
                         .HasColumnType("integer");
 
@@ -881,6 +886,12 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .IsRequired()
                         .HasMaxLength(100000)
                         .HasColumnType("character varying(100000)");
+
+                    b.Property<Guid?>("SourcePackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("SourceVersion")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Summary")
                         .IsRequired()
@@ -905,11 +916,16 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
                     b.HasIndex("OwnerId");
 
+                    b.HasIndex("SourcePackageId");
+
                     b.HasIndex("Tags");
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Tags"), "gin");
 
                     b.HasIndex("Visibility");
+
+                    b.HasIndex("OwnerId", "SourcePackageId")
+                        .HasFilter("\"SourcePackageId\" IS NOT NULL");
 
                     b.ToTable("WorkflowPackages", "EchoPhase");
                 });
@@ -1302,6 +1318,12 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.StorageEntry", b =>
                 {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.WorkflowPackage", "Package")
+                        .WithMany()
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -1312,6 +1334,8 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .WithMany()
                         .HasForeignKey("WorkflowId")
                         .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Package");
 
                     b.Navigation("User");
 
@@ -1370,11 +1394,19 @@ namespace EchoPhase.DAL.Postgres.Migrations
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.Workflow", b =>
                 {
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.WorkflowPackage", "Package")
+                        .WithMany("Workflows")
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("EchoPhase.DAL.Postgres.Models.User", "User")
                         .WithMany("Workflows")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Package");
 
                     b.Navigation("User");
                 });
@@ -1387,7 +1419,14 @@ namespace EchoPhase.DAL.Postgres.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("EchoPhase.DAL.Postgres.Models.WorkflowPackage", "SourcePackage")
+                        .WithMany()
+                        .HasForeignKey("SourcePackageId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Owner");
+
+                    b.Navigation("SourcePackage");
                 });
 
             modelBuilder.Entity("EchoPhase.DAL.Postgres.Models.WorkflowPackageInstall", b =>
@@ -1561,6 +1600,8 @@ namespace EchoPhase.DAL.Postgres.Migrations
                     b.Navigation("Shares");
 
                     b.Navigation("Versions");
+
+                    b.Navigation("Workflows");
                 });
 #pragma warning restore 612, 618
         }

@@ -14,8 +14,7 @@ namespace EchoPhase.DAL.Postgres.Configurations
             builder.ToTable("Workflows", PostgresContext.DefaultSchema);
             builder.HasKey(e => e.Id);
             builder.HasIndex(e => e.UserId);
-            // A user's copies of a package: what an update replaces.
-            builder.HasIndex(e => new { e.UserId, e.SourcePackageId }).HasFilter("\"SourcePackageId\" IS NOT NULL");
+            builder.HasIndex(e => new { e.PackageId, e.Key }).IsUnique();
 
             builder.Property(e => e.Name).HasMaxLength(100).IsRequired();
             builder.Property(e => e.Definition).HasColumnType("jsonb").IsRequired();
@@ -24,6 +23,11 @@ namespace EchoPhase.DAL.Postgres.Configurations
             builder.HasOne(e => e.User)
                 .WithMany(u => u.Workflows)
                 .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(e => e.Package)
+                .WithMany(p => p.Workflows)
+                .HasForeignKey(e => e.PackageId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }

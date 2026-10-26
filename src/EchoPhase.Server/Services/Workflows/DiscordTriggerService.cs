@@ -35,7 +35,7 @@ namespace EchoPhase.Server.Services.Workflows
         /// <summary>How long a connection that failed for good (bad token, intents) is left closed.</summary>
         public static readonly TimeSpan FailureHold = TimeSpan.FromMinutes(30);
 
-        private sealed record Trigger(Guid WorkflowId, int BlockId, BlockProgram Program, DiscordEventTriggerParams Params);
+        private sealed record Trigger(Guid WorkflowId, Guid PackageId, int BlockId, BlockProgram Program, DiscordEventTriggerParams Params);
 
         private sealed record OpenConnection(Guid Id, int Intents);
 
@@ -128,7 +128,7 @@ namespace EchoPhase.Server.Services.Workflows
                     var param = (DiscordEventTriggerParams)BlockParamsBinder.Bind(typeof(DiscordEventTriggerParams), block.Params);
                     if (!result.TryGetValue(param.Connection, out var list))
                         result[param.Connection] = list = [];
-                    list.Add(new Trigger(workflow.Id, block.Id, program, param));
+                    list.Add(new Trigger(workflow.Id, workflow.PackageId, block.Id, program, param));
                 }
             }
             return result;
@@ -214,7 +214,8 @@ namespace EchoPhase.Server.Services.Workflows
                 await using var scope = _scopes.CreateAsyncScope();
                 var runs = scope.ServiceProvider.GetRequiredService<BlockRunService>();
                 var result = await runs.StartAsync(userId, null, new BlockRunStart(
-                    trigger.Program, [trigger.BlockId], input, trigger.WorkflowId, BlockRunTriggers.Discord), ct);
+                    trigger.Program, [trigger.BlockId], input, new RunWorkflow(trigger.WorkflowId, trigger.PackageId),
+                    BlockRunTriggers.Discord), ct);
 
                 if (!result.Successful)
                     _logger.LogWarning("Discord event {Event} did not start workflow {WorkflowId}: {Error}",

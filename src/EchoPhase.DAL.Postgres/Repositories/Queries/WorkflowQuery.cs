@@ -24,5 +24,17 @@ namespace EchoPhase.DAL.Postgres.Repositories.Queries
             Where(x => userIds.Contains(x.UserId));
             return this;
         }
+
+        public WorkflowQuery WithPackageIds(params Guid[] packageIds)
+        {
+            Where(x => packageIds.Contains(x.PackageId));
+            return this;
+        }
+
+        public WorkflowQuery WithKeys(params Guid[] keys)
+        {
+            Where(x => keys.Contains(x.Key));
+            return this;
+        }
     }
 }

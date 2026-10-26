@@ -33,10 +33,10 @@ namespace EchoPhase.Server.Tests
         public async Task ConcurrentUpdatesLoseNothing()
         {
             Assert.SkipWhen(Connection is null, "ECHOPHASE_TEST_POSTGRES is not set.");
-            var userId = await CreateUserAsync();
+            var (userId, packageId) = await CreateUserAsync();
             try
             {
-                var slot = new StorageSlot(userId, null);
+                var slot = new StorageSlot(userId, packageId, null);
                 // Each "run" its own context and connection, as in the app.
                 await Task.WhenAll(Enumerable.Range(0, 20).Select(async _ =>
                 {
@@ -56,15 +56,18 @@ namespace EchoPhase.Server.Tests
             }
         }
 
-        private static async Task<Guid> CreateUserAsync()
+        // A user with a package: the storage's scope.
+        private static async Task<(Guid User, Guid Package)> CreateUserAsync()
         {
             await using var db = Context();
             await db.Database.MigrateAsync(Ct);
             var user = new User("Storage test") { UserName = $"storagetest{Guid.NewGuid():N}"[..24] };
             user.NormalizedUserName = user.UserName.ToUpperInvariant();
             db.Users.Add(user);
+            var package = new WorkflowPackage { OwnerId = user.Id, Name = "Storage test" };
+            db.WorkflowPackages.Add(package);
             await db.SaveChangesAsync(Ct);
-            return user.Id;
+            return (user.Id, package.Id);
         }
     }
 }

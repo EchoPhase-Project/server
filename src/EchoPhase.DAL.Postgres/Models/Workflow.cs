@@ -7,14 +7,26 @@ using UUIDNext;
 namespace EchoPhase.DAL.Postgres.Models
 {
     /// <summary>
-    /// A saved block program. Triggers in it (webhook, schedule) start runs
-    /// only while it is active; a manual run works either way.
+    /// A saved block program, always in a package. Triggers in it (webhook,
+    /// schedule) start runs only while it is active; a manual run works either
+    /// way.
     /// </summary>
     public class Workflow : ITrackingEntity, IConcurrentEntity, IIdentifiable
     {
         public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
         public Guid UserId { get; set; }
         public User? User { get; set; }
+
+        /// <summary>The package it lives in: the owner's, like the workflow.</summary>
+        public Guid PackageId { get; set; }
+        public WorkflowPackage? Package { get; set; }
+
+        /// <summary>
+        /// Its name for the package's other workflows (ExecuteWorkflow, the
+        /// error workflow): unique in the package, kept by renames, the same in
+        /// an installed copy, so the copy's programs need no rewriting.
+        /// </summary>
+        public Guid Key { get; set; } = Guid.NewGuid();
 
         public string Name { get; set; } = string.Empty;
 
@@ -32,14 +44,6 @@ namespace EchoPhase.DAL.Postgres.Models
         /// </summary>
         public string? ContentHash { get; set; }
 
-        /// <summary>The package it was installed from (it may be gone since); null: made here.</summary>
-        public Guid? SourcePackageId { get; set; }
-
-        /// <summary>That package's version.</summary>
-        public int? SourcePackageVersion { get; set; }
-
-        /// <summary>Which of the package's workflows it is (PackageWorkflow.Key): what an update replaces.</summary>
-        public Guid? SourceKey { get; set; }
 
         public ICollection<WorkflowSchedule> Schedules { get; set; } = new List<WorkflowSchedule>();
         public ICollection<WorkflowVersion> Versions { get; set; } = new List<WorkflowVersion>();

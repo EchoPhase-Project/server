@@ -12,7 +12,6 @@ using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Runners.Blocks.Models;
 using EchoPhase.Types.Result;
 using Microsoft.EntityFrameworkCore;
-using UUIDNext;
 
 namespace EchoPhase.Server.Services.Workflows
 {
@@ -28,7 +27,8 @@ namespace EchoPhase.Server.Services.Workflows
 
     /// <summary>A package as one user sees it.</summary>
     /// <param name="Installs">How many users (its owner aside) installed it.</param>
-    public sealed record PackageView(WorkflowPackage Package, PackageAccess Access, int Installs = 0);
+    /// <param name="Workflows">How many workflows it has now (its owner's; others see versions).</param>
+    public sealed record PackageView(WorkflowPackage Package, PackageAccess Access, int Installs = 0, int Workflows = 0);
 
     /// <summary>A page of packages and where the next one starts (null: this is the last).</summary>
     public sealed record PackagePage(IReadOnlyList<PackageView> Items, string? NextCursor);
@@ -37,24 +37,26 @@ namespace EchoPhase.Server.Services.Workflows
     /// <param name="OwnerId">The package's owner.</param>
     public sealed record PackageVersionDetails(WorkflowPackageVersion Version, WorkflowPackageContent Content, Guid OwnerId);
 
-    /// <summary>What a package says about itself; a version is published separately.</summary>
+    /// <summary>What a package says about itself and its settings; a version is published separately.</summary>
+    /// <param name="ErrorWorkflow">The key of its workflow started when an automatic run fails; null: none.</param>
     /// <param name="ExpectedStamp">On update: the stamp it was read with; a newer one fails it.</param>
     public sealed record PackageInput(string Name, string? Summary, string? Readme, PackageVisibility Visibility,
-        IReadOnlyList<string>? Tags, Guid? ExpectedStamp = null);
+        IReadOnlyList<string>? Tags, Guid? ErrorWorkflow = null, Guid? ExpectedStamp = null);
 
-    /// <summary>The workflows of a new version: the publisher's own.</summary>
-    /// <param name="Main">The one to open first; null: the first.</param>
-    public sealed record PackagePublish(IReadOnlyList<Guid> Workflows, Guid? Main, string? Changelog);
+    /// <summary>What a new version holds: some of the package's workflows, or all.</summary>
+    /// <param name="Workflows">Their ids, the main one first unless named; null or empty: all of them.</param>
+    /// <param name="Main">The id of the one to open first; null: the first.</param>
+    public sealed record PackagePublish(IReadOnlyList<Guid>? Workflows, Guid? Main, string? Changelog);
 
-    /// <summary>The copies an install made, and the connections it could not find a match for.</summary>
-    public sealed record PackageInstall(PackageVersionDetails Version, IReadOnlyList<WorkflowDetails> Workflows,
+    /// <summary>The package an install made, its workflows, and the connections it could not find a match for.</summary>
+    public sealed record PackageInstall(PackageView Package, PackageVersionDetails Version, IReadOnlyList<WorkflowDetails> Workflows,
         IReadOnlyList<PackageConnection> MissingConnections);
 
     /// <summary>
-    /// Workflows published as packages: fixed versions others read and install
-    /// as their own copies, programs pointing at each other and at the
-    /// installer's connections. A package someone may not see does not exist
-    /// for them (404); one they may see but not manage answers 403.
+    /// Packages: a user's workflows that belong together, published as fixed
+    /// versions others read and install as packages of their own, pointed at
+    /// the installer's connections. A package someone may not see does not
+    /// exist for them (404); one they may see but not manage answers 403.
     /// </summary>
     public class WorkflowPackageService
     {
@@ -63,12 +65,14 @@ namespace EchoPhase.Server.Services.Workflows
 
         private readonly PostgresContext _db;
         private readonly WorkflowService _workflows;
+        private readonly IWorkflowTriggerReloader _triggers;
         private readonly TimeProvider _time;
 
-        public WorkflowPackageService(PostgresContext db, WorkflowService workflows, TimeProvider time)
+        public WorkflowPackageService(PostgresContext db, WorkflowService workflows, IWorkflowTriggerReloader triggers, TimeProvider time)
         {
             _db = db;
             _workflows = workflows;
+            _triggers = triggers;
             _time = time;
         }
 
@@ -197,29 +201,26 @@ namespace EchoPhase.Server.Services.Workflows
                 : ServiceResult<PackageVersionDetails>.Success(new PackageVersionDetails(saved, WorkflowPackageContent.Parse(saved.Content), view.Package.OwnerId));
         }
 
-        /// <summary>A new package with its first version.</summary>
-        public async Task<IServiceResult<PackageView>> CreateAsync(Guid userId, Guid? actorId, PackageInput input,
-            PackagePublish publish, CancellationToken ct = default)
+        /// <summary>A new, empty package of the user's: workflows are made in it, versions published from it.</summary>
+        public async Task<IServiceResult<PackageView>> CreateAsync(Guid userId, PackageInput input, CancellationToken ct = default)
         {
             if (Check(input) is { } invalid)
                 return Fail<PackageView>(ErrorCodes.Invalid, invalid.Message, invalid.Field);
-            var content = await ContentAsync(userId, publish, ct);
-            if (!content.Successful)
-                return ServiceResult<PackageView>.Failure(content.Error);
+            if (input.ErrorWorkflow is not null)
+                return Fail<PackageView>(ErrorCodes.Invalid, "A new package has no workflows to be its error workflow.", "errorWorkflow");
 
             var now = Now();
             var package = new WorkflowPackage { OwnerId = userId, CreatedAt = now };
             Apply(package, input, now);
             _db.WorkflowPackages.Add(package);
-            AddVersion(package, content.Value, publish.Changelog, actorId ?? userId, now);
             await _db.SaveChangesAsync(ct);
             package.Owner = await _db.Users.FindAsync([userId], ct);
             return ServiceResult<PackageView>.Success(new PackageView(package, PackageAccess.Owner));
         }
 
         /// <summary>
-        /// A new version from the owner's workflows as they are now. Fails
-        /// (409) when it would hold the same as the latest.
+        /// A new version from the package's workflows as they are now, all or
+        /// those chosen. Fails (409) when it would hold the same as the latest.
         /// </summary>
         public async Task<IServiceResult<PackageVersionDetails>> PublishAsync(Guid userId, Guid? actorId, Guid id,
             PackagePublish publish, CancellationToken ct = default)
@@ -227,18 +228,18 @@ namespace EchoPhase.Server.Services.Workflows
             var owned = await OwnedAsync(userId, id, tracking: true, ct);
             if (!owned.Successful)
                 return ServiceResult<PackageVersionDetails>.Failure(owned.Error);
-            var content = await ContentAsync(userId, publish, ct);
+            var package = owned.Value.Package;
+            var content = await ContentAsync(package, publish, ct);
             if (!content.Successful)
                 return ServiceResult<PackageVersionDetails>.Failure(content.Error);
 
-            var package = owned.Value.Package;
             var latest = await _db.WorkflowPackageVersions.AsNoTracking()
                 .Where(v => v.PackageId == id && v.Version == package.LatestVersion)
                 .Select(v => v.ContentHash)
                 .FirstOrDefaultAsync(ct);
             if (latest == content.Value.Hash)
                 return Fail<PackageVersionDetails>(ErrorCodes.Conflict,
-                    $"Nothing changed since version {package.LatestVersion}: its workflows are the same.");
+                    $"Nothing changed since version {package.LatestVersion}: it would hold the same.");
 
             var version = AddVersion(package, content.Value, publish.Changelog, actorId ?? userId, Now());
             package.UpdatedAt = version.CreatedAt;
@@ -254,7 +255,7 @@ namespace EchoPhase.Server.Services.Workflows
             return ServiceResult<PackageVersionDetails>.Success(new PackageVersionDetails(version, content.Value, package.OwnerId));
         }
 
-        /// <summary>Changes what the package says about itself (not its versions).</summary>
+        /// <summary>Changes what the package says about itself and its error workflow (not its versions).</summary>
         public async Task<IServiceResult<PackageView>> UpdateAsync(Guid userId, Guid id, PackageInput input, CancellationToken ct = default)
         {
             var owned = await OwnedAsync(userId, id, tracking: true, ct);
@@ -262,11 +263,14 @@ namespace EchoPhase.Server.Services.Workflows
                 return owned;
             if (Check(input) is { } invalid)
                 return Fail<PackageView>(ErrorCodes.Invalid, invalid.Message, invalid.Field);
+            if (await _workflows.CheckErrorWorkflowAsync(userId, id, input.ErrorWorkflow, ct) is { } badErrorWorkflow)
+                return Fail<PackageView>(ErrorCodes.Invalid, badErrorWorkflow, "errorWorkflow");
 
             var package = owned.Value.Package;
             if (input.ExpectedStamp is { } expected && expected != package.ConcurrencyStamp)
                 return Fail<PackageView>(ErrorCodes.Conflict, ChangedMeanwhile);
             Apply(package, input, Now());
+            package.ErrorWorkflowKey = input.ErrorWorkflow;
             try
             {
                 await _db.SaveChangesAsync(ct);
@@ -278,7 +282,10 @@ namespace EchoPhase.Server.Services.Workflows
             return owned;
         }
 
-        /// <summary>Deletes the package and its versions; copies already installed stay.</summary>
+        /// <summary>
+        /// Deletes the package with its workflows, their schedules and storage,
+        /// and its versions; packages others installed from it stay theirs.
+        /// </summary>
         public async Task<IServiceResult> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default)
         {
             var owned = await OwnedAsync(userId, id, tracking: true, ct);
@@ -287,6 +294,7 @@ namespace EchoPhase.Server.Services.Workflows
 
             _db.WorkflowPackages.Remove(owned.Value.Package);
             await _db.SaveChangesAsync(ct);
+            await _triggers.ReloadUserAsync(userId, ct);
             return ServiceResult.Success();
         }
 
@@ -351,11 +359,11 @@ namespace EchoPhase.Server.Services.Workflows
         }
 
         /// <summary>
-        /// Copies a version's workflows into the user's own, inactive: their
-        /// links to each other point at the copies, their connections at the
-        /// user's (<paramref name="connections"/>: the package's name to theirs;
-        /// a name not given stays when the user has a connection by it), and
-        /// every webhook gets a new secret.
+        /// A new package of the user's from a version: its workflows, inactive,
+        /// with the same keys (so they call each other unchanged), their
+        /// connections pointed at the user's (<paramref name="connections"/>:
+        /// the package's name to theirs; a name not given stays when the user
+        /// has a connection by it), and new webhook secrets.
         /// </summary>
         public async Task<IServiceResult<PackageInstall>> InstallAsync(Guid userId, Guid? actorId, Guid id, int? version,
             IReadOnlyDictionary<string, string>? connections, CancellationToken ct = default)
@@ -364,6 +372,7 @@ namespace EchoPhase.Server.Services.Workflows
             if (!found.Successful)
                 return ServiceResult<PackageInstall>.Failure(found.Error);
             var content = found.Value.Content;
+            var source = await _db.WorkflowPackages.AsNoTracking().FirstAsync(p => p.Id == id, ct);
 
             var mine = await _db.Connections.AsNoTracking()
                 .Where(c => c.UserId == userId)
@@ -386,16 +395,32 @@ namespace EchoPhase.Server.Services.Workflows
                     missing.Add(needed);
             }
 
-            var ids = content.Workflows.ToDictionary(w => w.Key, _ => Uuid.NewDatabaseFriendly(Database.PostgreSql));
-            var rewrite = new LinkRewrite(ids, renamed, NewSecret);
-            var items = content.Workflows
-                .Select(w => new NewWorkflow(ids[w.Key], w.Name, WorkflowLinks.Rewrite(w.Program, rewrite),
-                    (id, found.Value.Version.Version, w.Key)))
-                .ToList();
+            var now = Now();
+            var package = new WorkflowPackage
+            {
+                OwnerId = userId,
+                Name = source.Name,
+                Summary = source.Summary,
+                Readme = source.Readme,
+                Visibility = PackageVisibility.Private,
+                ErrorWorkflowKey = content.ErrorWorkflow,
+                SourcePackageId = id,
+                SourceVersion = found.Value.Version.Version,
+                CreatedAt = now,
+                UpdatedAt = now,
+            };
+            _db.WorkflowPackages.Add(package);
 
-            var created = await _workflows.CreateManyAsync(userId, actorId, items, ct);
+            var rewrite = new LinkRewrite(renamed, NewSecret);
+            var items = content.Workflows
+                .Select(w => new NewWorkflow(w.Key, w.Name, WorkflowLinks.Rewrite(w.Program, rewrite)))
+                .ToList();
+            var created = await _workflows.CreateManyAsync(userId, actorId, package, items, ct);
             if (!created.Successful)
+            {
+                _db.WorkflowPackages.Remove(package);
                 return ServiceResult<PackageInstall>.Failure(created.Error);
+            }
 
             // Others' installs count, once each; a row of its own never conflicts with an edit of the package.
             if (found.Value.OwnerId != userId)
@@ -404,30 +429,41 @@ namespace EchoPhase.Server.Services.Workflows
                 if (install is null)
                     _db.WorkflowPackageInstalls.Add(install = new WorkflowPackageInstall { PackageId = id, UserId = userId });
                 install.Version = found.Value.Version.Version;
-                install.InstalledAt = Now();
+                install.InstalledAt = now;
                 await _db.SaveChangesAsync(ct);
             }
 
-            return ServiceResult<PackageInstall>.Success(new PackageInstall(found.Value, created.Value, missing));
+            package.Owner = await _db.Users.FindAsync([userId], ct);
+            return ServiceResult<PackageInstall>.Success(new PackageInstall(
+                new PackageView(package, PackageAccess.Owner, Workflows: created.Value.Count), found.Value, created.Value, missing));
         }
 
         // The publish's workflows as a package version's content.
-        private async Task<IServiceResult<WorkflowPackageContent>> ContentAsync(Guid userId, PackagePublish publish, CancellationToken ct)
+        private async Task<IServiceResult<WorkflowPackageContent>> ContentAsync(WorkflowPackage package, PackagePublish publish,
+            CancellationToken ct)
         {
-            var wanted = publish.Workflows.Distinct().ToList();
-            if (wanted.Count > MaxWorkflows)
-                return Fail<WorkflowPackageContent>(ErrorCodes.Invalid, $"A package holds at most {MaxWorkflows} workflows.", "workflows");
             if ((publish.Changelog ?? string.Empty).Length > WorkflowPackageVersionConfiguration.MaxChangelogLength)
                 return Fail<WorkflowPackageContent>(ErrorCodes.Invalid, "The changelog is too long.", "changelog");
 
-            var workflows = await _db.Workflows.AsNoTracking()
-                .Where(w => w.UserId == userId && wanted.Contains(w.Id))
+            var all = await _db.Workflows.AsNoTracking()
+                .Where(w => w.PackageId == package.Id)
+                .OrderBy(w => w.CreatedAt)
                 .ToListAsync(ct);
-            if (wanted.FirstOrDefault(id => workflows.All(w => w.Id != id)) is var unknown && unknown != Guid.Empty)
-                return Fail<WorkflowPackageContent>(ErrorCodes.NotFound, $"Workflow {unknown} not found.", "workflows");
+            var chosen = publish.Workflows is { Count: > 0 } ids ? ids.Distinct().ToList() : all.Select(w => w.Id).ToList();
+            if (chosen.Count > MaxWorkflows)
+                return Fail<WorkflowPackageContent>(ErrorCodes.Invalid, $"A version holds at most {MaxWorkflows} workflows.", "workflows");
+            if (chosen.FirstOrDefault(id => all.All(w => w.Id != id)) is var unknown && unknown != Guid.Empty)
+                return Fail<WorkflowPackageContent>(ErrorCodes.NotFound, $"Workflow {unknown} is not in the package.", "workflows");
+            Guid? main = null;
+            if (publish.Main is { } mainId)
+            {
+                if (all.FirstOrDefault(w => w.Id == mainId) is not { } mainWorkflow)
+                    return Fail<WorkflowPackageContent>(ErrorCodes.Invalid, $"Workflow {mainId} is not in the package.", "main");
+                main = mainWorkflow.Key;
+            }
 
             var providers = await _db.Connections.AsNoTracking()
-                .Where(c => c.UserId == userId)
+                .Where(c => c.UserId == package.OwnerId)
                 .Select(c => new { c.Name, c.Provider })
                 .ToListAsync(ct);
             string? ProviderOf(string name)
@@ -437,10 +473,10 @@ namespace EchoPhase.Server.Services.Workflows
             }
 
             // In the order given: the first is the main one unless named.
-            var sources = wanted.Select(id => workflows.First(w => w.Id == id))
-                .Select(w => new PackageSource(w.Id, w.Name, WorkflowService.Parse(w)))
+            var sources = chosen.Select(id => all.First(w => w.Id == id))
+                .Select(w => new PackageSource(w.Key, w.Name, WorkflowService.Parse(w)))
                 .ToList();
-            var (content, problems) = WorkflowPackageContent.Build(sources, publish.Main, ProviderOf);
+            var (content, problems) = WorkflowPackageContent.Build(sources, main, package.ErrorWorkflowKey, ProviderOf);
             return content is null
                 ? Fail<WorkflowPackageContent>(ErrorCodes.Invalid, string.Join(" ", problems), "workflows")
                 : ServiceResult<WorkflowPackageContent>.Success(content);
@@ -522,12 +558,13 @@ namespace EchoPhase.Server.Services.Workflows
             CancellationToken ct)
         {
             var rows = await packages
-                .Select(p => new { Package = p, p.Owner, Installs = p.Installs.Count })
+                .Select(p => new { Package = p, p.Owner, Installs = p.Installs.Count, Workflows = p.Workflows.Count })
                 .ToListAsync(ct);
             return rows.Select(r =>
             {
                 r.Package.Owner = r.Owner;
-                return new PackageView(r.Package, AccessOf(r.Package, userId), r.Installs);
+                var access = AccessOf(r.Package, userId);
+                return new PackageView(r.Package, access, r.Installs, access == PackageAccess.Owner ? r.Workflows : 0);
             }).ToList();
         }
 

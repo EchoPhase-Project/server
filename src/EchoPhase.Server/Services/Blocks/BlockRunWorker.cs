@@ -122,6 +122,7 @@ namespace EchoPhase.Server.Services.Blocks
                     Limits = new BlockLimits(_options.MaxSteps, _options.MaxOutputEntries),
                     RunId = run.RunId,
                     WorkflowId = run.WorkflowId,
+                    PackageId = run.PackageId,
                     Reply = job.Reply
                 };
 
@@ -156,22 +157,20 @@ namespace EchoPhase.Server.Services.Blocks
                 _registry.Release(run.RunId);
                 // After the result is stored, so the caller can fetch the run at once.
                 job.Reply?.TrySend(DefaultReply(job.Reply.Mode, run, context));
-                await StartErrorWorkflowAsync(scope.ServiceProvider, run, context, job.Program.Settings, stoppingToken);
+                await StartErrorWorkflowAsync(scope.ServiceProvider, run, context, stoppingToken);
             }
         }
 
         /// <summary>
         /// Like n8n: a failed or timed-out automatic run (not a manual one or a
         /// retry, not one started by an ErrorTrigger, so error workflows never loop) starts
-        /// the workflow's error workflow. Released first, so it counts against
-        /// the owner's active runs like any other.
+        /// its package's error workflow, if it has one. Released first, so it
+        /// counts against the owner's active runs like any other.
         /// </summary>
         private async Task StartErrorWorkflowAsync(
-            IServiceProvider services, BlockRun run, IBlockExecutionContext? context, BlockProgramSettings settings,
-            CancellationToken ct)
+            IServiceProvider services, BlockRun run, IBlockExecutionContext? context, CancellationToken ct)
         {
-            if (settings.ErrorWorkflowId is not { } errorWorkflowId
-                || run.WorkflowId is null
+            if (run.WorkflowId is null
                 || run.Status is not (BlockRunStatus.Failed or BlockRunStatus.TimedOut)
                 || run.Trigger is BlockRunTriggers.Manual or BlockRunTriggers.Error or BlockRunTriggers.Retry)
                 return;
@@ -179,15 +178,15 @@ namespace EchoPhase.Server.Services.Blocks
             try
             {
                 var workflows = services.GetRequiredService<WorkflowService>();
-                var started = await workflows.StartErrorWorkflowAsync(run, errorWorkflowId, context?.Errors.ToList() ?? [], ct);
+                var started = await workflows.StartErrorWorkflowAsync(run, context?.Errors.ToList() ?? [], ct);
                 if (!started.Successful)
-                    _logger.LogWarning("Error workflow {ErrorWorkflowId} of failed run {RunId} not started: {Error}",
-                        errorWorkflowId, run.RunId, started.Error.Value);
+                    _logger.LogWarning("Error workflow of failed run {RunId} (workflow {WorkflowId}) not started: {Error}",
+                        run.RunId, run.WorkflowId, started.Error.Value);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogError(ex, "Error workflow {ErrorWorkflowId} of failed run {RunId} could not be started.",
-                    errorWorkflowId, run.RunId);
+                _logger.LogError(ex, "Error workflow of failed run {RunId} (workflow {WorkflowId}) could not be started.",
+                    run.RunId, run.WorkflowId);
             }
         }
 

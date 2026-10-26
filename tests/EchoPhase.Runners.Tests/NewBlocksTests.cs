@@ -7,7 +7,6 @@ using EchoPhase.Runners.Blocks;
 using EchoPhase.Runners.Blocks.Contexts;
 using EchoPhase.Runners.Blocks.Handlers;
 using EchoPhase.Runners.Blocks.Http;
-using EchoPhase.Runners.Blocks.Models;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EchoPhase.Runners.Tests
@@ -66,23 +65,31 @@ namespace EchoPhase.Runners.Tests
         }
 
         // The owner is set once the harness (and so the run's user) exists.
+        // Workflows are found by key in their package; the key is used as the id too.
         private sealed class Workflows(Dictionary<Guid, string> programs) : IWorkflowSource
         {
             public Guid Owner { get; set; }
 
-            public Task<BlockProgram?> FindAsync(Guid user, Guid workflowId, CancellationToken ct)
-                => Task.FromResult(user == Owner && programs.TryGetValue(workflowId, out var json) ? RunnerHarness.Parse(json) : null);
+            public Task<SavedProgram?> FindAsync(Guid user, Guid workflowId, CancellationToken ct)
+                => FindInPackageAsync(user, Package, workflowId, ct);
+
+            public Task<SavedProgram?> FindInPackageAsync(Guid user, Guid package, Guid key, CancellationToken ct)
+                => Task.FromResult(user == Owner && package == Package && programs.TryGetValue(key, out var json)
+                    ? new SavedProgram(key, package, RunnerHarness.Parse(json))
+                    : null);
         }
 
         private static readonly Guid Child = Guid.NewGuid();
+        private static readonly Guid Package = Guid.NewGuid();
 
-        // The child belongs to the harness's user.
-        private static async Task<IBlockExecutionContext> RunWithChildAsync(string parent, string child)
+        // The child belongs to the harness's user, in the parent's package (or another).
+        private static async Task<IBlockExecutionContext> RunWithChildAsync(string parent, string child, Guid? package = null)
         {
             var workflows = new Workflows(new() { [Child] = child });
             await using var harness = new RunnerHarness(s => s.AddSingleton<IWorkflowSource>(workflows));
             workflows.Owner = harness.UserId;
-            return await harness.RunAsync(parent.Replace("CHILD", Child.ToString()));
+            return await harness.RunAsync(parent.Replace("CHILD", Child.ToString()), workflowId: Guid.NewGuid(),
+                packageId: package ?? Package);
         }
 
         [Fact]
@@ -92,7 +99,7 @@ namespace EchoPhase.Runners.Tests
                 {
                   "blocks": [
                     { "id": 1, "type": "Set", "params": { "name": "x", "value": 1 } },
-                    { "id": 2, "type": "ExecuteWorkflow", "params": { "workflowId": "CHILD", "input": "@({ n: x + 1 })" } },
+                    { "id": 2, "type": "ExecuteWorkflow", "params": { "workflow": "CHILD", "input": "@({ n: x + 1 })" } },
                     { "id": 3, "type": "Print", "params": { "text": "got @input, x=@x" } }
                   ],
                   "connections": [ { "from": 1, "to": 2 }, { "from": 2, "to": 3 } ]
@@ -118,7 +125,7 @@ namespace EchoPhase.Runners.Tests
             var context = await RunWithChildAsync("""
                 {
                   "blocks": [
-                    { "id": 1, "type": "ExecuteWorkflow", "onError": "Continue", "params": { "workflowId": "CHILD" } },
+                    { "id": 1, "type": "ExecuteWorkflow", "onError": "Continue", "params": { "workflow": "CHILD" } },
                     { "id": 2, "type": "Print", "params": { "text": "@input.error.type" } }
                   ],
                   "connections": [ { "from": 1, "to": 2 } ]
@@ -134,12 +141,24 @@ namespace EchoPhase.Runners.Tests
         public async Task ExecuteWorkflow_SelfCall_StopsAtTheDepthLimit()
         {
             var self = """
-                { "blocks": [ { "id": 1, "type": "ExecuteWorkflow", "params": { "workflowId": "CHILD" } } ] }
+                { "blocks": [ { "id": 1, "type": "ExecuteWorkflow", "params": { "workflow": "CHILD" } } ] }
                 """;
             var context = await RunWithChildAsync(self, self.Replace("CHILD", Child.ToString()));
 
             var error = Assert.Single(context.Errors);
             Assert.Contains("SubWorkflowFailed", error.Type);
+        }
+
+        [Fact]
+        public async Task ExecuteWorkflow_DoesNotReachAnotherPackage()
+        {
+            var context = await RunWithChildAsync("""
+                { "blocks": [ { "id": 1, "type": "ExecuteWorkflow", "params": { "workflow": "CHILD" } } ] }
+                """, """
+                { "blocks": [ { "id": 1, "type": "Print", "params": { "text": "hi" } } ] }
+                """, package: Guid.NewGuid());
+
+            Assert.Contains("has no workflow", Assert.Single(context.Errors).Message);
         }
 
         private sealed class Stub(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler

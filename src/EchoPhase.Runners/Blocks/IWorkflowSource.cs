@@ -5,10 +5,16 @@ using EchoPhase.Runners.Blocks.Models;
 
 namespace EchoPhase.Runners.Blocks
 {
+    /// <summary>A saved workflow's program and where it lives.</summary>
+    public sealed record SavedProgram(Guid WorkflowId, Guid PackageId, BlockProgram Program);
+
     /// <summary>Saved workflows, for ExecuteWorkflow; the host provides it.</summary>
     public interface IWorkflowSource
     {
-        /// <summary>The program of one of the user's workflows, or null.</summary>
-        Task<BlockProgram?> FindAsync(Guid userId, Guid workflowId, CancellationToken ct);
+        /// <summary>One of the user's workflows, or null.</summary>
+        Task<SavedProgram?> FindAsync(Guid userId, Guid workflowId, CancellationToken ct);
+
+        /// <summary>The workflow of a package by its key, or null.</summary>
+        Task<SavedProgram?> FindInPackageAsync(Guid userId, Guid packageId, Guid key, CancellationToken ct);
     }
 }

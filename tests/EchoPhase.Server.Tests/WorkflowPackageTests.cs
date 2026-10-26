@@ -7,6 +7,7 @@ using EchoPhase.Configuration.Runner;
 using EchoPhase.DAL.Postgres;
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Postgres.Repositories;
+using EchoPhase.DAL.Scylla.Entities;
 using EchoPhase.Runners.Blocks;
 using EchoPhase.Runners.Blocks.Handlers;
 using EchoPhase.Runners.Blocks.Models;
@@ -23,41 +24,36 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace EchoPhase.Server.Tests
 {
-    /// <summary>The links a program has to its owner's things, read and moved.</summary>
+    /// <summary>The links a program has to its package and its owner's things, read and moved.</summary>
     public class WorkflowLinksTests
     {
         private static readonly Guid Other = Guid.NewGuid();
-        private static readonly Guid ErrorFlow = Guid.NewGuid();
 
         private static BlockProgram Program() => WorkflowPackageTests.Parse($$"""
             { "blocks": [
                 { "id": 1, "type": "WebhookTrigger", "params": { "secret": "the-authors-own-secret" } },
-                { "id": 2, "type": "ExecuteWorkflow", "params": { "workflowId": "{{Other}}" } },
-                { "id": 3, "type": "DiscordGetUserGuilds", "params": { "connection": "bot" } } ],
-              "settings": { "errorWorkflowId": "{{ErrorFlow}}" } }
+                { "id": 2, "type": "ExecuteWorkflow", "params": { "workflow": "{{Other}}" } },
+                { "id": 3, "type": "DiscordGetUserGuilds", "params": { "connection": "bot" } } ] }
             """);
 
         [Fact]
-        public void Of_FindsOtherWorkflowsAndConnections()
+        public void Of_FindsCalledWorkflowsAndConnections()
         {
             var links = WorkflowLinks.Of(Program());
 
-            Assert.Equal(new HashSet<Guid> { Other, ErrorFlow }, links.Workflows);
+            Assert.Equal(new HashSet<Guid> { Other }, links.Workflows);
             Assert.Equal(["bot"], links.Connections);
         }
 
         [Fact]
-        public void Rewrite_MovesWorkflowsConnectionsAndSecrets()
+        public void Rewrite_MovesConnectionsAndSecrets_NotTheWorkflowsCalled()
         {
-            Guid other2 = Guid.NewGuid(), error2 = Guid.NewGuid();
             var moved = WorkflowLinks.Rewrite(Program(), new LinkRewrite(
-                new Dictionary<Guid, Guid> { [Other] = other2, [ErrorFlow] = error2 },
                 new Dictionary<string, string> { ["bot"] = "my-bot" },
                 () => "a-new-secret-for-the-copy"));
 
-            Assert.Equal(error2, moved.Settings.ErrorWorkflowId);
             var links = WorkflowLinks.Of(moved);
-            Assert.Equal(new HashSet<Guid> { other2, error2 }, links.Workflows);
+            Assert.Equal(new HashSet<Guid> { Other }, links.Workflows);
             Assert.Equal(["my-bot"], links.Connections);
             var webhook = (WebhookTriggerParams)BlockParamsBinder.Bind(typeof(WebhookTriggerParams),
                 moved.Blocks.Single(b => b.Type == BlockTypes.WebhookTrigger).Params);
@@ -68,13 +64,13 @@ namespace EchoPhase.Server.Tests
         public void Rewrite_LeavesWhatItIsNotTold()
         {
             var program = Program();
-            var same = WorkflowLinks.Rewrite(program, new LinkRewrite(new Dictionary<Guid, Guid>(), new Dictionary<string, string>()));
+            var same = WorkflowLinks.Rewrite(program, new LinkRewrite(new Dictionary<string, string>()));
 
             Assert.Equal(BlockProgramHash.Of(program), BlockProgramHash.Of(same));
         }
     }
 
-    /// <summary>Packages: published from workflows that belong together, read by others, installed as copies.</summary>
+    /// <summary>Packages: workflows that belong together, published, read by others, installed as packages of their own.</summary>
     public class WorkflowPackageTests : IDisposable
     {
         private static readonly BlockTypeRegistry Types = new(typeof(BlockTypeAttribute).Assembly.GetTypes()
@@ -116,55 +112,164 @@ namespace EchoPhase.Server.Tests
                 Options.Create(_options), _time, new BlockProgramValidator(Types), new WorkflowVersionTests.NoWorkflows()),
             new BlockProgramValidator(Types), Options.Create(_options), _time, new WorkflowVersionTests.NoTriggers());
 
-        private WorkflowPackageService Packages() => new(_db, Workflows(), _time);
+        private WorkflowPackageService Packages() => new(_db, Workflows(), new WorkflowVersionTests.NoTriggers(), _time);
 
-        // Ann's pair: "main" runs "on error" and names it its error workflow.
-        private async Task<(Guid Main, Guid OnError)> PairAsync(string text = "failed")
+        private static PackageInput Input(PackageVisibility visibility = PackageVisibility.Private, Guid? errorWorkflow = null,
+            params string[] tags)
+            => new("Guild tools", "Lists guilds.", "# Guild tools", visibility, tags, errorWorkflow);
+
+        private static readonly BlockProgram OnError = Parse("""
+            { "blocks": [ { "id": 1, "type": "ErrorTrigger", "params": {} },
+                          { "id": 2, "type": "Print", "params": { "text": "failed" } } ],
+              "connections": [ { "from": 1, "to": 2 } ] }
+            """);
+
+        private static BlockProgram Calling(Guid key) => Parse($$"""
+            { "blocks": [ { "id": 1, "type": "WebhookTrigger", "params": { "secret": "the-authors-own-secret" } },
+                          { "id": 2, "type": "ExecuteWorkflow", "params": { "workflow": "{{key}}" } },
+                          { "id": 3, "type": "DiscordGetUserGuilds", "params": { "connection": "bot" } } ],
+              "connections": [ { "from": 1, "to": 2 }, { "from": 2, "to": 3 } ] }
+            """);
+
+        private static readonly BlockProgram Solo = Parse("""
+            { "blocks": [ { "id": 1, "type": "Print", "params": { "text": "alone" } } ] }
+            """);
+
+        private sealed record Pair(Guid Package, Workflow Main, Workflow OnError);
+
+        // Ann's package: "main" calls "on error", which is the package's error workflow.
+        private async Task<Pair> PairAsync(PackageVisibility visibility = PackageVisibility.Private, params string[] tags)
         {
-            var onError = (await Workflows().CreateAsync(_ann.Id, null, "on error", Parse($$"""
-                { "blocks": [ { "id": 1, "type": "ErrorTrigger", "params": {} },
-                              { "id": 2, "type": "Print", "params": { "text": "{{text}}" } } ],
-                  "connections": [ { "from": 1, "to": 2 } ] }
-                """), false, Ct)).Ok().Workflow.Id;
-            var main = (await Workflows().CreateAsync(_ann.Id, null, "main", Parse($$"""
-                { "blocks": [ { "id": 1, "type": "WebhookTrigger", "params": { "secret": "the-authors-own-secret" } },
-                              { "id": 2, "type": "ExecuteWorkflow", "params": { "workflowId": "{{onError}}" } },
-                              { "id": 3, "type": "DiscordGetUserGuilds", "params": { "connection": "bot" } } ],
-                  "connections": [ { "from": 1, "to": 2 }, { "from": 2, "to": 3 } ],
-                  "settings": { "errorWorkflowId": "{{onError}}" } }
-                """), false, Ct)).Ok().Workflow.Id;
-            return (main, onError);
+            var package = (await Packages().CreateAsync(_ann.Id, Input(visibility, null, tags), Ct)).Ok().Package.Id;
+            var onError = (await Workflows().CreateAsync(_ann.Id, null, package, "on error", OnError, false, Ct)).Ok().Workflow;
+            var main = (await Workflows().CreateAsync(_ann.Id, null, package, "main", Calling(onError.Key), false, Ct)).Ok().Workflow;
+            (await Packages().UpdateAsync(_ann.Id, package, Input(visibility, onError.Key, tags), Ct)).Ok();
+            return new Pair(package, main, onError);
         }
-
-        private static PackageInput Input(PackageVisibility visibility = PackageVisibility.Private, params string[] tags)
-            => new("Guild tools", "Lists guilds.", "# Guild tools", visibility, tags);
 
         private async Task<Guid> PublishPairAsync(PackageVisibility visibility = PackageVisibility.Private, params string[] tags)
         {
-            var (main, onError) = await PairAsync();
-            var created = (await Packages().CreateAsync(_ann.Id, null, Input(visibility, tags),
-                new PackagePublish([main, onError], null, "First."), Ct)).Ok();
-            Assert.Equal("ann", created.Package.Owner?.UserName);
-            return created.Package.Id;
+            var pair = await PairAsync(visibility, tags);
+            (await Packages().PublishAsync(_ann.Id, null, pair.Package,
+                new PackagePublish([pair.Main.Id, pair.OnError.Id], null, "First."), Ct)).Ok();
+            Assert.Equal("ann", Must.Present((await Packages().GetAsync(_ann.Id, pair.Package, Ct)).Ok().Package.Owner).UserName);
+            return pair.Package;
         }
 
         [Fact]
-        public async Task Publish_RefusesAWorkflowThatUsesOneLeftOut()
+        public async Task AWorkflowWithoutAPackage_GetsOneOfItsOwn_OfTheSameName()
         {
-            var (main, _) = await PairAsync();
+            var created = (await Workflows().CreateAsync(_ann.Id, null, null, "alone", Solo, false, Ct)).Ok().Workflow;
 
-            var result = await Packages().CreateAsync(_ann.Id, null, Input(), new PackagePublish([main], null, null), Ct);
-
-            Assert.Equal(ErrorCodes.Invalid, result.Error.Code);
-            Assert.Contains("not in the package", result.Error.Message);
+            var package = (await Packages().GetAsync(_ann.Id, created.PackageId, Ct)).Ok();
+            Assert.Equal("alone", package.Package.Name);
+            Assert.Equal(PackageVisibility.Private, package.Package.Visibility);
+            Assert.Equal(1, package.Workflows);
         }
 
         [Fact]
-        public async Task Version_HoldsTheWorkflowsWithoutSecrets_AndTheConnectionsTheyNeed()
+        public async Task AWorkflow_CallsOnlyWorkflowsOfItsPackage()
+        {
+            var elsewhere = (await Workflows().CreateAsync(_ann.Id, null, null, "elsewhere", Solo, false, Ct)).Ok().Workflow;
+
+            var result = await Workflows().CreateAsync(_ann.Id, null, null, "caller", Calling(elsewhere.Key), false, Ct);
+
+            Assert.Equal(WorkflowErrors.Invalid, result.Error.Code);
+            Assert.Contains("not in its package", result.Error.Message);
+        }
+
+        [Fact]
+        public async Task AnotherUsersPackage_TakesNoWorkflows()
+        {
+            var package = (await Packages().CreateAsync(_ann.Id, Input(), Ct)).Ok().Package.Id;
+
+            var result = await Workflows().CreateAsync(_bob.Id, null, package, "intruder", Solo, false, Ct);
+
+            Assert.Equal(WorkflowErrors.NotFound, result.Error.Code);
+        }
+
+        [Fact]
+        public async Task Delete_RefusesAWorkflowThatIsCalled_OrIsTheErrorWorkflow()
+        {
+            var pair = await PairAsync();
+
+            Assert.Equal(WorkflowErrors.Conflict, (await Workflows().DeleteAsync(_ann.Id, pair.OnError.Id, Ct)).Error.Code);
+            Assert.True((await Workflows().DeleteAsync(_ann.Id, pair.Main.Id, Ct)).Successful);
+            // Still the error workflow.
+            Assert.Equal(WorkflowErrors.Conflict, (await Workflows().DeleteAsync(_ann.Id, pair.OnError.Id, Ct)).Error.Code);
+
+            (await Packages().UpdateAsync(_ann.Id, pair.Package, Input(), Ct)).Ok();
+            Assert.True((await Workflows().DeleteAsync(_ann.Id, pair.OnError.Id, Ct)).Successful);
+        }
+
+        [Fact]
+        public async Task TheErrorWorkflow_NeedsAnErrorTrigger_AndKeepsIt()
+        {
+            var pair = await PairAsync();
+
+            var wrong = await Packages().UpdateAsync(_ann.Id, pair.Package, Input(errorWorkflow: pair.Main.Key), Ct);
+            Assert.Equal("errorWorkflow", wrong.Error.Field);
+
+            var dropped = await Workflows().UpdateAsync(_ann.Id, null, pair.OnError.Id, "on error", Solo, false, null, Ct);
+            Assert.Equal(WorkflowErrors.Invalid, dropped.Error.Code);
+        }
+
+        [Fact]
+        public async Task AFailedRun_StartsThePackagesErrorWorkflow()
+        {
+            var pair = await PairAsync();
+            var failed = new BlockRun
+            {
+                UserId = _ann.Id,
+                RunId = Guid.NewGuid(),
+                WorkflowId = pair.Main.Id,
+                PackageId = pair.Package,
+                Status = BlockRunStatus.Failed,
+                Trigger = BlockRunTriggers.Webhook,
+            };
+
+            var started = Must.Present((await Workflows().StartErrorWorkflowAsync(failed, [], Ct)).Ok());
+
+            Assert.Equal(pair.OnError.Id, started.WorkflowId);
+            Assert.Equal(BlockRunTriggers.Error, started.Trigger);
+
+            // Without an error workflow, nothing starts.
+            var alone = (await Workflows().CreateAsync(_ann.Id, null, null, "alone", Solo, false, Ct)).Ok().Workflow;
+            var none = await Workflows().StartErrorWorkflowAsync(new BlockRun
+            {
+                UserId = _ann.Id,
+                RunId = Guid.NewGuid(),
+                WorkflowId = alone.Id,
+                PackageId = alone.PackageId,
+                Status = BlockRunStatus.Failed,
+                Trigger = BlockRunTriggers.Webhook,
+            }, [], Ct);
+            Assert.Null(none.Ok());
+        }
+
+        [Fact]
+        public async Task Publish_RefusesAWorkflowThatCallsOneLeftOut_OrLeavingOutTheErrorWorkflow()
+        {
+            var pair = await PairAsync();
+            var solo = (await Workflows().CreateAsync(_ann.Id, null, pair.Package, "solo", Solo, false, Ct)).Ok().Workflow;
+
+            var calls = await Packages().PublishAsync(_ann.Id, null, pair.Package, new PackagePublish([pair.Main.Id], null, null), Ct);
+            Assert.Equal(ErrorCodes.Invalid, calls.Error.Code);
+            Assert.Contains("calls workflow", calls.Error.Message);
+
+            var onError = await Packages().PublishAsync(_ann.Id, null, pair.Package, new PackagePublish([solo.Id], null, null), Ct);
+            Assert.Contains("error workflow is not chosen", onError.Error.Message);
+
+            // Without a list: all of them.
+            var all = (await Packages().PublishAsync(_ann.Id, null, pair.Package, new PackagePublish(null, null, null), Ct)).Ok();
+            Assert.Equal(3, all.Content.Workflows.Count);
+        }
+
+        [Fact]
+        public async Task Version_HoldsTheWorkflowsWithoutSecrets_TheConnectionsTheyNeed_AndTheErrorWorkflow()
         {
             var id = await PublishPairAsync();
 
-            Assert.Equal("ann", Must.Present((await Packages().GetAsync(_ann.Id, id, Ct)).Ok().Package.Owner).UserName);
             var version = (await Packages().VersionAsync(_ann.Id, id, null, Ct)).Ok();
             Assert.Equal(1, version.Version.Version);
             Assert.Equal(version.Content.Hash, version.Version.ContentHash);
@@ -172,6 +277,7 @@ namespace EchoPhase.Server.Tests
             Assert.True(version.Content.Workflows[0].Main);
             Assert.DoesNotContain("the-authors-own-secret", version.Version.Content);
             Assert.Equal([new PackageConnection("bot", "discord")], version.Content.Connections);
+            Assert.Equal(version.Content.Workflows[1].Key, version.Content.ErrorWorkflow);
         }
 
         [Fact]
@@ -184,9 +290,11 @@ namespace EchoPhase.Server.Tests
 
             var seen = (await Packages().GetAsync(_bob.Id, id, Ct)).Ok();
             Assert.Equal(PackageAccess.Read, seen.Access);
+            Assert.Equal(0, seen.Workflows);
             Assert.Contains(await Packages().ListAsync(_bob.Id, Ct), v => v.Package.Id == id);
             Assert.Equal(ErrorCodes.Forbidden, (await Packages().UpdateAsync(_bob.Id, id, Input(), Ct)).Error.Code);
             Assert.Equal(ErrorCodes.Forbidden, (await Packages().DeleteAsync(_bob.Id, id, Ct)).Error.Code);
+            Assert.Empty(await Workflows().ListAsync(_bob.Id, id, Ct));
 
             // Bob may leave it.
             Assert.True((await Packages().UnshareAsync(_bob.Id, id, _bob.Id, Ct)).Successful);
@@ -203,7 +311,7 @@ namespace EchoPhase.Server.Tests
         }
 
         [Fact]
-        public async Task Install_CopiesTheWorkflows_LinkedToEachOther_WithTheInstallersConnection()
+        public async Task Install_MakesAPackage_WithTheSameKeys_TheErrorWorkflow_AndTheInstallersConnection()
         {
             var id = await PublishPairAsync(PackageVisibility.Public);
             _db.Connections.Add(new Connection { UserId = _bob.Id, Provider = "discord", Name = "my-bot" });
@@ -213,19 +321,24 @@ namespace EchoPhase.Server.Tests
                 new Dictionary<string, string> { ["bot"] = "my-bot" }, Ct)).Ok();
 
             Assert.Empty(install.MissingConnections);
+            var package = install.Package.Package;
+            Assert.Equal((_bob.Id, "Guild tools", PackageVisibility.Private), (package.OwnerId, package.Name, package.Visibility));
+            Assert.Equal((id, 1), (package.SourcePackageId, package.SourceVersion));
+            Assert.NotEqual(id, package.Id);
+
             var copies = install.Workflows.ToDictionary(w => w.Workflow.Name);
             var main = copies["main"];
             var onError = copies["on error"];
             Assert.All(install.Workflows, w =>
             {
                 Assert.Equal(_bob.Id, w.Workflow.UserId);
+                Assert.Equal(package.Id, w.Workflow.PackageId);
                 Assert.False(w.Workflow.Active);
-                Assert.Equal((id, 1), (w.Workflow.SourcePackageId, w.Workflow.SourcePackageVersion));
             });
+            Assert.Equal(onError.Workflow.Key, package.ErrorWorkflowKey);
 
             var links = WorkflowLinks.Of(main.Program);
-            Assert.Equal(new HashSet<Guid> { onError.Workflow.Id }, links.Workflows);
-            Assert.Equal(onError.Workflow.Id, main.Program.Settings.ErrorWorkflowId);
+            Assert.Equal(new HashSet<Guid> { onError.Workflow.Key }, links.Workflows);
             Assert.Equal(["my-bot"], links.Connections);
             var secret = ((WebhookTriggerParams)BlockParamsBinder.Bind(typeof(WebhookTriggerParams),
                 main.Program.Blocks.Single(b => b.Type == BlockTypes.WebhookTrigger).Params)).Secret;
@@ -234,6 +347,7 @@ namespace EchoPhase.Server.Tests
 
             // Saved: Bob's to edit, with a first version.
             Assert.Single((await Workflows().VersionsAsync(_bob.Id, main.Workflow.Id, Ct)).Ok());
+            Assert.Equal(2, (await Packages().GetAsync(_bob.Id, package.Id, Ct)).Ok().Workflows);
         }
 
         [Fact]
@@ -261,21 +375,33 @@ namespace EchoPhase.Server.Tests
         }
 
         [Fact]
+        public async Task Delete_TakesItsWorkflows_ButNotThePackagesInstalledFromIt()
+        {
+            var id = await PublishPairAsync(PackageVisibility.Public);
+            var installed = (await Packages().InstallAsync(_bob.Id, null, id, null, null, Ct)).Ok().Package.Package.Id;
+
+            Assert.True((await Packages().DeleteAsync(_ann.Id, id, Ct)).Successful);
+
+            Assert.Empty(await Workflows().ListAsync(_ann.Id, null, Ct));
+            Assert.Equal(2, (await Workflows().ListAsync(_bob.Id, installed, Ct)).Count);
+        }
+
+        [Fact]
         public async Task Publish_AgainWithoutChanges_Conflicts_AndAChangeIsTheNextVersion()
         {
-            var (main, onError) = await PairAsync();
-            var publish = new PackagePublish([main, onError], null, null);
-            var id = (await Packages().CreateAsync(_ann.Id, null, Input(), publish, Ct)).Ok().Package.Id;
+            var pair = await PairAsync();
+            var publish = new PackagePublish([pair.Main.Id, pair.OnError.Id], null, null);
+            (await Packages().PublishAsync(_ann.Id, null, pair.Package, publish, Ct)).Ok();
 
-            Assert.Equal(ErrorCodes.Conflict, (await Packages().PublishAsync(_ann.Id, null, id, publish, Ct)).Error.Code);
+            Assert.Equal(ErrorCodes.Conflict, (await Packages().PublishAsync(_ann.Id, null, pair.Package, publish, Ct)).Error.Code);
 
-            var workflow = (await Workflows().GetAsync(_ann.Id, onError, Ct)).Ok();
+            var workflow = (await Workflows().GetAsync(_ann.Id, pair.OnError.Id, Ct)).Ok();
             workflow.Program.Blocks[1].Params = JsonSerializer.SerializeToElement(new { text = "changed" });
-            (await Workflows().UpdateAsync(_ann.Id, null, onError, "on error", workflow.Program, false, null, Ct)).Ok();
+            (await Workflows().UpdateAsync(_ann.Id, null, pair.OnError.Id, "on error", workflow.Program, false, null, Ct)).Ok();
 
-            var v2 = (await Packages().PublishAsync(_ann.Id, null, id, publish with { Changelog = "Louder." }, Ct)).Ok();
+            var v2 = (await Packages().PublishAsync(_ann.Id, null, pair.Package, publish with { Changelog = "Louder." }, Ct)).Ok();
             Assert.Equal(2, v2.Version.Version);
-            Assert.Equal([2, 1], (await Packages().VersionsAsync(_ann.Id, id, Ct)).Ok().Select(v => v.Version));
+            Assert.Equal([2, 1], (await Packages().VersionsAsync(_ann.Id, pair.Package, Ct)).Ok().Select(v => v.Version));
         }
 
         [Fact]
@@ -283,6 +409,8 @@ namespace EchoPhase.Server.Tests
         {
             var id = await PublishPairAsync(PackageVisibility.Public, "Discord Bot", "guilds");
             await PublishPairAsync(PackageVisibility.Private, "discord-bot");
+            // Public but never published: nothing to install yet.
+            (await Packages().CreateAsync(_ann.Id, Input(PackageVisibility.Public), Ct)).Ok();
 
             var all = (await Packages().ExploreAsync(_bob.Id, null, null, null, 50, Ct)).Ok().Items;
             Assert.Equal([id], all.Select(v => v.Package.Id));
@@ -321,10 +449,7 @@ namespace EchoPhase.Server.Tests
         [Fact]
         public async Task Tags_MustBeWords()
         {
-            var (main, onError) = await PairAsync();
-
-            var result = await Packages().CreateAsync(_ann.Id, null, Input(PackageVisibility.Public, "c#"),
-                new PackagePublish([main, onError], null, null), Ct);
+            var result = await Packages().CreateAsync(_ann.Id, Input(PackageVisibility.Public, null, "c#"), Ct);
 
             Assert.Equal("tags", result.Error.Field);
         }

@@ -20,10 +20,12 @@ namespace EchoPhase.DAL.Postgres.Models
     }
 
     /// <summary>
-    /// Workflows published together, with a README: others read them and
-    /// install copies (never edit the author's). Each publish is a fixed
-    /// <see cref="WorkflowPackageVersion"/>; the package itself holds what
-    /// may change without one (name, text, tags, who may see it).
+    /// A user's workflows that belong together, like code in a repository:
+    /// they call only each other, and storage is shared by them. Publishing
+    /// makes a fixed <see cref="WorkflowPackageVersion"/> others read and
+    /// install as a package of their own (never editing the author's); the
+    /// package itself holds what may change without one (name, text, tags,
+    /// who may see it, its workflows as they are now).
     /// </summary>
     public class WorkflowPackage : ITrackingEntity, IConcurrentEntity, IIdentifiable
     {
@@ -48,6 +50,17 @@ namespace EchoPhase.DAL.Postgres.Models
         /// <summary>The newest version's number; 0 before the first is published.</summary>
         public int LatestVersion { get; set; }
 
+        /// <summary>The key of its workflow whose ErrorTriggers start when an automatic run of one of them fails.</summary>
+        public Guid? ErrorWorkflowKey { get; set; }
+
+        /// <summary>The package it was installed from (it may be gone since); null: made here.</summary>
+        public Guid? SourcePackageId { get; set; }
+        public WorkflowPackage? SourcePackage { get; set; }
+
+        /// <summary>The version of it installed.</summary>
+        public int? SourceVersion { get; set; }
+
+        public List<Workflow> Workflows { get; set; } = [];
         public List<WorkflowPackageVersion> Versions { get; set; } = [];
         public List<WorkflowPackageShare> Shares { get; set; } = [];
 

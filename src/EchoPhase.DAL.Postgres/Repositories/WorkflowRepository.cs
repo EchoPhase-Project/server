@@ -79,6 +79,12 @@ namespace EchoPhase.DAL.Postgres.Repositories
 
         public void RemoveSchedule(WorkflowSchedule schedule) => _context.WorkflowSchedules.Remove(schedule);
 
+        /// <summary>One of the user's packages, tracked; null when it is not theirs.</summary>
+        public Task<WorkflowPackage?> PackageAsync(Guid ownerId, Guid id, CancellationToken ct = default)
+            => _context.WorkflowPackages.FirstOrDefaultAsync(p => p.Id == id && p.OwnerId == ownerId, ct);
+
+        public void AddPackage(WorkflowPackage package) => _context.WorkflowPackages.Add(package);
+
         public override void Add(Workflow entity) => _context.Workflows.Add(entity);
         public override void Update(Workflow entity) => _context.Workflows.Update(entity);
         public override void Remove(Workflow entity) => _context.Workflows.Remove(entity);

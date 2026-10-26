@@ -41,7 +41,7 @@ namespace EchoPhase.Runners.Blocks.Params
         [JsonPropertyName("key")]
         public string Key { get; set; } = string.Empty;
 
-        /// <summary>Workflow: this workflow's own; User: shared by the owner's workflows.</summary>
+        /// <summary>Workflow: this workflow's own; Package: shared by the workflows of its package.</summary>
         [JsonPropertyName("scope")]
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public StorageScope Scope { get; set; } = StorageScope.Workflow;

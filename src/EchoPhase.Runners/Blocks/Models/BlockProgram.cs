@@ -28,12 +28,6 @@ namespace EchoPhase.Runners.Blocks.Models
 
         /// <summary>IANA zone for schedules (and the program's notion of "today"); null: the owner's.</summary>
         public string? TimeZone { get; set; }
-
-        /// <summary>
-        /// The owner's workflow whose ErrorTriggers start when an automatic run
-        /// (webhook, schedule, event) of this one fails; it may be this one.
-        /// </summary>
-        public Guid? ErrorWorkflowId { get; set; }
     }
 
     /// <summary>Which runs keep per-block execution data (inputs, outputs, timings).</summary>

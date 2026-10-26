@@ -18,16 +18,19 @@ namespace EchoPhase.Server.Services.Blocks
         public const string Retry = "retry";
     }
 
+    /// <summary>The saved workflow a run runs and its package.</summary>
+    public sealed record RunWorkflow(Guid Id, Guid PackageId);
+
     /// <summary>
     /// What to run: the program, where to start (null: its manual start),
-    /// the first blocks' input, where it came from, and the webhook caller
-    /// waiting for its answer, if any.
+    /// the first blocks' input, the workflow it is (null: a program run as
+    /// is), and the webhook caller waiting for its answer, if any.
     /// </summary>
     public sealed record BlockRunStart(
         EchoPhase.Runners.Blocks.Models.BlockProgram Program,
         IReadOnlyCollection<int>? StartIds = null,
         object? Input = null,
-        Guid? WorkflowId = null,
+        RunWorkflow? Workflow = null,
         string Trigger = BlockRunTriggers.Manual,
         EchoPhase.Runners.Blocks.Contexts.WebhookReply? Reply = null);
 }

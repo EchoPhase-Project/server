@@ -23,6 +23,9 @@ namespace EchoPhase.DAL.Scylla.Entities
         /// <summary>The saved workflow it ran; null for a program sent to run directly.</summary>
         public Guid? WorkflowId { get; set; }
 
+        /// <summary>The package of that workflow; null for a program sent directly and for older runs.</summary>
+        public Guid? PackageId { get; set; }
+
         /// <summary>
         /// SHA-256 (hex) of the program it ran, canonical JSON: the same as its
         /// workflow version's ContentHash when it ran one. Null for older runs.

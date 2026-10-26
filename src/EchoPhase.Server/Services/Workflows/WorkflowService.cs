@@ -46,16 +46,16 @@ namespace EchoPhase.Server.Services.Workflows
     /// <param name="ContentHash">The program's hash: the file's ETag.</param>
     public sealed record WorkflowExport(string FileName, string Json, string ContentHash);
 
-    /// <summary>A workflow to create with others, its id chosen beforehand so they can name each other.</summary>
-    /// <param name="Source">The package it comes from: its id, version and the workflow's key in it.</param>
-    public sealed record NewWorkflow(Guid Id, string Name, BlockProgram Program, (Guid Package, int Version, Guid Key)? Source = null);
+    /// <summary>A workflow to create with others in one package, its key chosen beforehand so they can call each other.</summary>
+    public sealed record NewWorkflow(Guid Key, string Name, BlockProgram Program);
 
     /// <summary>A workflow made from an export file.</summary>
     /// <param name="Intact">The program matches the hash the file states (false: it was edited by hand).</param>
     public sealed record WorkflowImport(WorkflowDetails Details, bool Intact);
 
     /// <summary>
-    /// Saved block programs: storing them (validated), keeping their
+    /// Saved block programs, each in one of its owner's packages: storing
+    /// them (validated: what they call is in their package), keeping their
     /// schedules in step with their ScheduleTriggers, and starting runs of
     /// them by hand or from a webhook. Every lookup is by owner.
     /// </summary>
@@ -92,8 +92,14 @@ namespace EchoPhase.Server.Services.Workflows
             _discordTriggers = discordTriggers;
         }
 
-        public Task<List<Workflow>> ListAsync(Guid userId, CancellationToken ct = default)
-            => _workflows.Query().WithUserIds(userId).OrderBy(w => w.Name).ToListAsync(ct);
+        /// <summary>The user's workflows, of one package or all.</summary>
+        public Task<List<Workflow>> ListAsync(Guid userId, Guid? packageId = null, CancellationToken ct = default)
+        {
+            var query = _workflows.Query().WithUserIds(userId);
+            if (packageId is { } package)
+                query = query.WithPackageIds(package);
+            return query.OrderBy(w => w.Name).ToListAsync(ct);
+        }
 
         public async Task<IServiceResult<WorkflowDetails>> GetAsync(Guid userId, Guid id, CancellationToken ct = default)
         {
@@ -103,22 +109,41 @@ namespace EchoPhase.Server.Services.Workflows
                 : ServiceResult<WorkflowDetails>.Success(new WorkflowDetails(workflow, Parse(workflow)));
         }
 
+        /// <summary>
+        /// A new workflow in one of the user's packages; without one, in a new
+        /// package of its own, of the same name.
+        /// </summary>
         public async Task<IServiceResult<WorkflowDetails>> CreateAsync(
-            Guid userId, Guid? actorId, string name, BlockProgram program, bool active, CancellationToken ct = default)
+            Guid userId, Guid? actorId, Guid? packageId, string name, BlockProgram program, bool active, CancellationToken ct = default)
         {
             if (Check(name, program) is { } invalid)
                 return Failure<WorkflowDetails>(WorkflowErrors.Invalid, invalid);
 
+            WorkflowPackage package;
+            if (packageId is { } id)
+            {
+                if (await _workflows.PackageAsync(userId, id, ct) is not { } owned)
+                    return Failure<WorkflowDetails>(WorkflowErrors.NotFound, "Package not found.");
+                package = owned;
+            }
+            else
+            {
+                var now = _time.GetUtcNow().UtcDateTime;
+                package = new WorkflowPackage { OwnerId = userId, Name = name.Trim(), CreatedAt = now, UpdatedAt = now };
+                _workflows.AddPackage(package);
+            }
+
             var workflow = new Workflow
             {
                 UserId = userId,
+                PackageId = package.Id,
                 Name = name.Trim(),
                 Definition = Serialize(program),
                 ContentHash = BlockProgramHash.Of(program),
                 Active = active
             };
-            if (await CheckErrorWorkflowAsync(workflow, program, ct) is { } badErrorWorkflow)
-                return Failure<WorkflowDetails>(WorkflowErrors.Invalid, badErrorWorkflow);
+            if (await CheckLinksAsync(workflow, program, package, ct) is { } badLink)
+                return Failure<WorkflowDetails>(WorkflowErrors.Invalid, badLink);
             _workflows.Add(workflow);
             _workflows.AddVersion(Snapshot(workflow, actorId ?? userId, parent: null, restoredFrom: null));
             await _workflows.ReplaceSchedulesAsync(workflow.Id, await SchedulesAsync(workflow, program, ct), ct);
@@ -129,13 +154,13 @@ namespace EchoPhase.Server.Services.Workflows
         }
 
         /// <summary>
-        /// Several new workflows, inactive, saved together or not at all; their
-        /// error workflows may be among them.
+        /// Several new workflows in one package (tracked, perhaps new), inactive,
+        /// saved together with it or not at all; they may call each other.
         /// </summary>
         public async Task<IServiceResult<IReadOnlyList<WorkflowDetails>>> CreateManyAsync(
-            Guid userId, Guid? actorId, IReadOnlyList<NewWorkflow> items, CancellationToken ct = default)
+            Guid userId, Guid? actorId, WorkflowPackage package, IReadOnlyList<NewWorkflow> items, CancellationToken ct = default)
         {
-            var pending = items.ToDictionary(i => i.Id, i => i.Program);
+            var pending = items.ToDictionary(i => i.Key, i => i.Program);
             var created = new List<WorkflowDetails>();
             foreach (var item in items)
             {
@@ -144,17 +169,15 @@ namespace EchoPhase.Server.Services.Workflows
 
                 var workflow = new Workflow
                 {
-                    Id = item.Id,
                     UserId = userId,
+                    PackageId = package.Id,
+                    Key = item.Key,
                     Name = item.Name.Trim(),
                     Definition = Serialize(item.Program),
                     ContentHash = BlockProgramHash.Of(item.Program),
-                    SourcePackageId = item.Source?.Package,
-                    SourcePackageVersion = item.Source?.Version,
-                    SourceKey = item.Source?.Key,
                 };
-                if (await CheckErrorWorkflowAsync(workflow, item.Program, ct, pending) is { } badErrorWorkflow)
-                    return Failure<IReadOnlyList<WorkflowDetails>>(WorkflowErrors.Invalid, $"\"{item.Name}\": {badErrorWorkflow}");
+                if (await CheckLinksAsync(workflow, item.Program, package, ct, pending) is { } badLink)
+                    return Failure<IReadOnlyList<WorkflowDetails>>(WorkflowErrors.Invalid, $"\"{item.Name}\": {badLink}");
                 created.Add(new WorkflowDetails(workflow, item.Program));
             }
 
@@ -190,8 +213,10 @@ namespace EchoPhase.Server.Services.Workflows
                     $"The workflow changed (version {workflow.Version}, not {expected}); reload it.");
             if (Check(name, program) is { } invalid)
                 return Failure<WorkflowDetails>(WorkflowErrors.Invalid, invalid);
-            if (await CheckErrorWorkflowAsync(workflow, program, ct) is { } badErrorWorkflow)
-                return Failure<WorkflowDetails>(WorkflowErrors.Invalid, badErrorWorkflow);
+            if (await _workflows.PackageAsync(userId, workflow.PackageId, ct) is not { } package)
+                throw new InvalidOperationException($"Workflow {workflow.Id} has no package of its owner's.");
+            if (await CheckLinksAsync(workflow, program, package, ct) is { } badLink)
+                return Failure<WorkflowDetails>(WorkflowErrors.Invalid, badLink);
 
             var hash = BlockProgramHash.Of(program);
             // Saved before hashes: its hash, from the stored program.
@@ -294,11 +319,12 @@ namespace EchoPhase.Server.Services.Workflows
 
         /// <summary>
         /// A new workflow from an export file, inactive: its triggers start once
-        /// it is turned on. Validated like any save.
+        /// it is turned on. Validated like any save; in the package given, or a
+        /// new one of its own.
         /// </summary>
         /// <param name="name">Instead of the file's name.</param>
         public async Task<IServiceResult<WorkflowImport>> ImportAsync(Guid userId, Guid? actorId, string json, string? name,
-            CancellationToken ct = default)
+            Guid? packageId = null, CancellationToken ct = default)
         {
             WorkflowFileContent file;
             try
@@ -310,8 +336,8 @@ namespace EchoPhase.Server.Services.Workflows
                 return Failure<WorkflowImport>(WorkflowErrors.Invalid, e.Message);
             }
 
-            var created = await CreateAsync(userId, actorId, string.IsNullOrWhiteSpace(name) ? file.Name : name, file.Program,
-                active: false, ct);
+            var created = await CreateAsync(userId, actorId, packageId, string.IsNullOrWhiteSpace(name) ? file.Name : name,
+                file.Program, active: false, ct);
             return created.Successful
                 ? ServiceResult<WorkflowImport>.Success(new WorkflowImport(created.Value, file.Intact))
                 : ServiceResult<WorkflowImport>.Failure(created.Error);
@@ -324,11 +350,17 @@ namespace EchoPhase.Server.Services.Workflows
             return safe.Length == 0 ? "workflow" : safe.Length > 60 ? safe[..60] : safe;
         }
 
+        /// <summary>
+        /// Deletes the workflow; not while another workflow of its package calls
+        /// it or it is the package's error workflow (409): that would break them.
+        /// </summary>
         public async Task<IServiceResult> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default)
         {
             var workflow = await FindAsync(userId, id, ct);
             if (workflow is null)
                 return ServiceResult.Failure(e => e.Set(WorkflowErrors.NotFound, "Workflow not found."));
+            if (await UsedByAsync(workflow, ct) is { } used)
+                return ServiceResult.Failure(e => e.Set(WorkflowErrors.Conflict, used));
 
             // Schedules go with it (cascade).
             _workflows.Remove(workflow);
@@ -346,7 +378,7 @@ namespace EchoPhase.Server.Services.Workflows
                 return Failure<BlockRun>(WorkflowErrors.NotFound, "Workflow not found.");
 
             return await _runs.StartAsync(userId, actorId,
-                new BlockRunStart(Parse(workflow), Input: input, WorkflowId: workflow.Id), ct);
+                new BlockRunStart(Parse(workflow), Input: input, Workflow: RunOf(workflow)), ct);
         }
 
         /// <summary>
@@ -373,7 +405,7 @@ namespace EchoPhase.Server.Services.Workflows
 
             var reply = trigger.Respond == WebhookRespondMode.Immediately ? null : new WebhookReply(trigger.Respond);
             var started = await _runs.StartAsync(workflow.UserId, null,
-                new BlockRunStart(program, [blockId], body, workflow.Id, BlockRunTriggers.Webhook, reply), ct);
+                new BlockRunStart(program, [blockId], body, RunOf(workflow), BlockRunTriggers.Webhook, reply), ct);
 
             if (started.TryGetValue(out var run))
                 return ServiceResult<WebhookStarted>.Success(new WebhookStarted(run, reply));
@@ -384,27 +416,33 @@ namespace EchoPhase.Server.Services.Workflows
 
         /// <summary>
         /// After an automatic run of a workflow failed: starts the ErrorTriggers
-        /// of the error workflow it names, owned by the same user, active or
-        /// not. Their input describes the failed run.
+        /// of its package's error workflow, active or not; null when the
+        /// package has none. Their input describes the failed run.
         /// </summary>
-        public async Task<IServiceResult<BlockRun>> StartErrorWorkflowAsync(
-            BlockRun failed, Guid errorWorkflowId, IReadOnlyList<BlockError> errors, CancellationToken ct = default)
+        public async Task<IServiceResult<BlockRun?>> StartErrorWorkflowAsync(
+            BlockRun failed, IReadOnlyList<BlockError> errors, CancellationToken ct = default)
         {
             if (failed.WorkflowId is not { } failedWorkflowId)
-                return Failure<BlockRun>(WorkflowErrors.Invalid, $"Run {failed.RunId} is not a workflow's; it has no error workflow.");
+                return Failure<BlockRun?>(WorkflowErrors.Invalid, $"Run {failed.RunId} is not a workflow's; it has no error workflow.");
 
-            var errorWorkflow = await _workflows.Query().WithIds(errorWorkflowId).WithUserIds(failed.UserId).FirstOrDefaultAsync(ct);
+            var source = await _workflows.Query().WithIds(failedWorkflowId).WithUserIds(failed.UserId).FirstOrDefaultAsync(ct);
+            if (source is null)
+                return Failure<BlockRun?>(WorkflowErrors.NotFound, $"Workflow {failedWorkflowId} no longer exists.");
+            var package = await _workflows.PackageAsync(failed.UserId, source.PackageId, ct);
+            if (package?.ErrorWorkflowKey is not { } errorKey)
+                return ServiceResult<BlockRun?>.Success(null);
+
+            var errorWorkflow = errorKey == source.Key
+                ? source
+                : await _workflows.Query().WithUserIds(failed.UserId).WithPackageIds(source.PackageId).WithKeys(errorKey)
+                    .FirstOrDefaultAsync(ct);
             if (errorWorkflow is null)
-                return Failure<BlockRun>(WorkflowErrors.NotFound, $"Error workflow {errorWorkflowId} not found.");
+                return Failure<BlockRun?>(WorkflowErrors.NotFound, $"The error workflow {errorKey} of package {package.Id} is gone.");
 
             var program = Parse(errorWorkflow);
             var triggers = ErrorTriggerIds(program);
             if (triggers.Count == 0)
-                return Failure<BlockRun>(WorkflowErrors.Invalid, $"Error workflow {errorWorkflowId} has no enabled ErrorTrigger.");
-
-            var source = failedWorkflowId == errorWorkflow.Id
-                ? errorWorkflow
-                : await _workflows.Query().WithIds(failedWorkflowId).FirstOrDefaultAsync(ct);
+                return Failure<BlockRun?>(WorkflowErrors.Invalid, $"Error workflow {errorWorkflow.Id} has no enabled ErrorTrigger.");
 
             // A timeout or an oversized result fails a run without a block error.
             var described = errors.Count > 0
@@ -416,7 +454,8 @@ namespace EchoPhase.Server.Services.Workflows
                 ["workflow"] = new Dictionary<string, object?>
                 {
                     ["id"] = failedWorkflowId.ToString(),
-                    ["name"] = source?.Name
+                    ["key"] = source.Key.ToString(),
+                    ["name"] = source.Name
                 },
                 ["run"] = new Dictionary<string, object?>
                 {
@@ -429,36 +468,68 @@ namespace EchoPhase.Server.Services.Workflows
                 ["errors"] = described
             };
 
-            return await _runs.StartAsync(failed.UserId, null,
-                new BlockRunStart(program, triggers, input, errorWorkflow.Id, BlockRunTriggers.Error), ct);
+            var started = await _runs.StartAsync(failed.UserId, null,
+                new BlockRunStart(program, triggers, input, RunOf(errorWorkflow), BlockRunTriggers.Error), ct);
+            return started.Successful
+                ? ServiceResult<BlockRun?>.Success(started.Value)
+                : ServiceResult<BlockRun?>.Failure(started.Error);
         }
+
+        /// <summary>
+        /// Sets (or clears) the package's error workflow: one of its workflows
+        /// with an enabled ErrorTrigger, by key.
+        /// </summary>
+        public async Task<string?> CheckErrorWorkflowAsync(Guid userId, Guid packageId, Guid? key, CancellationToken ct = default)
+        {
+            if (key is not { } wanted)
+                return null;
+            var workflow = await _workflows.Query().WithUserIds(userId).WithPackageIds(packageId).WithKeys(wanted).FirstOrDefaultAsync(ct);
+            if (workflow is null)
+                return $"The package has no workflow {wanted}.";
+            return ErrorTriggerIds(Parse(workflow)).Count == 0
+                ? $"\"{workflow.Name}\" has no enabled ErrorTrigger: it cannot be the error workflow."
+                : null;
+        }
+
+        private static RunWorkflow RunOf(Workflow workflow) => new(workflow.Id, workflow.PackageId);
 
         public static BlockProgram Parse(Workflow workflow) => Parse(workflow.Definition);
 
         private static List<int> ErrorTriggerIds(BlockProgram program)
             => program.Blocks.Where(b => b.Type == BlockTypes.ErrorTrigger && !b.Disabled).Select(b => b.Id).ToList();
 
-        // The error workflow must be the owner's and able to start: caught on
-        // save, not when a run has already failed. It may be the workflow itself.
-        private async Task<string?> CheckErrorWorkflowAsync(Workflow workflow, BlockProgram program, CancellationToken ct,
-            IReadOnlyDictionary<Guid, BlockProgram>? pending = null)
+        // What the program calls must be in its package, caught on save, not
+        // when a run gets there; it may call itself. The package's error
+        // workflow must keep an ErrorTrigger.
+        private async Task<string?> CheckLinksAsync(Workflow workflow, BlockProgram program, WorkflowPackage package,
+            CancellationToken ct, IReadOnlyDictionary<Guid, BlockProgram>? pending = null)
         {
-            if (program.Settings.ErrorWorkflowId is not { } id)
+            if (package.ErrorWorkflowKey == workflow.Key && ErrorTriggerIds(program).Count == 0)
+                return "This is its package's error workflow: keep an enabled ErrorTrigger, or choose another error workflow first.";
+
+            var others = WorkflowLinks.Of(program).Workflows
+                .Where(key => key != workflow.Key && pending?.ContainsKey(key) != true)
+                .ToArray();
+            if (others.Length == 0)
                 return null;
 
-            var target = id == workflow.Id
-                ? program
-                : pending?.GetValueOrDefault(id) is { } saved
-                    ? saved
-                : await _workflows.Query().WithIds(id).WithUserIds(workflow.UserId).FirstOrDefaultAsync(ct) is { } other
-                    ? Parse(other)
-                    : null;
+            var found = (await _workflows.Query().WithUserIds(workflow.UserId).WithPackageIds(package.Id).WithKeys(others)
+                .AsNoTracking().ToListAsync(ct)).Select(w => w.Key).ToHashSet();
+            return others.FirstOrDefault(key => !found.Contains(key)) is var missing && missing != Guid.Empty
+                ? $"It calls workflow {missing}, which is not in its package."
+                : null;
+        }
 
-            if (target is null)
-                return $"Error workflow {id} not found.";
-            if (ErrorTriggerIds(target).Count == 0)
-                return $"Error workflow {id} has no enabled ErrorTrigger.";
-            return null;
+        // Why deleting the workflow would break its package, or null.
+        private async Task<string?> UsedByAsync(Workflow workflow, CancellationToken ct)
+        {
+            var package = await _workflows.PackageAsync(workflow.UserId, workflow.PackageId, ct);
+            if (package?.ErrorWorkflowKey == workflow.Key)
+                return "It is its package's error workflow: choose another one (or none) first.";
+
+            var siblings = await _workflows.Query().WithUserIds(workflow.UserId).WithPackageIds(workflow.PackageId).ToListAsync(ct);
+            var caller = siblings.FirstOrDefault(w => w.Id != workflow.Id && WorkflowLinks.Of(Parse(w)).Workflows.Contains(workflow.Key));
+            return caller is null ? null : $"\"{caller.Name}\" calls it: change that first.";
         }
 
         private static BlockProgram Parse(string definition)

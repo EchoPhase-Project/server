@@ -33,6 +33,9 @@ namespace EchoPhase.Runners.Blocks.Contexts
         /// <summary>The saved workflow being run (its storage); null for a program run as is.</summary>
         Guid? WorkflowId { get; }
 
+        /// <summary>That workflow's package: the workflows it may call, the storage they share.</summary>
+        Guid? PackageId { get; }
+
         /// <summary>The stored run this executes, for observers; empty outside one.</summary>
         Guid RunId { get; }
 

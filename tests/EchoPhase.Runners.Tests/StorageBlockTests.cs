@@ -13,6 +13,7 @@ namespace EchoPhase.Runners.Tests
         private readonly MemoryStore _store = new();
         private readonly RunnerHarness _harness;
         private readonly Guid _workflowId = Guid.NewGuid();
+        private readonly Guid _packageId = Guid.NewGuid();
 
         public StorageBlockTests()
         {
@@ -23,9 +24,12 @@ namespace EchoPhase.Runners.Tests
 
         private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-        private Task<Blocks.Contexts.IBlockExecutionContext> Run(string blocks, object? input = null, Guid? workflowId = null)
+        private Task<Blocks.Contexts.IBlockExecutionContext> Run(string blocks, object? input = null, Guid? workflowId = null,
+            Guid? packageId = null)
             => _harness.RunAsync($$"""{ "blocks": [ {{blocks}} ], "connections": [ { "from": 1, "to": 2 } ] }""",
-                input: input, workflowId: workflowId ?? _workflowId);
+                input: input, workflowId: workflowId ?? _workflowId, packageId: packageId ?? _packageId);
+
+        private StorageSlot Mine => new(_harness.UserId, _packageId, _workflowId);
 
         [Fact]
         public async Task ABloomFilterRemembersAcrossRuns()
@@ -64,26 +68,42 @@ namespace EchoPhase.Runners.Tests
                 { "id": 1, "type": "Storage", "params": { "operation": "Set", "key": "user:@input.id", "value": "@input.name" } },
                 { "id": 2, "type": "Print", "params": { "text": "@input" } }
                 """, new Dictionary<string, object?> { ["id"] = 7, ["name"] = "Ann" });
-            Assert.Equal("Ann", (await _store.GetAsync(new StorageSlot(_harness.UserId, _workflowId), "user:7", Ct))?.Value);
+            Assert.Equal("Ann", (await _store.GetAsync(Mine, "user:7", Ct))?.Value);
 
-            // Another workflow, and the shared scope, do not see it.
+            // Another workflow, and the package's shared scope, do not see it.
             var other = await Run("""
                 { "id": 1, "type": "Storage", "params": { "operation": "Get", "key": "user:7", "default": "none" } },
                 { "id": 2, "type": "Print", "params": { "text": "@input" } }
                 """, workflowId: Guid.NewGuid());
             Assert.Equal(["none"], other.Output);
             var shared = await Run("""
-                { "id": 1, "type": "Storage", "params": { "operation": "Get", "key": "user:7", "scope": "User", "default": "none" } },
+                { "id": 1, "type": "Storage", "params": { "operation": "Get", "key": "user:7", "scope": "Package", "default": "none" } },
                 { "id": 2, "type": "Print", "params": { "text": "@input" } }
                 """);
             Assert.Equal(["none"], shared.Output);
         }
 
         [Fact]
+        public async Task ThePackageScopeIsSharedByItsWorkflows_AndNotByOtherPackages()
+        {
+            await Run("""
+                { "id": 1, "type": "Storage", "params": { "operation": "Set", "key": "k", "value": "shared", "scope": "Package" } },
+                { "id": 2, "type": "Print", "params": { "text": "@input" } }
+                """);
+
+            const string Get = """
+                { "id": 1, "type": "Storage", "params": { "operation": "Get", "key": "k", "scope": "Package", "default": "none" } },
+                { "id": 2, "type": "Print", "params": { "text": "@input" } }
+                """;
+            Assert.Equal(["shared"], (await Run(Get, workflowId: Guid.NewGuid())).Output);
+            Assert.Equal(["none"], (await Run(Get, workflowId: Guid.NewGuid(), packageId: Guid.NewGuid())).Output);
+        }
+
+        [Fact]
         public async Task ListAndDelete()
         {
             foreach (var key in new[] { "a:1", "a:2", "b:1" })
-                await _store.SetAsync(new StorageSlot(_harness.UserId, _workflowId), key, 1, null, Ct);
+                await _store.SetAsync(Mine, key, 1, null, Ct);
 
             var listed = await Run("""
                 { "id": 1, "type": "Storage", "params": { "operation": "List", "prefix": "a:" } },
@@ -96,16 +116,16 @@ namespace EchoPhase.Runners.Tests
                 { "id": 2, "type": "Print", "params": { "text": "@input" } }
                 """);
             Assert.Equal(["true"], deleted.Output);
-            Assert.Null(await _store.GetAsync(new StorageSlot(_harness.UserId, _workflowId), "a:1", Ct));
+            Assert.Null(await _store.GetAsync(Mine, "a:1", Ct));
         }
 
         [Fact]
-        public async Task AnUnsavedProgramHasNoWorkflowStorage()
+        public async Task AnUnsavedProgramHasNoStorage()
         {
             var context = await _harness.RunAsync("""
-                { "blocks": [ { "id": 1, "type": "Storage", "params": { "operation": "Get", "key": "x" } } ] }
+                { "blocks": [ { "id": 1, "type": "Storage", "params": { "operation": "Get", "key": "x", "scope": "Package" } } ] }
                 """);
-            Assert.Contains("scope User", Assert.Single(context.Errors).Message);
+            Assert.Contains("runs unsaved", Assert.Single(context.Errors).Message);
         }
 
         [Fact]

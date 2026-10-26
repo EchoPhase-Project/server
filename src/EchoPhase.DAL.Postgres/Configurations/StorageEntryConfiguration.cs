@@ -15,13 +15,15 @@ namespace EchoPhase.DAL.Postgres.Configurations
         {
             builder.ToTable("StorageEntries", PostgresContext.DefaultSchema);
             builder.HasKey(e => e.Id);
-            // One value per key and scope; the shared scope (no workflow) is a
-            // scope too, so nulls count as equal.
-            builder.HasIndex(e => new { e.UserId, e.WorkflowId, e.Key })
+            // One value per key and scope; the package's shared scope (no
+            // workflow) is a scope too, so nulls count as equal.
+            builder.HasIndex(e => new { e.PackageId, e.WorkflowId, e.Key })
                 .IsUnique()
                 .AreNullsDistinct(false);
             // prune: what has expired.
             builder.HasIndex(e => e.ExpiresAt);
+            // The user's quota.
+            builder.HasIndex(e => e.UserId);
 
             builder.Property(e => e.Key).HasMaxLength(MaxKeyLength).IsRequired();
             builder.Property(e => e.Value).HasColumnType("jsonb").IsRequired();
@@ -29,6 +31,11 @@ namespace EchoPhase.DAL.Postgres.Configurations
             builder.HasOne(e => e.User)
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(e => e.Package)
+                .WithMany()
+                .HasForeignKey(e => e.PackageId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasOne(e => e.Workflow)

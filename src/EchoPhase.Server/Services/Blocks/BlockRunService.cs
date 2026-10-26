@@ -84,7 +84,8 @@ namespace EchoPhase.Server.Services.Blocks
                 RunId = Uuid.NewSequential(),
                 Status = BlockRunStatus.Queued,
                 ActorId = actorId,
-                WorkflowId = start.WorkflowId,
+                WorkflowId = start.Workflow?.Id,
+                PackageId = start.Workflow?.PackageId,
                 ProgramHash = BlockProgramHash.Of(start.Program),
                 Trigger = start.Trigger,
                 BlockCount = start.Program.Blocks.Count,
@@ -101,6 +102,8 @@ namespace EchoPhase.Server.Services.Blocks
                 _db.BlockRuns.Add(run, History);
                 if (run.WorkflowId is { } workflowId)
                     _db.WorkflowRuns.Add(new WorkflowRun { WorkflowId = workflowId, RunId = run.RunId, UserId = userId }, History);
+                if (run.PackageId is { } packageId)
+                    _db.PackageRuns.Add(new PackageRun { PackageId = packageId, RunId = run.RunId, UserId = userId }, History);
                 _db.ActiveBlockRuns.Add(new ActiveBlockRun { RunId = run.RunId, UserId = userId });
                 await _db.SaveChangesAsync(ct);
 
@@ -158,8 +161,30 @@ namespace EchoPhase.Server.Services.Blocks
         /// the workflow is the user's). From the workflow_runs index; runs gone
         /// since (expired, forgotten) are left out.
         /// </summary>
-        public async Task<IServiceResult<BlockRunPage>> ListByWorkflowAsync(
+        public Task<IServiceResult<BlockRunPage>> ListByWorkflowAsync(
             Guid userId, Guid workflowId, int limit, string? cursor, CancellationToken ct = default)
+            => ListIndexedAsync(userId, async (state, size) =>
+            {
+                var page = await _db.WorkflowRuns.Where(r => r.WorkflowId == workflowId).ToPageAsync(size, state, ct);
+                return (page.Items.Select(r => (r.RunId, r.UserId)).ToList(), page.NextPagingState);
+            }, limit, cursor, ct);
+
+        /// <summary>
+        /// The runs of a package's workflows, newest first, a page at a time
+        /// (the caller checks the package is the user's), from the package_runs index.
+        /// </summary>
+        public Task<IServiceResult<BlockRunPage>> ListByPackageAsync(
+            Guid userId, Guid packageId, int limit, string? cursor, CancellationToken ct = default)
+            => ListIndexedAsync(userId, async (state, size) =>
+            {
+                var page = await _db.PackageRuns.Where(r => r.PackageId == packageId).ToPageAsync(size, state, ct);
+                return (page.Items.Select(r => (r.RunId, r.UserId)).ToList(), page.NextPagingState);
+            }, limit, cursor, ct);
+
+        // A page of an index (run ids, newest first), read back from block_runs; runs gone since are left out.
+        private async Task<IServiceResult<BlockRunPage>> ListIndexedAsync(
+            Guid userId, Func<byte[]?, int, Task<(List<(Guid RunId, Guid UserId)> Items, byte[]? Next)>> page,
+            int limit, string? cursor, CancellationToken ct)
         {
             byte[]? pagingState = null;
             if (cursor is not null)
@@ -176,9 +201,7 @@ namespace EchoPhase.Server.Services.Blocks
 
             try
             {
-                var index = await _db.WorkflowRuns
-                    .Where(r => r.WorkflowId == workflowId)
-                    .ToPageAsync(Math.Clamp(limit, 1, MaxPageSize), pagingState, ct);
+                var index = await page(pagingState, Math.Clamp(limit, 1, MaxPageSize));
                 var ids = index.Items.Where(r => r.UserId == userId).Select(r => r.RunId).ToList();
                 var runs = ids.Count == 0
                     ? []
@@ -189,7 +212,7 @@ namespace EchoPhase.Server.Services.Blocks
 
                 return ServiceResult<BlockRunPage>.Success(new BlockRunPage(
                     ordered,
-                    index.NextPagingState is { } next ? WebEncoders.Base64UrlEncode(next) : null));
+                    index.Next is { } next ? WebEncoders.Base64UrlEncode(next) : null));
             }
             catch (DriverException) when (pagingState is not null)
             {
@@ -253,7 +276,7 @@ namespace EchoPhase.Server.Services.Blocks
                 var current = await _workflows.FindAsync(userId, workflowId, ct);
                 if (current is null)
                     return Failure<BlockRun>(BlockRunErrors.NotFound, "The run's workflow no longer exists.");
-                program = current;
+                program = current.Program;
             }
             else
             {
@@ -264,7 +287,19 @@ namespace EchoPhase.Server.Services.Blocks
             var input = start.TryGetProperty("input", out var stored) ? stored.Clone() : (JsonElement?)null;
 
             return await StartAsync(userId, actorId,
-                new BlockRunStart(program, startIds, input, run.WorkflowId, BlockRunTriggers.Retry), ct);
+                new BlockRunStart(program, startIds, input, await WorkflowOfAsync(run, ct), BlockRunTriggers.Retry), ct);
+        }
+
+        // The run's workflow and package; runs from before packages are looked up.
+        private async Task<RunWorkflow?> WorkflowOfAsync(BlockRun run, CancellationToken ct)
+        {
+            if (run.WorkflowId is not { } workflowId)
+                return null;
+            if (run.PackageId is { } packageId)
+                return new RunWorkflow(workflowId, packageId);
+            return await _workflows.FindAsync(run.UserId, workflowId, ct) is { } saved
+                ? new RunWorkflow(workflowId, saved.PackageId)
+                : null;
         }
 
         public async Task<IServiceResult> CancelAsync(Guid userId, Guid runId, CancellationToken ct = default)
@@ -296,6 +331,8 @@ namespace EchoPhase.Server.Services.Blocks
             _db.BlockRuns.Remove(run);
             if (run.WorkflowId is { } workflowId)
                 _db.WorkflowRuns.Remove(new WorkflowRun { WorkflowId = workflowId, RunId = run.RunId, UserId = run.UserId });
+            if (run.PackageId is { } packageId)
+                _db.PackageRuns.Remove(new PackageRun { PackageId = packageId, RunId = run.RunId, UserId = run.UserId });
             _db.ActiveBlockRuns.Remove(new ActiveBlockRun { RunId = run.RunId, UserId = run.UserId });
             await _db.SaveChangesAsync(CancellationToken.None);
         }

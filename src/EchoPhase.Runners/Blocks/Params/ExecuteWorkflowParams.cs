@@ -10,9 +10,12 @@ namespace EchoPhase.Runners.Blocks.Params
 {
     public class ExecuteWorkflowParams : IValidatable
     {
-        /// <summary>One of the owner's workflows; it starts from its manual start (ManualTrigger or roots).</summary>
-        [JsonPropertyName("workflowId")]
-        public Guid WorkflowId { get; set; }
+        /// <summary>
+        /// The key of a workflow in the same package (not its id: an installed
+        /// copy keeps the keys); it starts from its manual start (ManualTrigger or roots).
+        /// </summary>
+        [JsonPropertyName("workflow")]
+        public Guid Workflow { get; set; }
 
         /// <summary>Its input: a template ("@input.user") or a JSON value; absent: this block's input.</summary>
         [JsonPropertyName("input")]
@@ -20,9 +23,9 @@ namespace EchoPhase.Runners.Blocks.Params
 
         public IValidationResult Validate()
         {
-            if (WorkflowId == Guid.Empty)
+            if (Workflow == Guid.Empty)
                 return ValidationResult.Failure(error =>
-                    error.Set(nameof(WorkflowId), "WorkflowId is required."));
+                    error.Set(nameof(Workflow), "Workflow (the key of a workflow in the package) is required."));
 
             return ValidationResult.Success();
         }

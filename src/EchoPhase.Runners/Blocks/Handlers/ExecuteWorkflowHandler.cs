@@ -20,7 +20,7 @@ namespace EchoPhase.Runners.Blocks.Handlers
     /// buy a run more room. Nesting is bounded (a workflow may call itself).
     /// </summary>
     [BlockType(BlockTypes.ExecuteWorkflow,
-        Description = "Runs one of the owner's workflows from its manual start and waits; output: its last block's output.")]
+        Description = "Runs a workflow of the same package from its manual start and waits; output: its last block's output.")]
     public class ExecuteWorkflowHandler : BlockHandlerBase<ExecuteWorkflowParams>
     {
         public const int MaxCallDepth = 5;
@@ -31,18 +31,21 @@ namespace EchoPhase.Runners.Blocks.Handlers
             if (context.CallDepth >= MaxCallDepth)
                 throw new InvalidOperationException($"Workflows may call each other at most {MaxCallDepth} deep.");
 
+            if (context.PackageId is not { } package)
+                throw new InvalidOperationException("Only a saved workflow calls others: those of its package.");
             var source = context.Services.GetService<IWorkflowSource>()
                 ?? throw new InvalidOperationException("Workflows cannot be called here.");
-            var program = await source.FindAsync(context.UserId, param.WorkflowId, context.CancellationToken)
-                ?? throw new InvalidOperationException($"Workflow {param.WorkflowId} not found.");
+            var target = await source.FindInPackageAsync(context.UserId, package, param.Workflow, context.CancellationToken)
+                ?? throw new InvalidOperationException($"The package has no workflow {param.Workflow}.");
+            var program = target.Program;
 
             // Saved programs were valid when saved; block types may have changed since.
             var validator = GetService<BlockProgramValidator>(context);
             if (validator.Validate(program, int.MaxValue) is [var issue, ..])
-                throw new InvalidOperationException($"Workflow {param.WorkflowId} is invalid: {issue.Message}");
+                throw new InvalidOperationException($"Workflow {param.Workflow} is invalid: {issue.Message}");
             var startIds = validator.ManualStartIds(program);
             if (startIds.Count == 0)
-                throw new InvalidOperationException($"Workflow {param.WorkflowId} has nothing to start: add a ManualTrigger.");
+                throw new InvalidOperationException($"Workflow {param.Workflow} has nothing to start: add a ManualTrigger.");
 
             var input = param.Input.ValueKind == JsonValueKind.Undefined ? call.Input : BlockValues.Evaluate(param.Input, call.Scope);
             var sub = new BlockExecutionContext(program, context.Services, context.UserId, context.CancellationToken)
@@ -50,7 +53,8 @@ namespace EchoPhase.Runners.Blocks.Handlers
                 Limits = context.Limits,
                 RunId = context.RunId,
                 // The sub-workflow keeps its own storage.
-                WorkflowId = param.WorkflowId,
+                WorkflowId = target.WorkflowId,
+                PackageId = target.PackageId,
                 CallDepth = context.CallDepth + 1,
                 Steps = context.Steps
             };
@@ -68,7 +72,7 @@ namespace EchoPhase.Runners.Blocks.Handlers
                 if (error.Type == "LimitExceeded")
                     throw new BlockLimitExceededException(call.Block.Id, error.Message);
                 throw new SubWorkflowFailedException(
-                    $"Workflow {param.WorkflowId} failed at block {error.Id}: {error.Type}: {error.Message}");
+                    $"Workflow {param.Workflow} failed at block {error.Id}: {error.Type}: {error.Message}");
             }
 
             if (context.Output.Count > context.Limits.MaxOutputEntries)

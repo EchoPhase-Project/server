@@ -59,13 +59,12 @@ namespace EchoPhase.Runners.Blocks.Handlers
             }
         }
 
-        private static StorageSlot Slot(IBlockExecutionContext context, StorageScope scope) => scope switch
+        private static StorageSlot Slot(IBlockExecutionContext context, StorageScope scope)
         {
-            StorageScope.User => new StorageSlot(context.UserId, null),
-            _ => new StorageSlot(context.UserId, context.WorkflowId
-                ?? throw new InvalidOperationException(
-                    "Workflow storage belongs to a saved workflow; this program runs unsaved. Use scope User.")),
-        };
+            if (context.PackageId is not { } package || context.WorkflowId is not { } workflow)
+                throw new InvalidOperationException("Storage belongs to a saved workflow and its package; this program runs unsaved.");
+            return new StorageSlot(context.UserId, package, scope == StorageScope.Package ? null : workflow);
+        }
 
         private static string Key(StorageParams param, BlockCall call)
         {

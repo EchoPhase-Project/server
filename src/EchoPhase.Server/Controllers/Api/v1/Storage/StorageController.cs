@@ -31,8 +31,9 @@ namespace EchoPhase.Server.Controllers.Api.v1.Storage
 
     /// <summary>
     /// What workflows keep between runs (the Storage block): a workflow's own
-    /// values with ?workflowId=, the ones its owner's workflows share without.
-    /// To look at, seed or clear them; runs read and write them themselves.
+    /// values with ?workflowId=, the ones a package's workflows share with
+    /// ?packageId= (one of the two). To look at, seed or clear them; runs read
+    /// and write them themselves.
     /// </summary>
     [Route("api/v1/storage")]
     public class StorageController : ApiControllerBase
@@ -41,11 +42,13 @@ namespace EchoPhase.Server.Controllers.Api.v1.Storage
 
         private readonly IWorkflowStore _store;
         private readonly WorkflowService _workflows;
+        private readonly WorkflowPackageService _packages;
 
-        public StorageController(IWorkflowStore store, WorkflowService workflows)
+        public StorageController(IWorkflowStore store, WorkflowService workflows, WorkflowPackageService packages)
         {
             _store = store;
             _workflows = workflows;
+            _packages = packages;
         }
 
         /// <summary>Keys in order (no values), a page at a time: pass the last key as `after`.</summary>
@@ -54,10 +57,10 @@ namespace EchoPhase.Server.Controllers.Api.v1.Storage
         [ProducesResponseType<StorageEntryResponse[]>(StatusCodes.Status200OK)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> List(
-            Guid? workflowId, string? prefix, string? after,
+            Guid? workflowId, Guid? packageId, string? prefix, string? after,
             [Range(1, StorageParams.MaxListLimit)] int limit = 100, CancellationToken ct = default)
         {
-            if (await SlotAsync(workflowId, ct) is not { } slot)
+            if (await SlotAsync(workflowId, packageId, ct) is not { } slot)
                 return WorkflowNotFound();
             var items = await _store.ListAsync(slot, prefix, after, limit, values: false, ct);
             return Ok(items.Select(i => View(i, withValue: false)));
@@ -67,9 +70,9 @@ namespace EchoPhase.Server.Controllers.Api.v1.Storage
         [RequirePermission(Resources.Workflows, Permissions.Read)]
         [ProducesResponseType<StorageEntryResponse>(StatusCodes.Status200OK)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Get([Required] string key, Guid? workflowId, CancellationToken ct = default)
+        public async Task<IActionResult> Get([Required] string key, Guid? workflowId, Guid? packageId, CancellationToken ct = default)
         {
-            if (await SlotAsync(workflowId, ct) is not { } slot)
+            if (await SlotAsync(workflowId, packageId, ct) is not { } slot)
                 return WorkflowNotFound();
             var item = await _store.GetAsync(slot, key, ct);
             return item is null
@@ -85,10 +88,10 @@ namespace EchoPhase.Server.Controllers.Api.v1.Storage
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Put(
-            [Required][MaxLength(StorageEntryConfiguration.MaxKeyLength)] string key, Guid? workflowId,
+            [Required][MaxLength(StorageEntryConfiguration.MaxKeyLength)] string key, Guid? workflowId, Guid? packageId,
             [FromBody] PutStorageRequest dto, CancellationToken ct = default)
         {
-            if (await SlotAsync(workflowId, ct) is not { } slot)
+            if (await SlotAsync(workflowId, packageId, ct) is not { } slot)
                 return WorkflowNotFound();
             try
             {
@@ -109,27 +112,35 @@ namespace EchoPhase.Server.Controllers.Api.v1.Storage
         [RequirePermission(Resources.Workflows, Permissions.Update)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Delete([Required] string key, Guid? workflowId, CancellationToken ct = default)
+        public async Task<IActionResult> Delete([Required] string key, Guid? workflowId, Guid? packageId, CancellationToken ct = default)
         {
-            if (await SlotAsync(workflowId, ct) is not { } slot)
+            if (await SlotAsync(workflowId, packageId, ct) is not { } slot)
                 return WorkflowNotFound();
             return await _store.DeleteAsync(slot, key, ct)
                 ? NoContent()
                 : Error(ErrorCodes.NotFound, $"No value under '{key}'.", StatusCodes.Status404NotFound);
         }
 
-        // A workflow's storage only for its owner; without one, the shared scope.
-        private async Task<StorageSlot?> SlotAsync(Guid? workflowId, CancellationToken ct)
+        // A workflow's storage, or its package's shared one, only for their owner.
+        private async Task<StorageSlot?> SlotAsync(Guid? workflowId, Guid? packageId, CancellationToken ct)
         {
             var userId = User.GetUserId();
-            if (workflowId is not { } id)
-                return new StorageSlot(userId, null);
-            var workflow = await _workflows.GetAsync(userId, id, ct);
-            return workflow.Successful ? new StorageSlot(userId, id) : null;
+            if (workflowId is { } id)
+            {
+                var workflow = await _workflows.GetAsync(userId, id, ct);
+                return workflow.Successful ? new StorageSlot(userId, workflow.Value.Workflow.PackageId, id) : null;
+            }
+            if (packageId is { } package)
+            {
+                var found = await _packages.GetAsync(userId, package, ct);
+                return found.Successful && found.Value.Access == PackageAccess.Owner ? new StorageSlot(userId, package, null) : null;
+            }
+            return null;
         }
 
         private ObjectResult WorkflowNotFound()
-            => Error(ErrorCodes.NotFound, "Workflow not found.", StatusCodes.Status404NotFound);
+            => Error(ErrorCodes.NotFound, "No such workflow or package of yours (give workflowId or packageId).",
+                StatusCodes.Status404NotFound);
 
         private static StorageEntryResponse View(StorageItem item, bool withValue)
             => new(item.Key, item.Size, item.UpdatedAt, item.ExpiresAt,

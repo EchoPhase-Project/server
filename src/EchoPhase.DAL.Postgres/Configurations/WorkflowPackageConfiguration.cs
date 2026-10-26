@@ -23,6 +23,8 @@ namespace EchoPhase.DAL.Postgres.Configurations
             // Explore: public packages.
             builder.HasIndex(p => p.Visibility);
             builder.HasIndex(p => p.Tags).HasMethod("gin");
+            // A user's installs of a package: what an update finds.
+            builder.HasIndex(p => new { p.OwnerId, p.SourcePackageId }).HasFilter("\"SourcePackageId\" IS NOT NULL");
 
             builder.Property(p => p.Name).HasMaxLength(MaxNameLength).IsRequired();
             builder.Property(p => p.Summary).HasMaxLength(MaxSummaryLength).IsRequired();
@@ -33,6 +35,12 @@ namespace EchoPhase.DAL.Postgres.Configurations
                 .WithMany()
                 .HasForeignKey(p => p.OwnerId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Installs outlive the package they came from.
+            builder.HasOne(p => p.SourcePackage)
+                .WithMany()
+                .HasForeignKey(p => p.SourcePackageId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 

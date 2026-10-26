@@ -30,6 +30,10 @@ namespace EchoPhase.Server.Services.Workflows.Commands
         [Description("Name instead of the one in the file")]
         public string? Name { get; set; }
 
+        [CommandOption("--package")]
+        [Description("Id of the owner's package it goes in; left out: a new package of its own")]
+        public Guid? Package { get; set; }
+
         public override ValidationResult Validate()
             => string.IsNullOrWhiteSpace(User) ? ValidationResult.Error("--user is required.") : ValidationResult.Success();
     }
@@ -76,7 +80,8 @@ namespace EchoPhase.Server.Services.Workflows.Commands
                 return CliExit.Failure;
             }
 
-            var result = await _workflows.CreateAsync(owner.Id, null, settings.Name ?? name, program, active: false, cancellationToken);
+            var result = await _workflows.CreateAsync(owner.Id, null, settings.Package, settings.Name ?? name, program,
+                active: false, cancellationToken);
             if (!result.Successful)
             {
                 AnsiConsole.MarkupLineInterpolated($"[red]{result.Error.Message}[/]");
@@ -84,7 +89,7 @@ namespace EchoPhase.Server.Services.Workflows.Commands
             }
 
             AnsiConsole.MarkupLineInterpolated(
-                $"[green]Imported '{result.Value.Workflow.Name}' for '{settings.User}' as {result.Value.Workflow.Id}, inactive.[/]");
+                $"[green]Imported '{result.Value.Workflow.Name}' for '{settings.User}' as {result.Value.Workflow.Id} (package {result.Value.Workflow.PackageId}), inactive.[/]");
             return CliExit.Success;
         }
     }

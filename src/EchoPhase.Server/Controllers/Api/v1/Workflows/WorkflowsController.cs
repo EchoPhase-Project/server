@@ -19,9 +19,9 @@ using Microsoft.Net.Http.Headers;
 namespace EchoPhase.Server.Controllers.Api.v1.Workflows
 {
     /// <summary>
-    /// Saved block programs. A workflow's runs are listed here
-    /// ({id}/runs) and fetched with the other runs (api/v1/blocks/runs);
-    /// their webhooks are api/v1/hooks.
+    /// Saved block programs, each in a package (api/v1/workflow-packages).
+    /// A workflow's runs are listed here ({id}/runs) and fetched with the
+    /// other runs (api/v1/blocks/runs); their webhooks are api/v1/hooks.
     /// </summary>
     [Route("api/v1/workflows")]
     public class WorkflowsController : ApiControllerBase
@@ -35,12 +35,13 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             _runs = runs;
         }
 
+        /// <summary>The caller's workflows, by name; those of one package with `packageId`.</summary>
         [HttpGet]
         [RequirePermission(Resources.Workflows, Permissions.Read)]
         [ProducesResponseType<WorkflowSummaryResponse[]>(StatusCodes.Status200OK)]
-        public async Task<IActionResult> List(CancellationToken ct = default)
+        public async Task<IActionResult> List(Guid? packageId, CancellationToken ct = default)
         {
-            var workflows = await _workflows.ListAsync(User.GetUserId(), ct);
+            var workflows = await _workflows.ListAsync(User.GetUserId(), packageId, ct);
             return Ok(workflows.Select(WorkflowSummaryResponse.From));
         }
 
@@ -54,14 +55,17 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             return result.Successful ? Ok(WorkflowResponse.From(result.Value)) : Failure(result.Error);
         }
 
+        /// <summary>A new workflow in the package given, or in a new package of its own.</summary>
         [HttpPost]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Workflows, Permissions.Create)]
         [ProducesResponseType<WorkflowResponse>(StatusCodes.Status201Created)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Create([FromBody] SaveWorkflowRequest dto, CancellationToken ct = default)
         {
-            var result = await _workflows.CreateAsync(User.GetUserId(), User.GetActorId(), dto.Name, dto.Program, dto.Active, ct);
+            var result = await _workflows.CreateAsync(User.GetUserId(), User.GetActorId(), dto.PackageId, dto.Name, dto.Program,
+                dto.Active, ct);
             return result.Successful
                 ? CreatedAtAction(nameof(Get), new { id = result.Value.Workflow.Id }, WorkflowResponse.From(result.Value))
                 : Failure(result.Error);
@@ -102,6 +106,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         /// file's contentHash (it was edited after export).
         /// </summary>
         /// <param name="name">Instead of the name in the file.</param>
+        /// <param name="packageId">The package it goes in; absent: a new package of its own.</param>
         [HttpPost("import")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Workflows, Permissions.Create)]
@@ -109,8 +114,10 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         [Consumes("application/json")]
         [ProducesResponseType<WorkflowImportResponse>(StatusCodes.Status201Created)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Import([FromBody] JsonElement file, [MaxLength(100)] string? name, CancellationToken ct = default)
-            => Imported(await _workflows.ImportAsync(User.GetUserId(), User.GetActorId(), file.GetRawText(), name, ct));
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Import([FromBody] JsonElement file, [MaxLength(100)] string? name, Guid? packageId,
+            CancellationToken ct = default)
+            => Imported(await _workflows.ImportAsync(User.GetUserId(), User.GetActorId(), file.GetRawText(), name, packageId, ct));
 
         /// <summary>The same, from an uploaded file (multipart/form-data: file, name).</summary>
         [HttpPost("import/file")]
@@ -120,13 +127,14 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         [Consumes("multipart/form-data")]
         [ProducesResponseType<WorkflowImportResponse>(StatusCodes.Status201Created)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> ImportFile([FromForm] ImportWorkflowFileRequest dto, CancellationToken ct = default)
         {
             if (dto.File.Length > MaxImportBytes)
                 return Error(WorkflowErrors.Invalid, $"An export file is at most {MaxImportBytes} bytes.", StatusCodes.Status400BadRequest);
             using var reader = new StreamReader(dto.File.OpenReadStream(), Encoding.UTF8);
             var json = await reader.ReadToEndAsync(ct);
-            return Imported(await _workflows.ImportAsync(User.GetUserId(), User.GetActorId(), json, dto.Name, ct));
+            return Imported(await _workflows.ImportAsync(User.GetUserId(), User.GetActorId(), json, dto.Name, dto.PackageId, ct));
         }
 
         /// <summary>An export file is a program of at most a few hundred blocks: far below this.</summary>
@@ -152,11 +160,13 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             return result.Successful ? Ok(WorkflowResponse.From(result.Value)) : Failure(result.Error);
         }
 
+        /// <summary>Deletes it; 409 while another workflow of its package calls it or it is the package's error workflow.</summary>
         [HttpDelete("{id:guid}")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Workflows, Permissions.Delete)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
         {
             var result = await _workflows.DeleteAsync(User.GetUserId(), id, ct);

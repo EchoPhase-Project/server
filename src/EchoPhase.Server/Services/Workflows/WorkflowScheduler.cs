@@ -68,7 +68,8 @@ namespace EchoPhase.Server.Services.Workflows
                 };
 
                 var result = await runs.StartAsync(workflow.UserId, null, new BlockRunStart(
-                    WorkflowService.Parse(workflow), [schedule.BlockId], input, workflow.Id, BlockRunTriggers.Schedule), ct);
+                    WorkflowService.Parse(workflow), [schedule.BlockId], input, new RunWorkflow(workflow.Id, workflow.PackageId),
+                    BlockRunTriggers.Schedule), ct);
 
                 if (result.Successful)
                     started++;

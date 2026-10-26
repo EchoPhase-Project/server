@@ -11,11 +11,13 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
     /// <param name="Program">Blocks, connections and settings.</param>
     /// <param name="Active">Triggers (webhook, schedule) start runs only while active.</param>
     /// <param name="Version">On update: the version you edited; a newer one on the server is a 409.</param>
+    /// <param name="PackageId">On create: the package it goes in; absent: a new package of its own, of the same name. Ignored on update.</param>
     public sealed record SaveWorkflowRequest(
         [Required][MaxLength(100)] string Name,
         [Required] BlockProgram Program,
         bool Active = false,
-        int? Version = null);
+        int? Version = null,
+        Guid? PackageId = null);
 
     /// <param name="Input">The first blocks' input (a ManualTrigger's output).</param>
     public sealed record RunWorkflowRequest(JsonElement? Input = null);
@@ -31,5 +33,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         /// <summary>Instead of the name in the file.</summary>
         [MaxLength(100)]
         public string? Name { get; set; }
+
+        /// <summary>The package it goes in; absent: a new package of its own.</summary>
+        public Guid? PackageId { get; set; }
     }
 }

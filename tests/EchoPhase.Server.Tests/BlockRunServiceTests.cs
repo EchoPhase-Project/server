@@ -73,11 +73,11 @@ namespace EchoPhase.Server.Tests
         public async Task AWorkflowsRuns_AreListedNewestFirst_APageAtATime_AndOnlyItsOwn()
         {
             _options.Blocks.MaxActivePerUser = 10;
-            Guid workflow = Guid.NewGuid(), other = Guid.NewGuid();
+            Guid workflow = Guid.NewGuid(), other = Guid.NewGuid(), package = Guid.NewGuid();
             var runs = new List<BlockRun>();
             foreach (var id in new[] { workflow, other, workflow, workflow })
             {
-                runs.Add((await Service().StartAsync(_user, null, new BlockRunStart(Program(), WorkflowId: id), Ct)).Ok());
+                runs.Add((await Service().StartAsync(_user, null, new BlockRunStart(Program(), Workflow: new RunWorkflow(id, package)), Ct)).Ok());
                 _time.Advance(TimeSpan.FromSeconds(1));
             }
             await Start(); // not a workflow's
@@ -90,6 +90,11 @@ namespace EchoPhase.Server.Tests
 
             // Another user asking for the same workflow id sees nothing.
             Assert.Empty((await Service().ListByWorkflowAsync(Guid.NewGuid(), workflow, 10, null, Ct)).Ok().Items);
+
+            // The package lists the runs of all its workflows.
+            var byPackage = (await Service().ListByPackageAsync(_user, package, 10, null, Ct)).Ok();
+            Assert.Equal(runs.AsEnumerable().Reverse().Select(r => r.RunId), byPackage.Items.Select(r => r.RunId));
+            Assert.All(byPackage.Items, r => Assert.Equal(package, r.PackageId));
         }
 
         [Fact]
@@ -157,8 +162,11 @@ namespace EchoPhase.Server.Tests
 
         private sealed class NoWorkflows : IWorkflowSource
         {
-            public Task<BlockProgram?> FindAsync(Guid userId, Guid workflowId, CancellationToken ct)
-                => Task.FromResult<BlockProgram?>(null);
+            public Task<SavedProgram?> FindAsync(Guid userId, Guid workflowId, CancellationToken ct)
+                => Task.FromResult<SavedProgram?>(null);
+
+            public Task<SavedProgram?> FindInPackageAsync(Guid userId, Guid packageId, Guid key, CancellationToken ct)
+                => Task.FromResult<SavedProgram?>(null);
         }
     }
 }

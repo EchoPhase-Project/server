@@ -21,7 +21,7 @@ namespace EchoPhase.Server.Tests
         private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero));
         private readonly PostgresContext _db;
         private readonly RunnerOptions _options = new();
-        private readonly StorageSlot _slot = new(Guid.NewGuid(), Guid.NewGuid());
+        private readonly StorageSlot _slot = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
         public WorkflowStoreTests()
         {

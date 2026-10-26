@@ -8,23 +8,22 @@ using EchoPhase.Runners.Blocks.Handlers;
 namespace EchoPhase.Runners.Blocks.Models
 {
     /// <summary>What a program reaches outside itself.</summary>
-    /// <param name="Workflows">The owner's other workflows: ExecuteWorkflow targets and the error workflow.</param>
+    /// <param name="Workflows">The keys of the workflows of its package it calls (ExecuteWorkflow).</param>
     /// <param name="Connections">The owner's connections, by name.</param>
     public sealed record ProgramLinks(IReadOnlySet<Guid> Workflows, IReadOnlySet<string> Connections);
 
     /// <summary>How to point a program at another owner's things.</summary>
-    /// <param name="Workflows">Old workflow id to new; ids not in it stay.</param>
     /// <param name="Connections">Old connection name to new; names not in it stay.</param>
     /// <param name="WebhookSecret">Gives every WebhookTrigger a new secret; null: they keep theirs.</param>
     public sealed record LinkRewrite(
-        IReadOnlyDictionary<Guid, Guid> Workflows,
         IReadOnlyDictionary<string, string> Connections,
         Func<string>? WebhookSecret = null);
 
     /// <summary>
-    /// The places a program names its owner's workflows, connections and
-    /// secrets, read and rewritten: what changes when a program moves to
-    /// another owner (a published package installed).
+    /// The places a program names the workflows of its package and its
+    /// owner's connections and secrets: read, and rewritten when a program
+    /// moves to another owner (a published package installed). Workflows are
+    /// named by key, the same in every copy, so they never need rewriting.
     /// </summary>
     public static class WorkflowLinks
     {
@@ -32,13 +31,10 @@ namespace EchoPhase.Runners.Blocks.Models
         {
             var workflows = new HashSet<Guid>();
             var connections = new HashSet<string>(StringComparer.Ordinal);
-            if (program.Settings.ErrorWorkflowId is { } errorWorkflow)
-                workflows.Add(errorWorkflow);
-
             foreach (var block in Blocks(Node(program)))
             {
                 var parameters = block.Params;
-                if (block.Type == BlockTypes.ExecuteWorkflow.ToString() && GuidOf(parameters?["workflowId"]) is { } target)
+                if (block.Type == BlockTypes.ExecuteWorkflow.ToString() && GuidOf(parameters?["workflow"]) is { } target)
                     workflows.Add(target);
                 if (parameters?["connection"] is JsonValue connection && connection.TryGetValue(out string? name)
                     && !string.IsNullOrEmpty(name))
@@ -51,17 +47,10 @@ namespace EchoPhase.Runners.Blocks.Models
         public static BlockProgram Rewrite(BlockProgram program, LinkRewrite rewrite)
         {
             var root = Node(program);
-            if (root["settings"] is JsonObject settings && GuidOf(settings["errorWorkflowId"]) is { } errorWorkflow
-                && rewrite.Workflows.TryGetValue(errorWorkflow, out var newErrorWorkflow))
-                settings["errorWorkflowId"] = newErrorWorkflow;
-
             foreach (var block in Blocks(root))
             {
                 if (block.Params is not { } parameters)
                     continue;
-                if (block.Type == BlockTypes.ExecuteWorkflow.ToString() && GuidOf(parameters["workflowId"]) is { } target
-                    && rewrite.Workflows.TryGetValue(target, out var newTarget))
-                    parameters["workflowId"] = newTarget;
                 if (parameters["connection"] is JsonValue connection && connection.TryGetValue(out string? name)
                     && rewrite.Connections.TryGetValue(name, out var newName))
                     parameters["connection"] = newName;

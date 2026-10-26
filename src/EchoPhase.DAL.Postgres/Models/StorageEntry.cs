@@ -8,8 +8,8 @@ namespace EchoPhase.DAL.Postgres.Models
 {
     /// <summary>
     /// A value a workflow keeps between runs (the Storage block): one
-    /// workflow's own (WorkflowId set) or shared by all of a user's workflows
-    /// (WorkflowId null). Goes with its workflow or user.
+    /// workflow's own (WorkflowId set) or shared by the workflows of its
+    /// package (WorkflowId null). Goes with its workflow or package.
     /// </summary>
     public class StorageEntry : ITrackingEntity, IIdentifiable
     {
@@ -18,7 +18,11 @@ namespace EchoPhase.DAL.Postgres.Models
         public Guid UserId { get; set; }
         public User? User { get; set; }
 
-        /// <summary>The workflow it belongs to; null: shared by the user's workflows.</summary>
+        /// <summary>The package it belongs to.</summary>
+        public Guid PackageId { get; set; }
+        public WorkflowPackage? Package { get; set; }
+
+        /// <summary>The workflow it belongs to; null: shared by the package's workflows.</summary>
         public Guid? WorkflowId { get; set; }
         public Workflow? Workflow { get; set; }
 
