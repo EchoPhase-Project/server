@@ -447,6 +447,18 @@ namespace EchoPhase.Server.Tests
         }
 
         [Fact]
+        public async Task Tags_OfPublicPackages_MostUsedFirst_ByPrefix()
+        {
+            await PublishPairAsync(PackageVisibility.Public, "discord-bot", "guilds");
+            await PublishPairAsync(PackageVisibility.Public, "discord-bot");
+            await PublishPairAsync(PackageVisibility.Private, "secret-tag");
+
+            var all = await Packages().TagsAsync(null, 10, Ct);
+            Assert.Equal([new TagCount("discord-bot", 2), new TagCount("guilds", 1)], all);
+            Assert.Equal(["discord-bot"], (await Packages().TagsAsync("Disc", 10, Ct)).Select(t => t.Tag));
+        }
+
+        [Fact]
         public async Task Tags_MustBeWords()
         {
             var result = await Packages().CreateAsync(_ann.Id, Input(PackageVisibility.Public, null, "c#"), Ct);

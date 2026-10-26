@@ -129,6 +129,10 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
     public sealed record PackageInstallResponse(PackageResponse Package, IReadOnlyList<WorkflowSummaryResponse> Workflows, int Version,
         IReadOnlyList<PackageConnection> MissingConnections);
 
+    /// <param name="Tag">The tag, as kept: lower case, dashes.</param>
+    /// <param name="Packages">How many public packages carry it.</param>
+    public sealed record PackageTagResponse(string Tag, int Packages);
+
     /// <param name="UserName">Whom to share it with.</param>
     public sealed record SharePackageRequest([Required] string UserName);
 
@@ -180,6 +184,17 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
                 ? Ok(new CursorPageResponse<PackageResponse>(result.Value.Items.Select(PackageResponse.From).ToList(), result.Value.NextCursor))
                 : Failure(result.Error);
         }
+
+        /// <summary>
+        /// The tags of public packages, most used first, for a search's
+        /// suggestions (`tag:`); `q` keeps those starting with it.
+        /// </summary>
+        [HttpGet("explore/tags")]
+        [RequirePermission(Resources.Workflows, Permissions.Read)]
+        [ProducesResponseType<PackageTagResponse[]>(StatusCodes.Status200OK)]
+        public async Task<IActionResult> Tags([MaxLength(WorkflowPackageConfiguration.MaxTagLength)] string? q,
+            [Range(1, 50)] int limit = 10, CancellationToken ct = default)
+            => Ok((await _packages.TagsAsync(q, limit, ct)).Select(t => new PackageTagResponse(t.Tag, t.Packages)));
 
         [HttpGet("{id:guid}")]
         [RequirePermission(Resources.Workflows, Permissions.Read)]

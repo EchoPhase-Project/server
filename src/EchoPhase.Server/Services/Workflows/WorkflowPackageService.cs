@@ -30,6 +30,9 @@ namespace EchoPhase.Server.Services.Workflows
     /// <param name="Workflows">How many workflows it has now (its owner's; others see versions).</param>
     public sealed record PackageView(WorkflowPackage Package, PackageAccess Access, int Installs = 0, int Workflows = 0);
 
+    /// <summary>A tag and how many listed packages carry it.</summary>
+    public sealed record TagCount(string Tag, int Packages);
+
     /// <summary>A page of packages and where the next one starts (null: this is the last).</summary>
     public sealed record PackagePage(IReadOnlyList<PackageView> Items, string? NextCursor);
 
@@ -152,6 +155,31 @@ namespace EchoPhase.Server.Services.Workflows
                     return null;
                 }
             }
+        }
+
+        /// <summary>
+        /// The tags of the packages Explore lists, most used first, those
+        /// starting with <paramref name="prefix"/> (as tags are kept: lower
+        /// case, dashes): what a search can filter by.
+        /// </summary>
+        public async Task<IReadOnlyList<TagCount>> TagsAsync(string? prefix, int limit, CancellationToken ct = default)
+        {
+            var start = string.Join('-', (prefix ?? string.Empty).Trim().ToLowerInvariant()
+                .Split([' ', '_'], StringSplitOptions.RemoveEmptyEntries));
+            // Only the tag arrays are read; counted here (a few per package).
+            var arrays = await _db.WorkflowPackages.AsNoTracking()
+                .Where(p => p.Visibility == PackageVisibility.Public && p.LatestVersion > 0)
+                .Select(p => p.Tags)
+                .ToListAsync(ct);
+            return arrays
+                .SelectMany(tags => tags)
+                .Where(tag => tag.StartsWith(start, StringComparison.Ordinal))
+                .GroupBy(tag => tag)
+                .Select(g => new TagCount(g.Key, g.Count()))
+                .OrderByDescending(t => t.Packages)
+                .ThenBy(t => t.Tag, StringComparer.Ordinal)
+                .Take(limit)
+                .ToList();
         }
 
         public async Task<IServiceResult<PackageView>> GetAsync(Guid userId, Guid id, CancellationToken ct = default)
