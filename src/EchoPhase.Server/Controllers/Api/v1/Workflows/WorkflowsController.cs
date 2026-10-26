@@ -4,54 +4,35 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Json;
-using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.DAL.Scylla.Entities;
-using EchoPhase.Runners.Blocks;
-using EchoPhase.Runners.Blocks.Models;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Blocks;
 using EchoPhase.Server.Controllers.Api.v1.Common;
+using EchoPhase.Server.Services.Blocks;
 using EchoPhase.Server.Services.Workflows;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Workflows
 {
-    /// <param name="PackageId">The package it was installed from (it may be gone since).</param>
-    /// <param name="Version">That package's version.</param>
-    /// <param name="Key">Which of the package's workflows it is a copy of.</param>
-    public sealed record WorkflowSourceResponse(Guid PackageId, int? Version, Guid? Key);
-
-    /// <param name="Id">The workflow's id.</param>
-    /// <param name="Name">Its name.</param>
-    /// <param name="Active">Its triggers start runs.</param>
-    /// <param name="Version">Bumped on every change of its program.</param>
-    /// <param name="ContentHash">SHA-256 of its program; null until a workflow saved before hashes is saved again.</param>
-    /// <param name="Source">Where it was installed from; null: made here.</param>
-    /// <param name="CreatedAt">When it was created.</param>
-    /// <param name="UpdatedAt">When it last changed.</param>
-    public sealed record WorkflowSummaryResponse(Guid Id, string Name, bool Active, int Version, string? ContentHash,
-        WorkflowSourceResponse? Source, DateTime CreatedAt, DateTime UpdatedAt)
-    {
-        public static WorkflowSummaryResponse From(Workflow w) => new(w.Id, w.Name, w.Active, w.Version, w.ContentHash,
-            w.SourcePackageId is { } package ? new WorkflowSourceResponse(package, w.SourcePackageVersion, w.SourceKey) : null,
-            w.CreatedAt, w.UpdatedAt);
-    }
-
     /// <summary>
-    /// Saved block programs. Runs of them are listed and fetched with the
-    /// other runs (api/v1/blocks/runs); their webhooks are api/v1/hooks.
+    /// Saved block programs. A workflow's runs are listed here
+    /// ({id}/runs) and fetched with the other runs (api/v1/blocks/runs);
+    /// their webhooks are api/v1/hooks.
     /// </summary>
     [Route("api/v1/workflows")]
     public class WorkflowsController : ApiControllerBase
     {
         private readonly WorkflowService _workflows;
+        private readonly BlockRunService _runs;
 
-        public WorkflowsController(WorkflowService workflows)
+        public WorkflowsController(WorkflowService workflows, BlockRunService runs)
         {
             _workflows = workflows;
+            _runs = runs;
         }
 
         [HttpGet]
@@ -65,20 +46,24 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
 
         [HttpGet("{id:guid}")]
         [RequirePermission(Resources.Workflows, Permissions.Read)]
+        [ProducesResponseType<WorkflowResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Get(Guid id, CancellationToken ct = default)
         {
             var result = await _workflows.GetAsync(User.GetUserId(), id, ct);
-            return result.Successful ? Ok(View(result.Value)) : Failure(result.Error);
+            return result.Successful ? Ok(WorkflowResponse.From(result.Value)) : Failure(result.Error);
         }
 
         [HttpPost]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Workflows, Permissions.Create)]
+        [ProducesResponseType<WorkflowResponse>(StatusCodes.Status201Created)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromBody] SaveWorkflowRequest dto, CancellationToken ct = default)
         {
             var result = await _workflows.CreateAsync(User.GetUserId(), User.GetActorId(), dto.Name, dto.Program, dto.Active, ct);
             return result.Successful
-                ? CreatedAtAction(nameof(Get), new { id = result.Value.Workflow.Id }, View(result.Value))
+                ? CreatedAtAction(nameof(Get), new { id = result.Value.Workflow.Id }, WorkflowResponse.From(result.Value))
                 : Failure(result.Error);
         }
 
@@ -122,7 +107,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         [RequirePermission(Resources.Workflows, Permissions.Create)]
         [RequestSizeLimit(MaxImportBytes)]
         [Consumes("application/json")]
-        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType<WorkflowImportResponse>(StatusCodes.Status201Created)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Import([FromBody] JsonElement file, [MaxLength(100)] string? name, CancellationToken ct = default)
             => Imported(await _workflows.ImportAsync(User.GetUserId(), User.GetActorId(), file.GetRawText(), name, ct));
@@ -133,7 +118,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         [RequirePermission(Resources.Workflows, Permissions.Create)]
         [RequestSizeLimit(MaxImportBytes)]
         [Consumes("multipart/form-data")]
-        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType<WorkflowImportResponse>(StatusCodes.Status201Created)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> ImportFile([FromForm] ImportWorkflowFileRequest dto, CancellationToken ct = default)
         {
@@ -150,22 +135,28 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         private IActionResult Imported(Types.Result.IServiceResult<WorkflowImport> result)
             => result.Successful
                 ? CreatedAtAction(nameof(Get), new { id = result.Value.Details.Workflow.Id },
-                    new { workflow = View(result.Value.Details), intact = result.Value.Intact })
+                    new WorkflowImportResponse(WorkflowResponse.From(result.Value.Details), result.Value.Intact))
                 : Failure(result.Error);
 
         /// <summary>Replaces name, program and active flag; send the version you edited to avoid lost updates.</summary>
         [HttpPut("{id:guid}")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Workflows, Permissions.Update)]
+        [ProducesResponseType<WorkflowResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> Update(Guid id, [FromBody] SaveWorkflowRequest dto, CancellationToken ct = default)
         {
             var result = await _workflows.UpdateAsync(User.GetUserId(), User.GetActorId(), id, dto.Name, dto.Program, dto.Active, dto.Version, ct);
-            return result.Successful ? Ok(View(result.Value)) : Failure(result.Error);
+            return result.Successful ? Ok(WorkflowResponse.From(result.Value)) : Failure(result.Error);
         }
 
         [HttpDelete("{id:guid}")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Workflows, Permissions.Delete)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
         {
             var result = await _workflows.DeleteAsync(User.GetUserId(), id, ct);
@@ -176,6 +167,10 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         [HttpPost("{id:guid}/runs")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Workflows, Permissions.Execute)]
+        [ProducesResponseType<RunStartedResponse>(StatusCodes.Status202Accepted)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status429TooManyRequests)]
         public async Task<IActionResult> Run(Guid id, [FromBody] RunWorkflowRequest? dto, CancellationToken ct = default)
         {
             var result = await _workflows.RunAsync(User.GetUserId(), User.GetActorId(), id, dto?.Input, ct);
@@ -183,49 +178,49 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
                 return Failure(result.Error);
 
             var runId = result.Value.RunId;
-            return Accepted($"/api/v1/blocks/runs/{runId}", new { runId, status = BlockRunStatus.Queued });
+            return Accepted($"/api/v1/blocks/runs/{runId}", new RunStartedResponse(runId, BlockRunStatus.Queued));
+        }
+
+        /// <summary>Its runs, newest first, a page at a time (pass nextCursor as cursor).</summary>
+        [HttpGet("{id:guid}/runs")]
+        [RequirePermission(Resources.Workflows, Permissions.Read)]
+        [ProducesResponseType<BlockRunPageResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Runs(Guid id, [Range(1, 100)] int limit = 20, [MaxLength(512)] string? cursor = null,
+            CancellationToken ct = default)
+        {
+            var workflow = await _workflows.GetAsync(User.GetUserId(), id, ct);
+            if (!workflow.Successful)
+                return Failure(workflow.Error);
+
+            var page = await _runs.ListByWorkflowAsync(User.GetUserId(), id, limit, cursor, ct);
+            return page.Successful
+                ? Ok(new BlockRunPageResponse(page.Value.Items.Select(BlockRunResponse.From).ToList(), page.Value.NextCursor))
+                : Failure(page.Error);
         }
 
         /// <summary>Saved versions, newest first: one per change of the program, the last 50.</summary>
         [HttpGet("{id:guid}/versions")]
         [RequirePermission(Resources.Workflows, Permissions.Read)]
+        [ProducesResponseType<WorkflowVersionResponse[]>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Versions(Guid id, CancellationToken ct = default)
         {
             var result = await _workflows.VersionsAsync(User.GetUserId(), id, ct);
             return result.Successful
-                ? Ok(result.Value.Select(v => new
-                {
-                    version = v.Version,
-                    name = v.Name,
-                    contentHash = v.ContentHash,
-                    parentVersion = v.ParentVersion,
-                    restoredFrom = v.RestoredFrom,
-                    savedBy = v.SavedBy,
-                    createdAt = v.CreatedAt,
-                }))
+                ? Ok(result.Value.Select(WorkflowVersionResponse.From))
                 : Failure(result.Error);
         }
 
         [HttpGet("{id:guid}/versions/{version:int}")]
         [RequirePermission(Resources.Workflows, Permissions.Read)]
+        [ProducesResponseType<WorkflowVersionDetailsResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Version(Guid id, int version, CancellationToken ct = default)
         {
             var result = await _workflows.VersionAsync(User.GetUserId(), id, version, ct);
-            if (!result.Successful)
-                return Failure(result.Error);
-
-            var v = result.Value.Version;
-            return Ok(new
-            {
-                version = v.Version,
-                name = v.Name,
-                contentHash = v.ContentHash ?? BlockProgramHash.Of(result.Value.Program),
-                parentVersion = v.ParentVersion,
-                restoredFrom = v.RestoredFrom,
-                savedBy = v.SavedBy,
-                createdAt = v.CreatedAt,
-                program = result.Value.Program,
-            });
+            return result.Successful ? Ok(WorkflowVersionDetailsResponse.From(result.Value)) : Failure(result.Error);
         }
 
         /// <summary>
@@ -235,31 +230,14 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
         [HttpPost("{id:guid}/versions/{version:int}/restore")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Workflows, Permissions.Update)]
+        [ProducesResponseType<WorkflowResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> Restore(Guid id, int version, [FromBody] RestoreWorkflowRequest? dto, CancellationToken ct = default)
         {
             var result = await _workflows.RestoreAsync(User.GetUserId(), User.GetActorId(), id, version, dto?.CurrentVersion, ct);
-            return result.Successful ? Ok(View(result.Value)) : Failure(result.Error);
+            return result.Successful ? Ok(WorkflowResponse.From(result.Value)) : Failure(result.Error);
         }
-
-        private static object View(WorkflowDetails details) => new
-        {
-            id = details.Workflow.Id,
-            name = details.Workflow.Name,
-            active = details.Workflow.Active,
-            version = details.Workflow.Version,
-            contentHash = details.Workflow.ContentHash ?? BlockProgramHash.Of(details.Program),
-            source = details.Workflow.SourcePackageId is { } package
-                ? new { packageId = package, version = details.Workflow.SourcePackageVersion, key = details.Workflow.SourceKey }
-                : null,
-            createdAt = details.Workflow.CreatedAt,
-            updatedAt = details.Workflow.UpdatedAt,
-            program = details.Program,
-            // Where each WebhookTrigger listens (POST, X-Webhook-Secret header).
-            webhooks = details.Program.Blocks
-                .Where(b => b.Type == BlockTypes.WebhookTrigger)
-                .Select(b => new { blockId = b.Id, path = $"/api/v1/hooks/{details.Workflow.Id}/{b.Id}" }),
-            schedules = details.Workflow.Schedules
-                .Select(s => new { blockId = s.BlockId, cron = s.Cron, timeZone = s.TimeZone, nextRunAt = s.NextRunAt })
-        };
     }
 }

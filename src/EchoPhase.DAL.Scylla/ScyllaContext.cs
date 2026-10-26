@@ -13,6 +13,7 @@ namespace EchoPhase.DAL.Scylla
         public DbSet<BlockRun> BlockRuns => Set<BlockRun>();
         public DbSet<BlockRunResult> BlockRunResults => Set<BlockRunResult>();
         public DbSet<ActiveBlockRun> ActiveBlockRuns => Set<ActiveBlockRun>();
+        public DbSet<WorkflowRun> WorkflowRuns => Set<WorkflowRun>();
         public DbSet<Notification> Notifications => Set<Notification>();
 
         public ScyllaContext(ScyllaConnection connection) : base(connection)
@@ -59,6 +60,17 @@ namespace EchoPhase.DAL.Scylla
                 [nameof(BlockRunResult.UserId)] = "user_id",
                 [nameof(BlockRunResult.RunId)] = "run_id",
                 [nameof(BlockRunResult.Payload)] = "payload",
+            });
+
+            builder.Entity<WorkflowRun>()
+                .ToTable("workflow_runs")
+                .HasPartitionKey<Guid>(x => x.WorkflowId)
+                .HasClusteringKey<Guid>(x => x.RunId);
+            Columns(builder.Entity<WorkflowRun>(), new()
+            {
+                [nameof(WorkflowRun.WorkflowId)] = "workflow_id",
+                [nameof(WorkflowRun.RunId)] = "run_id",
+                [nameof(WorkflowRun.UserId)] = "user_id",
             });
 
             builder.Entity<ActiveBlockRun>()

@@ -99,6 +99,8 @@ namespace EchoPhase.Server.Services.Blocks
             {
                 // Stored before it is queued, so the worker always finds the row.
                 _db.BlockRuns.Add(run, History);
+                if (run.WorkflowId is { } workflowId)
+                    _db.WorkflowRuns.Add(new WorkflowRun { WorkflowId = workflowId, RunId = run.RunId, UserId = userId }, History);
                 _db.ActiveBlockRuns.Add(new ActiveBlockRun { RunId = run.RunId, UserId = userId });
                 await _db.SaveChangesAsync(ct);
 
@@ -145,6 +147,50 @@ namespace EchoPhase.Server.Services.Blocks
                     page.NextPagingState is { } next ? WebEncoders.Base64UrlEncode(next) : null));
             }
             // A tampered paging state is rejected by the server.
+            catch (DriverException) when (pagingState is not null)
+            {
+                return Failure<BlockRunPage>(BlockRunErrors.Invalid, "Invalid cursor.");
+            }
+        }
+
+        /// <summary>
+        /// A workflow's runs, newest first, a page at a time (the caller checks
+        /// the workflow is the user's). From the workflow_runs index; runs gone
+        /// since (expired, forgotten) are left out.
+        /// </summary>
+        public async Task<IServiceResult<BlockRunPage>> ListByWorkflowAsync(
+            Guid userId, Guid workflowId, int limit, string? cursor, CancellationToken ct = default)
+        {
+            byte[]? pagingState = null;
+            if (cursor is not null)
+            {
+                try
+                {
+                    pagingState = WebEncoders.Base64UrlDecode(cursor);
+                }
+                catch (FormatException)
+                {
+                    return Failure<BlockRunPage>(BlockRunErrors.Invalid, "Invalid cursor.");
+                }
+            }
+
+            try
+            {
+                var index = await _db.WorkflowRuns
+                    .Where(r => r.WorkflowId == workflowId)
+                    .ToPageAsync(Math.Clamp(limit, 1, MaxPageSize), pagingState, ct);
+                var ids = index.Items.Where(r => r.UserId == userId).Select(r => r.RunId).ToList();
+                var runs = ids.Count == 0
+                    ? []
+                    : await _db.BlockRuns.Where(r => r.UserId == userId && ids.Contains(r.RunId)).ToListAsync(ct);
+                // In the index's order: newest first.
+                var byId = runs.ToDictionary(r => r.RunId);
+                var ordered = ids.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
+
+                return ServiceResult<BlockRunPage>.Success(new BlockRunPage(
+                    ordered,
+                    index.NextPagingState is { } next ? WebEncoders.Base64UrlEncode(next) : null));
+            }
             catch (DriverException) when (pagingState is not null)
             {
                 return Failure<BlockRunPage>(BlockRunErrors.Invalid, "Invalid cursor.");
@@ -248,6 +294,8 @@ namespace EchoPhase.Server.Services.Blocks
         private async Task ForgetAsync(BlockRun run)
         {
             _db.BlockRuns.Remove(run);
+            if (run.WorkflowId is { } workflowId)
+                _db.WorkflowRuns.Remove(new WorkflowRun { WorkflowId = workflowId, RunId = run.RunId, UserId = run.UserId });
             _db.ActiveBlockRuns.Remove(new ActiveBlockRun { RunId = run.RunId, UserId = run.UserId });
             await _db.SaveChangesAsync(CancellationToken.None);
         }

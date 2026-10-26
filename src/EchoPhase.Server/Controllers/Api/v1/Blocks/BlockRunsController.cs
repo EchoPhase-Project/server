@@ -6,6 +6,7 @@ using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using EchoPhase.Server.Services.Blocks;
 using EchoPhase.Types.Result.Extensions;
 using Microsoft.AspNetCore.Mvc;
@@ -35,6 +36,10 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
         [HttpPost]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Scripts, Permissions.Execute)]
+        [ProducesResponseType<RunStartedResponse>(StatusCodes.Status202Accepted)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status429TooManyRequests)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> Start([FromBody] RunBlocksRequest request, CancellationToken ct = default)
         {
             var start = new BlockRunStart(request, request.StartIds.Count > 0 ? request.StartIds : null, request.Input);
@@ -45,12 +50,14 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
 
             // The worker may already be updating the run; at this point it is queued.
             var runId = result.Value.RunId;
-            return AcceptedAtAction(nameof(Get), new { runId }, new { runId, status = BlockRunStatus.Queued });
+            return AcceptedAtAction(nameof(Get), new { runId }, new RunStartedResponse(runId, BlockRunStatus.Queued));
         }
 
         /// <summary>The caller's runs, newest first.</summary>
         [HttpGet]
         [RequirePermission(Resources.Scripts, Permissions.Read)]
+        [ProducesResponseType<BlockRunPageResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> List(
             [FromQuery] int limit = 20, [FromQuery] string? cursor = null, CancellationToken ct = default)
         {
@@ -59,7 +66,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
                 return Failure(result.Error);
 
             var page = result.Value;
-            return Ok(new { data = page.Items.Select(View), nextCursor = page.NextCursor });
+            return Ok(new BlockRunPageResponse(page.Items.Select(BlockRunResponse.From).ToList(), page.NextCursor));
         }
 
         /// <summary>
@@ -68,6 +75,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
         /// </summary>
         [HttpGet("{runId:guid}")]
         [RequirePermission(Resources.Scripts, Permissions.Read)]
+        [ProducesResponseType<BlockRunDetailsResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Get(Guid runId, CancellationToken ct = default)
         {
             var result = await _runs.GetAsync(User.GetUserId(), runId, ct);
@@ -75,7 +84,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
                 return Failure(result.Error);
 
             var details = result.Value;
-            return Ok(new { run = View(details.Run), result = details.Result });
+            return Ok(new BlockRunDetailsResponse(BlockRunResponse.From(details.Run), details.Result));
         }
 
         /// <summary>
@@ -86,6 +95,9 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
         [HttpPost("{runId:guid}/cancel")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Scripts, Permissions.Execute)]
+        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> Cancel(Guid runId, CancellationToken ct = default)
         {
             var result = await _runs.CancelAsync(User.GetUserId(), runId, ct);
@@ -100,6 +112,10 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
         [HttpPost("{runId:guid}/retry")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Scripts, Permissions.Execute)]
+        [ProducesResponseType<RunStartedResponse>(StatusCodes.Status202Accepted)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> Retry(Guid runId, [FromQuery] string workflow = "original", CancellationToken ct = default)
         {
             if (workflow is not ("original" or "current"))
@@ -112,24 +128,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
                     : Failure(result.Error);
 
             var newRunId = retry.RunId;
-            return AcceptedAtAction(nameof(Get), new { runId = newRunId }, new { runId = newRunId, status = BlockRunStatus.Queued, retryOf = runId });
+            return AcceptedAtAction(nameof(Get), new { runId = newRunId }, new RunStartedResponse(newRunId, BlockRunStatus.Queued, runId));
         }
-
-        private static object View(BlockRun run) => new
-        {
-            runId = run.RunId,
-            status = run.Status,
-            actorId = run.ActorId,
-            workflowId = run.WorkflowId,
-            programHash = run.ProgramHash,
-            trigger = run.Trigger,
-            blockCount = run.BlockCount,
-            createdAt = run.CreatedAt,
-            startedAt = run.StartedAt,
-            finishedAt = run.FinishedAt,
-            durationMs = run.DurationMs,
-            steps = run.Steps,
-            errorCount = run.ErrorCount
-        };
     }
 }

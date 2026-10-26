@@ -70,6 +70,29 @@ namespace EchoPhase.Server.Tests
         }
 
         [Fact]
+        public async Task AWorkflowsRuns_AreListedNewestFirst_APageAtATime_AndOnlyItsOwn()
+        {
+            _options.Blocks.MaxActivePerUser = 10;
+            Guid workflow = Guid.NewGuid(), other = Guid.NewGuid();
+            var runs = new List<BlockRun>();
+            foreach (var id in new[] { workflow, other, workflow, workflow })
+            {
+                runs.Add((await Service().StartAsync(_user, null, new BlockRunStart(Program(), WorkflowId: id), Ct)).Ok());
+                _time.Advance(TimeSpan.FromSeconds(1));
+            }
+            await Start(); // not a workflow's
+
+            var first = (await Service().ListByWorkflowAsync(_user, workflow, 2, null, Ct)).Ok();
+            Assert.Equal([runs[3].RunId, runs[2].RunId], first.Items.Select(r => r.RunId));
+            Assert.NotNull(first.NextCursor);
+            var second = (await Service().ListByWorkflowAsync(_user, workflow, 2, first.NextCursor, Ct)).Ok();
+            Assert.Equal([runs[0].RunId], second.Items.Select(r => r.RunId));
+
+            // Another user asking for the same workflow id sees nothing.
+            Assert.Empty((await Service().ListByWorkflowAsync(Guid.NewGuid(), workflow, 10, null, Ct)).Ok().Items);
+        }
+
+        [Fact]
         public async Task Start_BeyondTheActiveLimit_IsRefused()
         {
             await Start();
