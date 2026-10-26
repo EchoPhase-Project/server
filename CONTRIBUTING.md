@@ -183,6 +183,12 @@ with a description and examples (the examples are validated). They return
 stdout and logs to stderr, so output can be piped: keep it that way, and offer
 `--json` for lists.
 
+All commands live in `EchoPhase.Cli`; `CliCommandPlacementTests` fails on a
+command in `Server`. When a command needs a service only `Server` has, define
+an interface in `Cli/Commands/<Area>/` with just the operations the command
+uses, implement it in `Server` and register it in `Startup.cs`
+(`IWorkflowEditor` and `WorkflowEditor`).
+
 ### Settings
 
 An options class has a `SectionName` and a validator, registered in

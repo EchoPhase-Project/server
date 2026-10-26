@@ -4,6 +4,7 @@
 using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using EchoPhase.Cli.Commands.Workflows;
 using EchoPhase.Configuration.Extensions;
 using EchoPhase.Connections.Extensions;
 using EchoPhase.Connections.Services;
@@ -195,6 +196,7 @@ namespace EchoPhase.Server
             services.AddScoped<BlockRunService>();
             services.AddScoped<BlockRunEventsNotifier>();
             services.AddScoped<WorkflowService>();
+            services.AddScoped<IWorkflowEditor, WorkflowEditor>();
             services.AddScoped<WorkflowPackageService>();
             services.AddScoped<IWorkflowSource, WorkflowProgramSource>();
             services.AddScoped<IWorkflowStore, WorkflowStore>();

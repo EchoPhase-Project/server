@@ -60,8 +60,11 @@ Tests need no database or Docker. Do not start services to run them.
   `[ExtensibleEnum]`.
 - New workflow block: a `BlockTypes` value, `Params/<X>Params.cs`
   (`IValidatable`), `Handlers/<X>Handler.cs` with `[BlockType(...)]`.
-- New CLI command: register it in `Server/Extensions/HostExtensions.cs` with
-  description and examples; output on stdout, logs on stderr.
+- New CLI command: it lives in `EchoPhase.Cli`, never in `Server`
+  (`CliCommandPlacementTests` fails). What it needs from `Server` is an
+  interface in `Cli`, implemented in `Server` (see `IWorkflowEditor`).
+  Register it in `Server/Extensions/HostExtensions.cs` with description and
+  examples; output on stdout, logs on stderr.
 - Read time from an injected `TimeProvider`, not `DateTime.UtcNow`.
 - Never ignore null: no `x!`, `null!` or `default!` (nullable warnings are
   errors, and `NullForgivingTests` fails on any). Check (`?? throw` with a

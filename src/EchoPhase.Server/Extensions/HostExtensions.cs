@@ -5,8 +5,6 @@ using EchoPhase.Server.Registrars;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using Commands = EchoPhase.Cli.Commands;
-using DiagnosticsCommands = EchoPhase.Server.Services.Diagnostics;
-using WorkflowCommands = EchoPhase.Server.Services.Workflows.Commands;
 
 namespace EchoPhase.Server.Extensions
 {
@@ -125,7 +123,7 @@ namespace EchoPhase.Server.Extensions
                         .WithDescription("List workflows, a page at a time, with their next scheduled run")
                         .WithExample(new[] { "workflows", "list", "--user", "admin", "--active" });
 
-                    workflows.AddCommand<WorkflowCommands.ImportCommand>("import")
+                    workflows.AddCommand<Commands.Workflows.ImportCommand>("import")
                         .WithDescription("Create an inactive workflow from `workflow export` output")
                         .WithExample(new[] { "workflows", "import", "backup.json", "--user", "admin" });
                 });
@@ -134,15 +132,15 @@ namespace EchoPhase.Server.Extensions
                 {
                     workflow.SetDescription("One workflow, by id");
 
-                    workflow.AddCommand<WorkflowCommands.ExportCommand>("export")
+                    workflow.AddCommand<Commands.Workflows.ExportCommand>("export")
                         .WithDescription("Print the workflow as an export file (as the API's export)")
                         .WithExample(new[] { "workflow", "0199a0c4-7d2e-7c4b-9f00-000000000000", "export" });
 
-                    workflow.AddCommand<WorkflowCommands.EnableCommand>("enable")
+                    workflow.AddCommand<Commands.Workflows.EnableCommand>("enable")
                         .WithDescription("Turn its triggers on (the server applies it within a minute)")
                         .WithExample(new[] { "workflow", "0199a0c4-7d2e-7c4b-9f00-000000000000", "enable" });
 
-                    workflow.AddCommand<WorkflowCommands.DisableCommand>("disable")
+                    workflow.AddCommand<Commands.Workflows.DisableCommand>("disable")
                         .WithDescription("Turn its triggers off (the server applies it within a minute)")
                         .WithExample(new[] { "workflow", "0199a0c4-7d2e-7c4b-9f00-000000000000", "disable" });
                 });
@@ -217,7 +215,7 @@ namespace EchoPhase.Server.Extensions
                     .WithDescription("Validate the settings and check Postgres, Scylla, Redis, object storage (if configured) and pending migrations")
                     .WithExample(new[] { "check" });
 
-                config.AddCommand<DiagnosticsCommands.ReportTestErrorCommand>("report-test-error")
+                config.AddCommand<Commands.Diagnostics.ReportTestErrorCommand>("report-test-error")
                     .WithDescription("Send a test error to GlitchTip (SENTRY_DSN) and wait until it is delivered")
                     .WithExample(new[] { "report-test-error" });
 

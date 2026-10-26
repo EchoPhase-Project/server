@@ -268,7 +268,7 @@ namespace EchoPhase.Server.Services.Workflows
             var saved = await _workflows.VersionAsync(id, version, ct);
             return saved is null
                 ? Failure<WorkflowVersionDetails>(WorkflowErrors.NotFound, $"Version {version} not found.")
-                : ServiceResult<WorkflowVersionDetails>.Success(new WorkflowVersionDetails(saved, Parse(saved.Definition)));
+                : ServiceResult<WorkflowVersionDetails>.Success(new WorkflowVersionDetails(saved, BlockProgramJson.Parse(saved.Definition)));
         }
 
         /// <summary>
@@ -493,7 +493,7 @@ namespace EchoPhase.Server.Services.Workflows
 
         private static RunWorkflow RunOf(Workflow workflow) => new(workflow.Id, workflow.PackageId);
 
-        public static BlockProgram Parse(Workflow workflow) => Parse(workflow.Definition);
+        public static BlockProgram Parse(Workflow workflow) => BlockProgramJson.Parse(workflow.Definition);
 
         private static List<int> ErrorTriggerIds(BlockProgram program)
             => program.Blocks.Where(b => b.Type == BlockTypes.ErrorTrigger && !b.Disabled).Select(b => b.Id).ToList();
@@ -531,9 +531,6 @@ namespace EchoPhase.Server.Services.Workflows
             var caller = siblings.FirstOrDefault(w => w.Id != workflow.Id && WorkflowLinks.Of(Parse(w)).Workflows.Contains(workflow.Key));
             return caller is null ? null : $"\"{caller.Name}\" calls it: change that first.";
         }
-
-        private static BlockProgram Parse(string definition)
-            => JsonSerializer.Deserialize<BlockProgram>(definition, BlockParamsBinder.Options) ?? new BlockProgram();
 
         private WorkflowVersion Snapshot(Workflow workflow, Guid savedBy, int? parent, int? restoredFrom) => new()
         {

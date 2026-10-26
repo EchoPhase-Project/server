@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Sentry" />
     <PackageReference Include="Spectre.Console.Cli" />
   </ItemGroup>
 
@@ -11,6 +12,7 @@
     <ProjectReference Include="..\EchoPhase.DAL.Redis\EchoPhase.DAL.Redis.csproj" />
     <ProjectReference Include="..\EchoPhase.DAL.Scylla\EchoPhase.DAL.Scylla.csproj" />
     <ProjectReference Include="..\EchoPhase.Files\EchoPhase.Files.csproj" />
+    <ProjectReference Include="..\EchoPhase.Runners\EchoPhase.Runners.csproj" />
     <ProjectReference Include="..\EchoPhase.Security.Authentication\EchoPhase.Security.Authentication.csproj" />
   </ItemGroup>
 

@@ -1,11 +1,7 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using EchoPhase.Cli.Commands;
-using Spectre.Console;
-using Spectre.Console.Cli;
-
-namespace EchoPhase.Server.Services.Diagnostics
+namespace EchoPhase.Cli.Commands.Diagnostics
 {
     public class ReportTestErrorSettings : CommandSettings
     {
@@ -14,7 +10,7 @@ namespace EchoPhase.Server.Services.Diagnostics
     /// <summary>
     /// Sends one error event through the configured Sentry SDK (SENTRY_DSN)
     /// and waits until it is delivered: after a deploy, does GlitchTip get the
-    /// server's errors? Lives here, not in EchoPhase.Cli, because the SDK does.
+    /// server's errors? The server configures the SDK; this only uses its hub.
     /// </summary>
     public class ReportTestErrorCommand : AsyncCommand<ReportTestErrorSettings>
     {

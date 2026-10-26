@@ -2,19 +2,14 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.ComponentModel;
-using EchoPhase.Cli.Commands;
-using EchoPhase.Cli.Commands.Workflows;
 using EchoPhase.DAL.Postgres.Repositories;
 using EchoPhase.Runners.Blocks.Models;
 using Microsoft.EntityFrameworkCore;
-using Spectre.Console;
-using Spectre.Console.Cli;
 
-// The workflow commands that go through WorkflowService (validation,
-// schedules), which lives here rather than in EchoPhase.Cli. Triggers and
-// schedules are read by the running server, so a change made here takes
-// effect within a minute (its next reload), not at once.
-namespace EchoPhase.Server.Services.Workflows.Commands
+// The workflow commands that save through IWorkflowEditor (validation,
+// schedules). Triggers and schedules are read by the running server, so a
+// change made here takes effect within a minute (its next reload), not at once.
+namespace EchoPhase.Cli.Commands.Workflows
 {
     public class ImportSettings : CommandSettings
     {
@@ -45,9 +40,9 @@ namespace EchoPhase.Server.Services.Workflows.Commands
     public class ImportCommand : AsyncCommand<ImportSettings>
     {
         private readonly UserRepository _users;
-        private readonly WorkflowService _workflows;
+        private readonly IWorkflowEditor _workflows;
 
-        public ImportCommand(UserRepository users, WorkflowService workflows)
+        public ImportCommand(UserRepository users, IWorkflowEditor workflows)
         {
             _users = users;
             _workflows = workflows;
@@ -80,8 +75,8 @@ namespace EchoPhase.Server.Services.Workflows.Commands
                 return CliExit.Failure;
             }
 
-            var result = await _workflows.CreateAsync(owner.Id, null, settings.Package, settings.Name ?? name, program,
-                active: false, cancellationToken);
+            var result = await _workflows.CreateInactiveAsync(owner.Id, settings.Package, settings.Name ?? name, program,
+                cancellationToken);
             if (!result.Successful)
             {
                 AnsiConsole.MarkupLineInterpolated($"[red]{result.Error.Message}[/]");
@@ -89,7 +84,7 @@ namespace EchoPhase.Server.Services.Workflows.Commands
             }
 
             AnsiConsole.MarkupLineInterpolated(
-                $"[green]Imported '{result.Value.Workflow.Name}' for '{settings.User}' as {result.Value.Workflow.Id} (package {result.Value.Workflow.PackageId}), inactive.[/]");
+                $"[green]Imported '{result.Value.Name}' for '{settings.User}' as {result.Value.Id} (package {result.Value.PackageId}), inactive.[/]");
             return CliExit.Success;
         }
     }
@@ -102,9 +97,9 @@ namespace EchoPhase.Server.Services.Workflows.Commands
     public abstract class ActivateCommandBase : AsyncCommand<ActivateSettings>
     {
         private readonly WorkflowRepository _repository;
-        private readonly WorkflowService _workflows;
+        private readonly IWorkflowEditor _workflows;
 
-        protected ActivateCommandBase(WorkflowRepository repository, WorkflowService workflows)
+        protected ActivateCommandBase(WorkflowRepository repository, IWorkflowEditor workflows)
         {
             _repository = repository;
             _workflows = workflows;
@@ -121,8 +116,7 @@ namespace EchoPhase.Server.Services.Workflows.Commands
                 return CliExit.Failure;
             }
 
-            var result = await _workflows.UpdateAsync(workflow.UserId, null, workflow.Id, workflow.Name,
-                WorkflowService.Parse(workflow), Active, workflow.Version, cancellationToken);
+            var result = await _workflows.SetActiveAsync(workflow, Active, cancellationToken);
             if (!result.Successful)
             {
                 AnsiConsole.MarkupLineInterpolated($"[red]{result.Error.Message}[/]");
@@ -135,15 +129,23 @@ namespace EchoPhase.Server.Services.Workflows.Commands
         }
     }
 
-    public class EnableCommand(WorkflowRepository repository, WorkflowService workflows)
-        : ActivateCommandBase(repository, workflows)
+    public class EnableCommand : ActivateCommandBase
     {
+        public EnableCommand(WorkflowRepository repository, IWorkflowEditor workflows)
+            : base(repository, workflows)
+        {
+        }
+
         protected override bool Active => true;
     }
 
-    public class DisableCommand(WorkflowRepository repository, WorkflowService workflows)
-        : ActivateCommandBase(repository, workflows)
+    public class DisableCommand : ActivateCommandBase
     {
+        public DisableCommand(WorkflowRepository repository, IWorkflowEditor workflows)
+            : base(repository, workflows)
+        {
+        }
+
         protected override bool Active => false;
     }
 
@@ -168,7 +170,8 @@ namespace EchoPhase.Server.Services.Workflows.Commands
                 return CliExit.Failure;
             }
 
-            Console.Out.WriteLine(WorkflowFile.Write(workflow.Name, WorkflowService.Parse(workflow), workflow.Version, _time.GetUtcNow()));
+            var program = BlockProgramJson.Parse(workflow.Definition);
+            Console.Out.WriteLine(WorkflowFile.Write(workflow.Name, program, workflow.Version, _time.GetUtcNow()));
             return CliExit.Success;
         }
     }
