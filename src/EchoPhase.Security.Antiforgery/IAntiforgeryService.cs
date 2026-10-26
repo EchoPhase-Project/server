@@ -6,6 +6,9 @@ namespace EchoPhase.Security.Antiforgery
     public interface IAntiforgeryService
     {
         void Set();
+
+        /// <summary>A header token for another tab of the same session, the cookie unchanged.</summary>
+        void Reissue();
         void Remove();
         Task ValidateAsync();
     }

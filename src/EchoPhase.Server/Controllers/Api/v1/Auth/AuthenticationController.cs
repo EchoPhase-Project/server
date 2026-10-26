@@ -3,6 +3,7 @@
 
 using EchoPhase.DAL.Postgres.Models;
 using EchoPhase.Identity;
+using EchoPhase.Security.Antiforgery;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication;
 using EchoPhase.Security.Authorization.Attributes;
@@ -23,6 +24,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
         private readonly IUserService _userService;
         private readonly UserManager<User> _users;
         private readonly NotificationEventsNotifier _notifier;
+        private readonly IAntiforgeryService _antiforgery;
         private readonly ILogger<AuthenticationController> _logger;
 
         public AuthenticationController(
@@ -30,12 +32,14 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
             IUserService userService,
             UserManager<User> users,
             NotificationEventsNotifier notifier,
+            IAntiforgeryService antiforgery,
             ILogger<AuthenticationController> logger)
         {
             _authService = authService;
             _userService = userService;
             _users = users;
             _notifier = notifier;
+            _antiforgery = antiforgery;
             _logger = logger;
         }
 
@@ -101,6 +105,9 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
             if (user is null)
                 return Unauthorized();
 
+            // Every tab asks this first: a new tab gets its CSRF token here
+            // (in X-CSRF-TOKEN), paired with the session's cookie.
+            _antiforgery.Reissue();
             return MeResponse.From(user);
         }
 

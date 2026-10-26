@@ -42,6 +42,42 @@ namespace EchoPhase.Security.Antiforgery
             context.Response.Headers[HeaderName] = headerToken;
         }
 
+        /// <summary>
+        /// A header token for this tab, paired with the cookie the browser
+        /// already has: other tabs keep theirs (the cookie does not change).
+        /// A fresh pair when there is no cookie, or one not of this user.
+        /// </summary>
+        public void Reissue()
+        {
+            var context = GetContext();
+            var userId = context.User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "anonymous";
+
+            if (context.Request.Cookies.TryGetValue(CookieName, out var cookie) && !string.IsNullOrEmpty(cookie))
+            {
+                CsrfPayload? payload = null;
+                try
+                {
+                    payload = Decrypt(cookie);
+                }
+                catch (Exception e) when (e is FormatException or CryptographicException or JsonException
+                    or InvalidOperationException)
+                {
+                    // Not one of ours (any more): a fresh pair below.
+                }
+
+                const string CookieSuffix = ":cookie";
+                if (payload is not null && payload.UserId == userId
+                    && payload.Random.EndsWith(CookieSuffix, StringComparison.Ordinal))
+                {
+                    var binding = payload.Random[..^CookieSuffix.Length];
+                    context.Response.Headers[HeaderName] = Encrypt(new CsrfPayload(userId, binding + ":header"));
+                    return;
+                }
+            }
+
+            Set();
+        }
+
         public void Remove()
         {
             var context = GetContext();
@@ -93,6 +129,9 @@ namespace EchoPhase.Security.Antiforgery
 
             return Task.CompletedTask;
         }
+
+        private string Encrypt(CsrfPayload payload) =>
+            ToUrlSafeBase64(_aes.EncryptToBase64(JsonSerializer.Serialize(payload)));
 
         private CsrfPayload Decrypt(string token)
         {
