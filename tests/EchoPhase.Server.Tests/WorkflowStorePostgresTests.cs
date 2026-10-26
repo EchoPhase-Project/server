@@ -24,7 +24,12 @@ namespace EchoPhase.Server.Tests
         private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
         private static PostgresContext Context() => new(new DbContextOptionsBuilder<PostgresContext>()
-            .UseNpgsql(Connection, PostgresContext.ConfigureNpgsql)
+            // As the app has it: retrying, which a transaction must go through.
+            .UseNpgsql(Connection, o =>
+            {
+                PostgresContext.ConfigureNpgsql(o);
+                o.EnableRetryOnFailure(maxRetryCount: 3);
+            })
             .Options);
 
         private static WorkflowStore Store(PostgresContext db) => new(db, Options.Create(new RunnerOptions()), TimeProvider.System);

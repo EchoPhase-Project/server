@@ -93,37 +93,54 @@ namespace EchoPhase.Server.Services.Storage
             if (key.Length > StorageEntryConfiguration.MaxKeyLength)
                 throw new StorageLimitException($"Keys are at most {StorageEntryConfiguration.MaxKeyLength} characters.");
 
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-            if (_db.Database.IsNpgsql())
-                await _db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({LockId(slot, key)})", ct);
-
-            var now = Now;
-            var entry = await In(slot).Where(e => e.Key == key).FirstOrDefaultAsync(ct);
-            // The stored entry while it has not expired; null otherwise.
-            var current = entry is not null && !Expired(entry, now) ? entry : null;
-            var live = current is not null;
-
-            var value = update(current is not null ? Parse(current.Value) : null);
-            var json = Eval.ToJson(value);
-            var size = Encoding.UTF8.GetByteCount(json);
-            if (size > _options.MaxValueBytes)
-                throw new StorageLimitException($"The value is {size} bytes as JSON; at most {_options.MaxValueBytes}.");
-
-            await CheckQuotaAsync(slot.UserId, current?.Size ?? 0, size, isNew: !live, now, ct);
-
-            if (entry is null)
+            // The context retries on transient failures, which needs the
+            // transaction inside the strategy: a retry runs it all again.
+            var strategy = _db.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
             {
-                entry = new StorageEntry { UserId = slot.UserId, PackageId = slot.PackageId, WorkflowId = slot.WorkflowId, Key = key };
-                _db.StorageEntries.Add(entry);
-            }
+                StorageEntry? entry = null;
+                try
+                {
+                    await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+                    if (_db.Database.IsNpgsql())
+                        await _db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({LockId(slot, key)})", ct);
 
-            entry.Value = json;
-            entry.Size = size;
-            // An expired value is gone: its expiry goes with it.
-            entry.ExpiresAt = ttl is { } t ? now + t : keepExpiry && live ? entry.ExpiresAt : null;
-            await _db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            return value;
+                    var now = Now;
+                    entry = await In(slot).Where(e => e.Key == key).FirstOrDefaultAsync(ct);
+                    // The stored entry while it has not expired; null otherwise.
+                    var current = entry is not null && !Expired(entry, now) ? entry : null;
+                    var live = current is not null;
+
+                    var value = update(current is not null ? Parse(current.Value) : null);
+                    var json = Eval.ToJson(value);
+                    var size = Encoding.UTF8.GetByteCount(json);
+                    if (size > _options.MaxValueBytes)
+                        throw new StorageLimitException($"The value is {size} bytes as JSON; at most {_options.MaxValueBytes}.");
+
+                    await CheckQuotaAsync(slot.UserId, current?.Size ?? 0, size, isNew: !live, now, ct);
+
+                    if (entry is null)
+                    {
+                        entry = new StorageEntry { UserId = slot.UserId, PackageId = slot.PackageId, WorkflowId = slot.WorkflowId, Key = key };
+                        _db.StorageEntries.Add(entry);
+                    }
+
+                    entry.Value = json;
+                    entry.Size = size;
+                    // An expired value is gone: its expiry goes with it.
+                    entry.ExpiresAt = ttl is { } t ? now + t : keepExpiry && live ? entry.ExpiresAt : null;
+                    await _db.SaveChangesAsync(ct);
+                    await transaction.CommitAsync(ct);
+                    return value;
+                }
+                catch
+                {
+                    // A retry starts from the database, not from this attempt.
+                    if (entry is not null)
+                        _db.Entry(entry).State = EntityState.Detached;
+                    throw;
+                }
+            });
         }
 
         private async Task CheckQuotaAsync(Guid userId, int oldSize, int newSize, bool isNew, DateTime now, CancellationToken ct)
