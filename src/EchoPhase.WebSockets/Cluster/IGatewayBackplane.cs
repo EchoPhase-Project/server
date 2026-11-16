@@ -15,8 +15,11 @@ namespace EchoPhase.WebSockets.Cluster
         /// <summary>Hands a delivery to every replica, this one included.</summary>
         Task PublishAsync(GatewayDelivery delivery, CancellationToken ct = default);
 
-        /// <summary>Starts receiving deliveries (once, from the hosted service).</summary>
-        Task SubscribeAsync(Func<GatewayDelivery, Task> deliver, CancellationToken ct = default);
+        /// <summary>Hands a close order to every replica, this one included.</summary>
+        Task PublishCloseAsync(GatewayClose close, CancellationToken ct = default);
+
+        /// <summary>Starts receiving deliveries and close orders (once, from the hosted service).</summary>
+        Task SubscribeAsync(Func<GatewayDelivery, Task> deliver, Func<GatewayClose, Task> close, CancellationToken ct = default);
 
         /// <summary>Lists (or updates: intents) a connection as its pool's member; nothing without a pool.</summary>
         Task JoinAsync(WebSocketConnection connection, CancellationToken ct = default);

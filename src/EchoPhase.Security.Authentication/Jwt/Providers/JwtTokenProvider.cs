@@ -25,6 +25,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
         private readonly BearerOptions _settings;
         private readonly UserRepository _userRepository;
         private readonly ApiClientRepository _apiClients;
+        private readonly SessionRepository _sessions;
         private readonly ImpersonationRepository _impersonations;
         private readonly IUserPrincipalFactory _principalFactory;
         private readonly IPrincipalVerdictCache _verdicts;
@@ -38,6 +39,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             KeyRing keys,
             UserRepository userRepository,
             ApiClientRepository apiClients,
+            SessionRepository sessions,
             ImpersonationRepository impersonations,
             IUserPrincipalFactory principalFactory,
             IPrincipalVerdictCache verdicts,
@@ -49,6 +51,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             _settings = settings.Value.Bearer;
             _userRepository = userRepository;
             _apiClients = apiClients;
+            _sessions = sessions;
             _impersonations = impersonations;
             _principalFactory = principalFactory;
             _verdicts = verdicts;
@@ -127,27 +130,33 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             };
         }
 
-        public async Task<bool> IsPrincipalValidAsync(ClaimsPrincipal principal, CancellationToken ct = default)
+        public async Task<PrincipalValidity> RevalidateAsync(ClaimsPrincipal principal, CancellationToken ct = default)
         {
             var exp = principal.FindFirstValue(JwtRegisteredClaimNames.Exp);
             if (exp is null
                 || !long.TryParse(exp, out var seconds)
                 || DateTimeOffset.FromUnixTimeSeconds(seconds) <= _time.GetUtcNow())
-                return false;
+                return PrincipalValidity.Invalid;
 
-            return await CheckPrincipalAsync(principal, ct) == PrincipalState.Valid;
+            return await CheckPrincipalAsync(principal, ct) switch
+            {
+                PrincipalState.Valid => PrincipalValidity.Valid,
+                PrincipalState.SessionEnded => PrincipalValidity.SessionEnded,
+                _ => PrincipalValidity.Invalid
+            };
         }
 
         private enum PrincipalState
         {
             Valid,
             Invalid,
-            StampMismatch
+            StampMismatch,
+            SessionEnded
         }
 
         /// <summary>
         /// Checks that still matter after the signature: the user, their security
-        /// stamp, and the API client or impersonation the token belongs to.
+        /// stamp, and the session, API client or impersonation the token belongs to.
         /// A cached positive verdict skips the database.
         /// </summary>
         private async Task<PrincipalState> CheckPrincipalAsync(ClaimsPrincipal claims, CancellationToken ct)
@@ -197,6 +206,19 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             {
                 _logger.LogWarning("SecurityStamp mismatch for user {UserId}", userId);
                 return PrincipalState.StampMismatch;
+            }
+
+            // Interactive tokens die with their session (sign-out, revoke). Tokens
+            // from before the claim existed have none and skip this check.
+            if (claims.FindFirstValue(EchoPhaseClaimTypes.SessionId) is { } sessionIdRaw
+                && (!Guid.TryParse(sessionIdRaw, out var sessionId)
+                    || !await _sessions.Query()
+                        .WithIds(sessionId)
+                        .WithUserIds(userId)
+                        .AnyAsync(ct)))
+            {
+                _logger.LogInformation("Session {SessionId} of user {UserId} has ended", sessionIdRaw, userId);
+                return PrincipalState.SessionEnded;
             }
 
             // Tokens issued to an API client die with the client, not just at expiry.

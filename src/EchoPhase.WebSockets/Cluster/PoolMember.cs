@@ -37,4 +37,10 @@ namespace EchoPhase.WebSockets.Cluster
         string Key,
         bool OnlyPicks = false,
         int Attempt = 0);
+
+    /// <summary>
+    /// Sessions that ended: every replica closes its connections of
+    /// <see cref="UserId"/> that were opened with one of them.
+    /// </summary>
+    public sealed record GatewayClose(Guid UserId, Guid[] SessionIds);
 }

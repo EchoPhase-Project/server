@@ -31,6 +31,7 @@ using EchoPhase.Runners.Extensions;
 using EchoPhase.Security.Antiforgery.Extensions;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authentication.Impersonation;
+using EchoPhase.Security.Authentication.Jwt.Providers;
 using EchoPhase.Security.Authorization.Extensions;
 using EchoPhase.Security.BitMasks.Extensions;
 using EchoPhase.Security.Cryptography.Extensions;
@@ -230,6 +231,7 @@ namespace EchoPhase.Server
             services.AddExternalConnections();
             services.AddScoped<IConnectionEvents, ConnectionEventsNotifier>();
             services.AddScoped<IImpersonationEvents, ImpersonationEventsNotifier>();
+            services.AddScoped<ISessionEvents, SessionEventsNotifier>();
 
             services.AddTelemetry(Configuration);
 

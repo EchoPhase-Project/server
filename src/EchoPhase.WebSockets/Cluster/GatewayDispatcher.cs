@@ -3,6 +3,7 @@
 
 using System.Net.WebSockets;
 using EchoPhase.Security.BitMasks;
+using EchoPhase.WebSockets.Constants;
 using Microsoft.Extensions.Logging;
 
 namespace EchoPhase.WebSockets.Cluster
@@ -52,6 +53,25 @@ namespace EchoPhase.WebSockets.Cluster
             var required = requiredIntents.ToArray();
             var picks = Pick(await _backplane.MembersAsync(userIds, ct), required, key, exclude: null);
             await _backplane.PublishAsync(new GatewayDelivery(userIds?.ToArray(), required, payload, picks, key), ct);
+        }
+
+        /// <summary>
+        /// Closes the connections of these sessions of the user on every
+        /// replica, with <see cref="CloseCodes.SessionEnded"/>.
+        /// </summary>
+        public Task CloseSessionsAsync(Guid userId, IReadOnlyCollection<Guid> sessionIds, CancellationToken ct = default)
+            => sessionIds.Count == 0
+                ? Task.CompletedTask
+                : _backplane.PublishCloseAsync(new GatewayClose(userId, [.. sessionIds]), ct);
+
+        /// <summary>What this replica does with a close order: closes its own connections of those sessions.</summary>
+        public async Task CloseAsync(GatewayClose close)
+        {
+            var closed = await _connections.CloseSessionsAsync(close.UserId, close.SessionIds,
+                CloseCodes.SessionEnded, CloseCodes.SessionEndedReason);
+            if (closed > 0)
+                _logger.LogInformation("Closed {Count} gateway connection(s) of user {UserId}: session ended",
+                    closed, close.UserId);
         }
 
         /// <summary>What this replica does with a delivery: its shared connections, and its picks.</summary>

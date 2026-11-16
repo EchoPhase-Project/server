@@ -24,7 +24,8 @@ namespace EchoPhase.Security.Authentication.Jwt.Verdicts
                 principal.FindFirstValue(JwtRegisteredClaimNames.Jti),
                 principal.FindFirstValue(JwtRegisteredClaimNames.Exp),
                 principal.FindFirstValue(EchoPhaseClaimTypes.ClientId),
-                principal.FindFirstValue(EchoPhaseClaimTypes.ImpersonationId));
+                principal.FindFirstValue(EchoPhaseClaimTypes.ImpersonationId),
+                principal.FindFirstValue(EchoPhaseClaimTypes.SessionId));
 
         /// <summary>
         /// Hashed form for storage: <c>jti</c> is the security stamp and must

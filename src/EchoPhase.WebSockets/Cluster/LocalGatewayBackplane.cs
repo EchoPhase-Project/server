@@ -11,6 +11,7 @@ namespace EchoPhase.WebSockets.Cluster
     {
         private readonly WebSocketConnectionManager _connections;
         private Func<GatewayDelivery, Task>? _deliver;
+        private Func<GatewayClose, Task>? _close;
 
         public LocalGatewayBackplane(WebSocketConnectionManager connections)
         {
@@ -22,9 +23,13 @@ namespace EchoPhase.WebSockets.Cluster
         public Task PublishAsync(GatewayDelivery delivery, CancellationToken ct = default)
             => _deliver is { } deliver ? deliver(delivery) : Task.CompletedTask;
 
-        public Task SubscribeAsync(Func<GatewayDelivery, Task> deliver, CancellationToken ct = default)
+        public Task PublishCloseAsync(GatewayClose close, CancellationToken ct = default)
+            => _close is { } handler ? handler(close) : Task.CompletedTask;
+
+        public Task SubscribeAsync(Func<GatewayDelivery, Task> deliver, Func<GatewayClose, Task> close, CancellationToken ct = default)
         {
             _deliver = deliver;
+            _close = close;
             return Task.CompletedTask;
         }
 

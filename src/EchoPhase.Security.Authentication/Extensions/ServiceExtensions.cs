@@ -80,14 +80,15 @@ namespace EchoPhase.Security.Authentication.Extensions
 
             services.AddScoped<IJwtTokenProvider, JwtTokenProvider>();
             services.AddSingleton<IPrincipalVerdictCache, RedisPrincipalVerdictCache>();
-            // Picked up by AddPostgres: drops cached verdicts when users, API clients
-            // or impersonations change.
+            // Picked up by AddPostgres: drops cached verdicts when users, API clients,
+            // impersonations or sessions change.
             services.AddSingleton<IInterceptor, PrincipalVerdictInvalidationInterceptor>();
             services.AddSingleton<SessionTokenHasher>();
             services.AddSingleton<ApiClientSecretHasher>();
             services.AddScoped<IApiClientService, ApiClientService>();
             services.TryAddScoped<IImpersonationEvents, NullImpersonationEvents>();
             services.AddScoped<IImpersonationService, ImpersonationService>();
+            services.TryAddScoped<ISessionEvents, NullSessionEvents>();
             services.AddScoped<ISessionProvider, SessionProvider>();
             services.AddScoped<IAuthenticationService, AuthenticationService>();
 

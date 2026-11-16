@@ -17,9 +17,9 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
 
         /// <summary>
         /// Re-checks a principal from an already validated token, for long-lived
-        /// connections: not expired, same security stamp, and its API client or
-        /// impersonation still active.
+        /// connections: not expired, same security stamp, and its session, API
+        /// client or impersonation still active.
         /// </summary>
-        Task<bool> IsPrincipalValidAsync(ClaimsPrincipal principal, CancellationToken ct = default);
+        Task<PrincipalValidity> RevalidateAsync(ClaimsPrincipal principal, CancellationToken ct = default);
     }
 }

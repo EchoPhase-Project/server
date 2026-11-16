@@ -25,5 +25,12 @@ namespace EchoPhase.Types.Claims
         /// Id of the impersonation record backing an <see cref="Act"/> token.
         /// </summary>
         public const string ImpersonationId = "imp";
+
+        /// <summary>
+        /// Id of the session (refresh token family) an interactive token was
+        /// issued for: the token dies with the session. Tokens from before
+        /// this claim existed have none and do not get the session check.
+        /// </summary>
+        public const string SessionId = "sid";
     }
 }

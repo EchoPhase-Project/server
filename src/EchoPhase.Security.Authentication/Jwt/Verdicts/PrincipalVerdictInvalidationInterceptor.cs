@@ -12,7 +12,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Verdicts
     /// <summary>
     /// Drops cached verdicts whenever something they depend on is saved, so no
     /// call site has to remember to: users (security stamp, deletion), API
-    /// clients, impersonations and permission grants. Over-invalidating only costs a database check.
+    /// clients, impersonations, permission grants and removed sessions. Over-invalidating only costs a database check.
     /// </summary>
     public class PrincipalVerdictInvalidationInterceptor : SaveChangesInterceptor
     {
@@ -104,6 +104,11 @@ namespace EchoPhase.Security.Authentication.Jwt.Verdicts
                         break;
                     case ImpersonationEntity impersonation:
                         pending.Users.Add(impersonation.TargetId);
+                        break;
+                    // Tokens with a session id die with the session. Only a
+                    // removal counts: every refresh modifies the row.
+                    case Session session when entry.State == EntityState.Deleted:
+                        pending.Users.Add(session.UserId);
                         break;
                     // Grant services also change the stamp; this covers direct edits.
                     case UserPermissionGrant grant:

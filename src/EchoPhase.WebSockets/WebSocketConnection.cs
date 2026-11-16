@@ -6,6 +6,7 @@ using System.Net.WebSockets;
 using System.Security.Claims;
 using EchoPhase.Types.Attributes;
 using EchoPhase.Types.BitMask;
+using EchoPhase.Types.Claims;
 using UUIDNext;
 
 namespace EchoPhase.WebSockets
@@ -26,6 +27,7 @@ namespace EchoPhase.WebSockets
             UserId = userId;
             WebSocket = webSocket;
             User = user;
+            SessionId = Guid.TryParse(user.FindFirstValue(EchoPhaseClaimTypes.SessionId), out var sessionId) ? sessionId : null;
             _lastSeen = now;
         }
 
@@ -37,6 +39,13 @@ namespace EchoPhase.WebSockets
 
         /// <summary>The principal of the token the socket was opened with; re-checked by the credential monitor.</summary>
         public ClaimsPrincipal User { get; }
+
+        /// <summary>
+        /// The session of the token (its <c>sid</c> claim); the connection
+        /// closes when that session ends. Null: an API client, an
+        /// impersonation, or a token from before the claim.
+        /// </summary>
+        public Guid? SessionId { get; }
 
         /// <summary>Which events it receives; replaced as a whole on handshake/adjust.</summary>
         [AlwaysMerge]

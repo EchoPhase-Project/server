@@ -24,6 +24,7 @@ namespace EchoPhase.WebSockets.Cluster
 
         private const string Prefix = "gateway:";
         private static readonly RedisChannel Deliveries = RedisChannel.Literal(Prefix + "deliveries");
+        private static readonly RedisChannel Closes = RedisChannel.Literal(Prefix + "closes");
         private static readonly RedisKey Replicas = Prefix + "replicas";
         private static readonly RedisKey PooledUsers = Prefix + "pooled-users";
 
@@ -47,25 +48,44 @@ namespace EchoPhase.WebSockets.Cluster
         public async Task PublishAsync(GatewayDelivery delivery, CancellationToken ct = default)
             => await _redis().GetSubscriber().PublishAsync(Deliveries, JsonSerializer.SerializeToUtf8Bytes(delivery));
 
-        public async Task SubscribeAsync(Func<GatewayDelivery, Task> deliver, CancellationToken ct = default)
+        public async Task PublishCloseAsync(GatewayClose close, CancellationToken ct = default)
+            => await _redis().GetSubscriber().PublishAsync(Closes, JsonSerializer.SerializeToUtf8Bytes(close));
+
+        public async Task SubscribeAsync(Func<GatewayDelivery, Task> deliver, Func<GatewayClose, Task> close, CancellationToken ct = default)
         {
-            var queue = await _redis().GetSubscriber().SubscribeAsync(Deliveries);
-            // In order, one at a time, off the multiplexer's thread.
-            queue.OnMessage(async message =>
+            var subscriber = _redis().GetSubscriber();
+            // A channel of its own: a replica that does not know close orders
+            // ignores them instead of taking them for an event.
+            var closes = await subscriber.SubscribeAsync(Closes);
+            try
+            {
+                Handle(closes, close, "close order");
+                Handle(await subscriber.SubscribeAsync(Deliveries), deliver, "delivery");
+            }
+            catch
+            {
+                // The hosted service retries; it must not find the first channel taken.
+                await closes.UnsubscribeAsync();
+                throw;
+            }
+            await HeartbeatAsync(ct);
+        }
+
+        // In order, one at a time, off the multiplexer's thread.
+        private void Handle<T>(ChannelMessageQueue queue, Func<T, Task> handle, string what)
+            => queue.OnMessage(async message =>
             {
                 try
                 {
                     if (message.Message.HasValue
-                        && JsonSerializer.Deserialize<GatewayDelivery>((byte[]?)message.Message ?? []) is { } delivery)
-                        await deliver(delivery);
+                        && JsonSerializer.Deserialize<T>((byte[]?)message.Message ?? []) is { } item)
+                        await handle(item);
                 }
                 catch (Exception e) when (e is JsonException or InvalidOperationException)
                 {
-                    _logger.LogWarning(e, "Dropped a gateway delivery that did not read");
+                    _logger.LogWarning(e, "Dropped a gateway {What} that did not read", what);
                 }
             });
-            await HeartbeatAsync(ct);
-        }
 
         public async Task JoinAsync(WebSocketConnection connection, CancellationToken ct = default)
         {

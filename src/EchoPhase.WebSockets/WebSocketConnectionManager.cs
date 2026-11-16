@@ -91,6 +91,17 @@ namespace EchoPhase.WebSockets
         public Task CloseConnectionsAsync(Guid userId, WebSocketCloseStatus status, string description)
             => Task.WhenAll(GetConnections(userId).Select(c => CloseConnectionAsync(c, status, description)));
 
+        /// <summary>Closes the user's connections opened with one of these sessions; returns how many.</summary>
+        public async Task<int> CloseSessionsAsync(Guid userId, IReadOnlyCollection<Guid> sessionIds,
+            WebSocketCloseStatus status, string description)
+        {
+            var ended = GetConnections(userId)
+                .Where(c => c.SessionId is { } id && sessionIds.Contains(id))
+                .ToList();
+            await Task.WhenAll(ended.Select(c => CloseConnectionAsync(c, status, description)));
+            return ended.Count;
+        }
+
         public Task CloseAllAsync(WebSocketCloseStatus status, string description)
             => Task.WhenAll(_bySocket.Values.Select(c => CloseConnectionAsync(c, status, description)));
 

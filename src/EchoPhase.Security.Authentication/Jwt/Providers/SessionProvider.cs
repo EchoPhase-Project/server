@@ -27,6 +27,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
         private readonly RefreshOptions _settings;
         private readonly UserRepository _userRepository;
         private readonly SessionTokenHasher _hasher;
+        private readonly ISessionEvents _events;
         private readonly TimeProvider _time;
 
         public SessionProvider(
@@ -36,6 +37,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             IOptions<AuthenticationOptions> settings,
             UserRepository userRepository,
             SessionTokenHasher hasher,
+            ISessionEvents events,
             TimeProvider time)
         {
             _repository = repository;
@@ -44,6 +46,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             _settings = settings.Value.Refresh;
             _userRepository = userRepository;
             _hasher = hasher;
+            _events = events;
             _time = time;
         }
 
@@ -64,7 +67,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             _db.Sessions.Add(session);
             await _db.SaveChangesAsync(ct);
 
-            var jwt = await GenerateJwtAsync(user);
+            var jwt = await GenerateJwtAsync(user, session.Id);
             return new TokenInitial
             {
                 SessionId = session.Id,
@@ -118,7 +121,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
 
             return new TokenPair
             {
-                AccessToken = await GenerateJwtAsync(user),
+                AccessToken = await GenerateJwtAsync(user, session.Id),
                 RefreshToken = next
             };
         }
@@ -152,7 +155,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
 
                 return ServiceResult<TokenPair>.Success(new TokenPair
                 {
-                    AccessToken = await GenerateJwtAsync(await LoadUserAsync(session.UserId, ct)),
+                    AccessToken = await GenerateJwtAsync(await LoadUserAsync(session.UserId, ct), session.Id),
                     RefreshToken = null
                 });
             }
@@ -167,6 +170,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             var userId = compromised.UserId;
             _repository.Remove(compromised);
             await _repository.SaveAsync(ct);
+            await _events.EndedAsync(userId, [compromised.Id], ct);
             return ServiceResult<TokenPair>.Failure(new RefreshTokenReusedError(userId));
         }
 
@@ -184,6 +188,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             {
                 _repository.Remove(existing);
                 await _repository.SaveAsync(ct);
+                await _events.EndedAsync(userId, [existing.Id], ct);
             }
         }
 
@@ -198,6 +203,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             {
                 _repository.Remove(existing);
                 await _repository.SaveAsync(ct);
+                await _events.EndedAsync(userId, [existing.Id], ct);
             }
         }
 
@@ -209,6 +215,7 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
 
             _db.Sessions.RemoveRange(sessions);
             await _db.SaveChangesAsync(ct);
+            await EndedAsync(userId, sessions, ct);
         }
 
         public async Task RevokeOthersAsync(Guid userId, string? keepRefreshToken, CancellationToken ct = default)
@@ -223,8 +230,10 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
             var others = await _repository.Query()
                 .WithUserIds(userId)
                 .ToListAsync(ct);
-            _db.Sessions.RemoveRange(others.Where(s => s.Id != keep));
+            var ended = others.Where(s => s.Id != keep).ToList();
+            _db.Sessions.RemoveRange(ended);
             await _db.SaveChangesAsync(ct);
+            await EndedAsync(userId, ended, ct);
         }
 
         public Task<CursorPage<Session>> GetSessionsAsync(
@@ -245,8 +254,13 @@ namespace EchoPhase.Security.Authentication.Jwt.Providers
                 .FirstOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("Invalid UserId.");
 
+        private Task EndedAsync(Guid userId, IReadOnlyCollection<Session> sessions, CancellationToken ct)
+            => sessions.Count == 0 ? Task.CompletedTask : _events.EndedAsync(userId, sessions.Select(s => s.Id).ToList(), ct);
+
         // Interactive sessions get the full ceiling of the user's current roles.
-        private Task<string> GenerateJwtAsync(User user)
-            => _jwtService.GenerateTokenAsync(user, _settings.Lifetime, new ClaimsEnrichmentContext { User = user });
+        // The session id lets the token (and its realtime connections) end with the session.
+        private Task<string> GenerateJwtAsync(User user, Guid sessionId)
+            => _jwtService.GenerateTokenAsync(user, _settings.Lifetime,
+                new ClaimsEnrichmentContext { User = user, SessionId = sessionId });
     }
 }

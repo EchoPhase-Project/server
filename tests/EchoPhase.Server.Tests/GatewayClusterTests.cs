@@ -98,7 +98,7 @@ namespace EchoPhase.Server.Tests
                 Options.Create(new GatewayOptions()), _lifetime, TimeProvider.System);
             _backplane = new LocalGatewayBackplane(_manager);
             _dispatcher = new GatewayDispatcher(_backplane, _manager, _intents, NullLogger<GatewayDispatcher>.Instance);
-            _backplane.SubscribeAsync(_dispatcher.DeliverAsync, TestContext.Current.CancellationToken).GetAwaiter().GetResult();
+            _backplane.SubscribeAsync(_dispatcher.DeliverAsync, _dispatcher.CloseAsync, TestContext.Current.CancellationToken).GetAwaiter().GetResult();
         }
 
         public void Dispose() => _lifetime.Dispose();

@@ -36,6 +36,8 @@ namespace EchoPhase.Security.Authentication.Jwt.Claims
                 identity.AddClaim(new Claim(JwtRegisteredClaimNames.Jti, user.SecurityStamp));
             if (context.ClientId is { } clientId)
                 identity.AddClaim(new Claim(EchoPhaseClaimTypes.ClientId, clientId.ToString()));
+            if (context.SessionId is { } sessionId)
+                identity.AddClaim(new Claim(EchoPhaseClaimTypes.SessionId, sessionId.ToString()));
             if (context.ActorId is { } actorId && context.ImpersonationId is { } impersonationId)
             {
                 identity.AddClaim(new Claim(

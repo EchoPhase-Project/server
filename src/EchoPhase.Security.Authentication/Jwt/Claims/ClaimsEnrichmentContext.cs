@@ -26,6 +26,11 @@ namespace EchoPhase.Security.Authentication.Jwt.Claims
         public Guid? ImpersonationId { get; init; }
 
         /// <summary>
+        /// The session an interactive token belongs to; becomes the <c>sid</c> claim.
+        /// </summary>
+        public Guid? SessionId { get; init; }
+
+        /// <summary>
         /// Permissions to narrow the token to. <c>null</c> (interactive sessions)
         /// grants the full ceiling of the user's roles; otherwise the token gets
         /// the intersection of this with that ceiling.

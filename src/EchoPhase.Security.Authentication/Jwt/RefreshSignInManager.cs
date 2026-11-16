@@ -106,10 +106,14 @@ namespace EchoPhase.Security.Authentication.Jwt
         private static IServiceResult InvalidCredentials()
             => ServiceResult.Failure(e => e.Set(AuthErrors.InvalidCredentials, "Invalid credentials."));
 
+        /// <summary>
+        /// Signs out this device: its session ends, and with it the access
+        /// tokens that carry its id and their realtime connections. The
+        /// user's other sessions stay signed in (the security stamp stays).
+        /// </summary>
         public async Task LogoutAsync(Guid userId, string refreshToken, CancellationToken ct = default)
         {
             await _refresh.RevokeByTokenAsync(userId, refreshToken, ct);
-            await InvalidateUserAsync(userId, ct);
             var context = _httpContext.HttpContext
                           ?? throw new InvalidOperationException("HttpContext is not available.");
             TokenCookieHelper.Clear(context.Response);
@@ -136,11 +140,9 @@ namespace EchoPhase.Security.Authentication.Jwt
             return result;
         }
 
+        /// <summary>Ends one session of the user, as <see cref="LogoutAsync"/> does for this device.</summary>
         public async Task RevokeSessionAsync(Guid userId, Guid sessionId, CancellationToken ct = default)
-        {
-            await _refresh.RevokeAsync(userId, sessionId, ct);
-            await InvalidateUserAsync(userId, ct);
-        }
+            => await _refresh.RevokeAsync(userId, sessionId, ct);
 
         private async Task InvalidateUserAsync(Guid userId, CancellationToken ct)
         {

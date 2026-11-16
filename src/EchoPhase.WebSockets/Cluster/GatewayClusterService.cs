@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace EchoPhase.WebSockets.Cluster
 {
     /// <summary>
-    /// Joins this replica to the others: receives deliveries (retrying until
+    /// Joins this replica to the others: receives deliveries and close orders (retrying until
     /// the backplane answers) and keeps saying it is alive.
     /// </summary>
     public class GatewayClusterService : BackgroundService
@@ -32,7 +32,7 @@ namespace EchoPhase.WebSockets.Cluster
             {
                 try
                 {
-                    await _backplane.SubscribeAsync(_dispatcher.DeliverAsync, stoppingToken);
+                    await _backplane.SubscribeAsync(_dispatcher.DeliverAsync, _dispatcher.CloseAsync, stoppingToken);
                     break;
                 }
                 catch (Exception e) when (e is not OperationCanceledException)

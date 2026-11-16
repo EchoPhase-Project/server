@@ -6,6 +6,7 @@ using System.Security.Claims;
 using EchoPhase.Security.Authentication.Jwt.Providers;
 using EchoPhase.Security.Authentication.Jwt.Verdicts;
 using EchoPhase.WebSockets;
+using EchoPhase.WebSockets.Constants;
 using Microsoft.Extensions.Options;
 using WebSocketOptions = EchoPhase.Configuration.WebSocket.WebSocketOptions;
 
@@ -15,7 +16,9 @@ namespace EchoPhase.Server.Services.Realtime
     /// Authentication only runs when a realtime connection opens. This
     /// periodically re-checks every open gateway connection and
     /// drops those whose token has expired or been revoked (security stamp
-    /// change, deleted API client, ended impersonation).
+    /// change, deleted API client, ended impersonation). A connection whose
+    /// session ended closes with <see cref="CloseCodes.SessionEnded"/>; the
+    /// sign-out closes it at once already, this is the safety net.
     /// </summary>
     public class RealtimeCredentialMonitor : BackgroundService
     {
@@ -57,31 +60,38 @@ namespace EchoPhase.Server.Services.Realtime
             }
         }
 
-        private async Task RevalidateAsync(CancellationToken ct)
+        /// <summary>One pass over the open connections (public for tests).</summary>
+        public async Task RevalidateAsync(CancellationToken ct)
         {
             await using var scope = _scopes.CreateAsyncScope();
             var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenProvider>();
 
             // Users often hold several connections with the same token; check each token once.
-            var verdicts = new Dictionary<string, bool>();
+            var verdicts = new Dictionary<string, PrincipalValidity>();
 
-            async Task<bool> IsValidAsync(ClaimsPrincipal principal)
+            async Task<PrincipalValidity> CheckAsync(ClaimsPrincipal principal)
             {
                 var key = PrincipalVerdictKey.For(principal);
-                if (!verdicts.TryGetValue(key, out var valid))
-                    verdicts[key] = valid = await jwt.IsPrincipalValidAsync(principal, ct);
-                return valid;
+                if (!verdicts.TryGetValue(key, out var validity))
+                    verdicts[key] = validity = await jwt.RevalidateAsync(principal, ct);
+                return validity;
             }
 
             foreach (var connection in _gateway.GetAllConnections().ToList())
             {
-                if (await IsValidAsync(connection.User))
+                var validity = await CheckAsync(connection.User);
+                if (validity == PrincipalValidity.Valid)
                     continue;
 
-                _logger.LogInformation("Closing gateway connection {ConnectionId} of user {UserId}: {Reason}",
-                    connection.Id, connection.UserId, RevokedReason);
+                // A client signed out does not reconnect; one with a stale token refreshes and does.
+                var (status, reason) = validity == PrincipalValidity.SessionEnded
+                    ? (CloseCodes.SessionEnded, CloseCodes.SessionEndedReason)
+                    : (WebSocketCloseStatus.PolicyViolation, RevokedReason);
 
-                await _gateway.CloseConnectionAsync(connection, WebSocketCloseStatus.PolicyViolation, RevokedReason);
+                _logger.LogInformation("Closing gateway connection {ConnectionId} of user {UserId}: {Reason}",
+                    connection.Id, connection.UserId, reason);
+
+                await _gateway.CloseConnectionAsync(connection, status, reason);
             }
         }
     }
