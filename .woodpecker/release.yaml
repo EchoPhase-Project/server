@@ -8,8 +8,10 @@
 # Manual-run variables:
 #   DEPLOY=false   publish only, do not touch the release
 #
-# Requires the repository to be "trusted" in Woodpecker (privileged builds)
-# and the secret deploy_key (write deploy key of EchoPhase-Project/deploy).
+# The image is built by the cluster's BuildKit daemon (deploy:
+# infra/woodpecker/buildkitd.yaml), which keeps its cache: the step is only a
+# client and needs no privileges. Requires the secret deploy_key (write
+# deploy key of EchoPhase-Project/deploy).
 
 variables:
   # Step image: mise + the tools of mise.lock. `mise run ci:image` updates it.
@@ -45,24 +47,25 @@ steps:
   - name: server-image
     image: *buildkit
     depends_on: [image-tag]
-    privileged: true
     environment:
       REGISTRY: *registry
+      BUILDKIT_HOST: tcp://buildkitd.woodpecker.svc:1234
     commands:
+      # A new pod is allowed through buildkitd's NetworkPolicy a few seconds
+      # after it starts (kube-router): wait for it, at most 10 s.
+      - for i in $$(seq 1 10); do buildctl --addr $${BUILDKIT_HOST} debug workers >/dev/null 2>&1 && break; sleep 1; done
       - TAG=$(cat .image-tag)
       - IMAGE=$${REGISTRY}/echophase/server
       - >
-        buildctl-daemonless.sh build
+        buildctl --addr $${BUILDKIT_HOST} build
         --frontend dockerfile.v0 --local context=src --local dockerfile=src
         --opt build-arg:ECHOPHASE_VERSION=$${TAG}
-        --import-cache type=registry,ref=$${IMAGE}:buildcache,registry.insecure=true
-        --export-cache type=registry,ref=$${IMAGE}:buildcache,mode=max,registry.insecure=true
         --output "type=image,\"name=$${IMAGE}:$${TAG},$${IMAGE}:latest\",push=true,registry.insecure=true"
     backend_options:
       kubernetes:
         resources:
-          requests: { cpu: "1", memory: 2Gi }
-          limits: { cpu: "4", memory: 6Gi }
+          requests: { cpu: 100m, memory: 128Mi }
+          limits: { cpu: "1", memory: 512Mi }
 
   # Fails on breaking changes within this version's compatibility series
   # (scripts/contract-check.sh); a breaking commit starts the next series.
