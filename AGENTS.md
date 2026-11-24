@@ -2,8 +2,9 @@
 
 This repository contains the .NET 10 server: the REST API, the realtime
 gateway, the workflow runner, and the admin CLI. The full rules for persons are
-in [CONTRIBUTING.md](CONTRIBUTING.md). This file is the short version for
-coding agents. If this file and CONTRIBUTING.md are different, CONTRIBUTING.md
+in [CONTRIBUTING.md](CONTRIBUTING.md). The reasons for the large decisions
+are in [docs/adr/](docs/adr/). This file is the short version for coding
+agents. If this file and CONTRIBUTING.md are different, CONTRIBUTING.md
 and the code are correct. Then correct this file.
 
 ## Commands
