@@ -21,6 +21,20 @@ ARG ECHOPHASE_VERSION=0.0.0-local
 RUN dotnet publish EchoPhase.Server/EchoPhase.Server.csproj -c Release -o /app --no-restore \
     -p:EchoPhaseVersion="$ECHOPHASE_VERSION"
 
+# The API contract, from the published build above (its XML docs give the
+# descriptions): `--opt target=contract --output type=local,dest=artifacts`.
+# The release pipeline builds it next to the image, so BuildKit shares the
+# restore and the publish with it instead of a second, Debug build.
+FROM dotnet-build AS openapi
+RUN dotnet tool restore --tool-manifest dotnet-tools.json
+WORKDIR /src/EchoPhase.Server
+RUN ASPNETCORE_ENVIRONMENT=Development \
+    dotnet swagger tofile --output /contract/openapi.json /app/EchoPhase.Server.dll v1
+
+FROM scratch AS contract
+COPY --from=openapi /contract/openapi.json /
+
+# The image (the default target: the last stage).
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 # Links the published package to its repository (and its visibility) on GHCR.
 LABEL org.opencontainers.image.source=https://github.com/EchoPhase-Project/server

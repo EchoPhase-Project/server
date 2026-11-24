@@ -2,7 +2,7 @@
 
   <PropertyGroup>
 	<GenerateGlobalUsings>true</GenerateGlobalUsings>
-    <GenerateDocumentationFile Condition="'$(Configuration)' == 'Debug'">true</GenerateDocumentationFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
     <!--
       Password hashing is CPU-bound and synchronous (IPasswordHasher), so it holds

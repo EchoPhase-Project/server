@@ -52,7 +52,9 @@ run = [
 ]
 
 # Building the host connects to nothing, so no database or configuration is
-# needed. Debug, because XML docs are generated only there. Skipped while
+# needed. Debug, the build a developer has already (XML docs are made in
+# every configuration; CI takes the contract from the image's Release build,
+# Dockerfile target `contract`). Skipped while
 # artifacts/openapi.json is newer than every source (`mise run openapi --force`).
 [openapi]
 description = "Export the API's OpenAPI document to artifacts/openapi.json"

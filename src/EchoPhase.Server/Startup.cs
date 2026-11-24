@@ -128,7 +128,7 @@ namespace EchoPhase.Server
 
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-                // Generated in Debug only (not shipped); the document still builds without it.
+                // Generated in every build: the contract's descriptions; the document still builds without it.
                 if (File.Exists(xmlPath))
                     o.IncludeXmlComments(xmlPath);
                 o.SwaggerDoc("v1", new OpenApiInfo
