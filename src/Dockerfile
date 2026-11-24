@@ -1,4 +1,6 @@
-# syntax=docker/dockerfile:1
+# No `# syntax=` line: BuildKit's built-in Dockerfile frontend (pinned with
+# BuildKit itself) builds it, so a build does not fetch a frontend image from
+# Docker Hub each time.
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dotnet-build
 WORKDIR /src
