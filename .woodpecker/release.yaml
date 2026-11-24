@@ -26,18 +26,21 @@ when:
     branch: main
   - event: manual
 
-clone:
-  - name: clone
-    image: woodpeckerci/plugin-git:2.10.1
-    settings:
-      # The image tag comes from `git describe`: full history and tags.
-      depth: 0
-      tags: true
+# The clone is part of the image-tag step: one pod less (a step's pod start
+# took 8-14 s of a clone whose fetch took ~1 s).
+skip_clone: true
 
 steps:
   - name: image-tag
     image: *ci-image
     commands:
+      # Blobless: history and tags for `git describe` (the image tag), the
+      # files of this commit only. The repository is public: no credentials.
+      - git init -q -b main .
+      - git config --global --add safe.directory "$${CI_WORKSPACE}"
+      - git remote add origin "$${CI_REPO_CLONE_URL}"
+      - git fetch -q --filter=blob:none --tags origin "+$${CI_COMMIT_SHA}:"
+      - git checkout -q --detach "$${CI_COMMIT_SHA}"
       # Computed first, written after: a file created during the computation
       # would count as an uncommitted change and make the tag "-dirty".
       - TAG=$(mise run -q image-tag)
