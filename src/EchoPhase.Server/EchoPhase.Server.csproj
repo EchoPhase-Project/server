@@ -27,7 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AutoMapper" />
     <PackageReference Include="Npgsql.OpenTelemetry" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
