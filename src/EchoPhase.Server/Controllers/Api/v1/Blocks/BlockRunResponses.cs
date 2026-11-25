@@ -37,7 +37,10 @@ namespace EchoPhase.Server.Controllers.Api.v1.Blocks
     public sealed record BlockRunDetailsResponse(BlockRunResponse Run, JsonElement? Result);
 
     /// <param name="RunId">The new run's id.</param>
-    /// <param name="Status">queued: it reports its progress as events.</param>
+    /// <param name="Status">
+    /// queued: it reports its progress as events; running when a webhook stopped
+    /// waiting for the program's reply (504).
+    /// </param>
     /// <param name="RetryOf">The run it repeats, for a retry.</param>
     public sealed record RunStartedResponse(Guid RunId, string Status, Guid? RetryOf = null);
 }
