@@ -35,8 +35,32 @@ Use an existing controller as the reference
 not return 400, add its case to `StatusFor`.** If you do not add it, the code
 returns 400.
 
-Return entities through the `Projector`. Only the properties with `[Expose]`
-go out of the server.
+## Responses
+
+Return each response body as a `sealed record` named `<Name>Response`. Put
+the record in the controller file, or in `<Area>/<Name>Response.cs` next to
+the controller. The record is the list of the fields that go out of the
+server. Thus, a new property of an entity stays inside until you add it.
+
+Map to the record with a static `From` method on the record. For a list,
+use `.Select(XResponse.From)`. If a field depends on the user, write that
+check in `From` (refer to `NoteResponse.From`). Then the access rule is in
+one place.
+
+Declare the record with `[ProducesResponseType<XResponse>(...)]`. Then the
+contract contains the type, the `/// <param>` docs, and the nullability, and
+the web client gets its types from the contract.
+
+Do not return an entity, an anonymous object, or the output of `Projector`
+in new code. The contract does not contain such a body, so `openapi:check`
+cannot see its changes. `ResponseTypeTests` fails if an action does not
+declare a typed success response. The test has a list of the old actions
+without one. Remove an action from that list when you give it a record. Do
+not add an action to it.
+
+If a list loads large rows, you can also give the record a static
+`Expression<Func<TEntity, XResponse>>` and use it in the query (`Select`).
+Then the database sends only the columns of the response.
 
 Permissions are `resource:action` constants (`Security.BitMasks/Constants`).
 `RolePermissions.cs` gives them to roles. A new permission changes the

@@ -79,8 +79,14 @@ The tests do not use a database or Docker. Do not start services for the tests.
 - Each action must have `[RequirePermission(...)]`.
 - Each action that changes data must have `[ValidateAntiForgery]`.
 - Declare each status code with `[ProducesResponseType]`.
-- Return entities through the `Projector`. Only `[Expose]` properties go out
-  of the server.
+- Return each response body as a `sealed record` named `<Name>Response`.
+  Put the record next to its controller.
+- Map to the record with a static `From` method on it. For a list, use
+  `.Select(XResponse.From)`.
+- Declare the record with `[ProducesResponseType<XResponse>(...)]`.
+- Do not return an entity, an anonymous object, or the output of
+  `Projector` in new code. `ResponseTypeTests` fails on a new action
+  without a typed response.
 - Write `/// <param>` docs for request and response records. These docs
   become the descriptions in the contract.
 - Nullability is part of the contract.
