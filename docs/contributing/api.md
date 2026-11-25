@@ -1,0 +1,65 @@
+# The API
+
+This file tells how to write services, endpoints, and the API contract.
+
+## Results and errors
+
+Services return `IServiceResult` or `IServiceResult<T>`
+(`EchoPhase.Types/Result`). They do not throw exceptions. Use `Success` and
+`Failure`. Use `Map` and `Bind` to chain steps: after a failure, the
+subsequent steps do not run. Exceptions are for bugs only. Do not use them
+for results that the caller must handle.
+
+An error has a stable code and a message. Codes are `const string` values in
+the `*Errors` class of the area (`AuthErrors`, `ApiClientErrors`,
+`BlockRunErrors`). If a code in `ErrorCodes` (`NotFound`, `Invalid`,
+`Conflict`, `Forbidden`…) has the same meaning, use it again. Clients use the
+codes in their logic. Thus, do not change the name of a released code.
+
+
+## An API endpoint
+
+Use an existing controller as the reference
+(`Controllers/Api/v1/Storage/StorageController.cs`):
+
+- The controller derives from `ApiControllerBase`. It is in
+  `Controllers/Api/v1/<Area>/`.
+- Request and response types are `sealed record` types with `/// <param>` docs
+  and validation attributes.
+- Each action has `[RequirePermission(Resources.X, Permissions.Y)]`. Each
+  action that changes data also has `[ValidateAntiForgery]`.
+- Each status code has `[ProducesResponseType]`. Errors use `ErrorBody`.
+- Each action gives its `CancellationToken` to the calls that it makes.
+
+`Failure(error)` changes a service failure into a response.
+`ApiControllerBase.StatusFor` sets the status code. **If a new error code must
+not return 400, add its case to `StatusFor`.** If you do not add it, the code
+returns 400.
+
+Return entities through the `Projector`. Only the properties with `[Expose]`
+go out of the server.
+
+Permissions are `resource:action` constants (`Security.BitMasks/Constants`).
+`RolePermissions.cs` gives them to roles. A new permission changes the
+permission encoding in tokens. Tell this in the pull request.
+
+
+## The API contract
+
+The web client and other clients use the contract (`artifacts/openapi.json`,
+`mise run openapi`). Nullability is important: a reference type that is not
+nullable is a required field.
+
+The contract must stay compatible with clients in a release series. Before
+1.0, a series is a minor version (`0.2.x`). `mise run openapi:check` compares
+the contract with the latest release of its series. It fails if it finds an
+incompatible change.
+
+If you must make an incompatible change, the commit must start a new series.
+Before 1.0, this is a `feat!:` commit. For an intentional exception, add an
+entry with its reason to `openapi.err-ignore`. The README tells about the two
+methods in "Breaking API changes".
+
+If more values can be added to an enum in the future, give it
+`[ExtensibleEnum]`. Then a new value is a compatible change, and clients must
+accept values that they do not know.
