@@ -11,7 +11,6 @@ start with incorrect settings, and `check` shows them.
 If a self-hoster needs a setting, also write about it in the chart
 ([charts](https://github.com/EchoPhase-Project/charts)).
 
-
 ## Telemetry
 
 Traces and metrics are on only when an OTLP endpoint is set. For new traces

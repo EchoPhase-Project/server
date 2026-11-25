@@ -16,7 +16,6 @@ the `*Errors` class of the area (`AuthErrors`, `ApiClientErrors`,
 `Conflict`, `Forbidden`…) has the same meaning, use it again. Clients use the
 codes in their logic. Thus, do not change the name of a released code.
 
-
 ## An API endpoint
 
 Use an existing controller as the reference
@@ -42,7 +41,6 @@ go out of the server.
 Permissions are `resource:action` constants (`Security.BitMasks/Constants`).
 `RolePermissions.cs` gives them to roles. A new permission changes the
 permission encoding in tokens. Tell this in the pull request.
-
 
 ## The API contract
 

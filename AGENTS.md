@@ -20,7 +20,7 @@ Get the tools from mise. Run `mise install --locked`, then run
 | Run some tests | `mise run test -- --filter-class '*Argon2*'` |
 | Examine the code style | `mise run lint` (to correct the style, run `mise run format`) |
 | Export the API contract | `mise run openapi` |
-| Find incompatible changes in the contract | `mise run openapi:check` (this task uses the registry, refer to CONTRIBUTING) |
+| Find incompatible changes in the contract | `mise run openapi:check` (this task uses the registry, refer to `docs/contributing/api.md`) |
 | Add a Postgres migration | `mise run migrations:add <Name>` |
 | Make sure that migrations include all model changes | `mise run migrations:check` |
 

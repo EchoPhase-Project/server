@@ -14,7 +14,6 @@ This file tells how to add a workflow block and an admin command.
 Handlers register automatically. A test fails if a block type does not have a
 handler.
 
-
 ## A command
 
 Commands are Spectre.Console `AsyncCommand<TSettings>` classes in

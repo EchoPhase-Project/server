@@ -2,7 +2,7 @@
 
 Each file here records one decision about the server: the situation, what
 we chose, what we gave up, and what follows from it. The rules themselves
-are in [CONTRIBUTING.md](../../CONTRIBUTING.md); a record explains *why* a
+are in [docs/contributing/](../contributing/); a record explains *why* a
 rule is the way it is, so that the reasoning is not lost and the decision is
 not argued again from scratch.
 
@@ -11,7 +11,7 @@ replaced is not deleted: its status changes to "Superseded by NNNN", and the
 new record links back to it.
 
 To add one, copy [template.md](template.md) to the next number, for example
-`0002-short-title.md`, and add it to the list below. Write in plain, clear
+`NNNN-short-title.md`, and add it to the list below. Write in plain, clear
 English.
 
 | No. | Decision | Status |
