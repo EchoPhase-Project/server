@@ -62,6 +62,19 @@ namespace EchoPhase.Server.Tests
                 + "[ProducesResponseType<XResponse>(...)], or 204 if it has no body:\n" + string.Join("\n", untyped));
         }
 
+        [Fact]
+        public void EveryUntypedEntry_StillNamesAnUntypedResponse()
+        {
+            var declared = Controllers()
+                .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                .SelectMany(m => m.GetCustomAttributes<ProducesResponseTypeAttribute>()
+                    .Where(a => !IsShaped(a.Type))
+                    .Select(a => (Name(m), a.StatusCode)))
+                .ToHashSet();
+            var stale = Untyped.Where(u => !declared.Contains(u)).Select(u => $"{u.Action} {u.Status}").ToList();
+            Assert.True(stale.Count == 0, "Remove these from Untyped (typed now, or gone):\n" + string.Join("\n", stale));
+        }
+
         /// <summary>
         /// Each declared success status (2xx, 3xx) is 204, a redirect, an allowed untyped
         /// one, or has a type: on the attribute, or from an <c>ActionResult&lt;T&gt;</c>
@@ -80,7 +93,8 @@ namespace EchoPhase.Server.Tests
                 a.StatusCode is StatusCodes.Status204NoContent or >= 300
                 || Untyped.Contains((Name(method), a.StatusCode))
                 || IsShaped(a.Type)
-                || (typedReturn && (a.Type is null || a.Type == typeof(void))));
+                // ApiExplorer takes the type from ActionResult<T> for 200 and 201 only.
+                || (typedReturn && a.Type == typeof(void) && a.StatusCode is 200 or 201));
         }
 
         private static bool IsShaped(Type? type) => type is not null && type != typeof(void) && !Shapeless.Contains(type);
