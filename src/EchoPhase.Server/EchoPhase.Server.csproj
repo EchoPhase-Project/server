@@ -75,7 +75,6 @@
     <ProjectReference Include="..\EchoPhase.Security.BitMasks\EchoPhase.Security.BitMasks.csproj" />
     <ProjectReference Include="..\EchoPhase.Identity\EchoPhase.Identity.csproj" />
     <ProjectReference Include="..\EchoPhase.Security.Antiforgery\EchoPhase.Security.Antiforgery.csproj" />
-    <ProjectReference Include="..\EchoPhase.Projection\EchoPhase.Projection.csproj" />
     <ProjectReference Include="..\EchoPhase.Security.Authentication\EchoPhase.Security.Authentication.csproj" />
     <ProjectReference Include="..\EchoPhase.Security.Hashers\EchoPhase.Security.Hashers.csproj" />
     <ProjectReference Include="..\EchoPhase.Security.Authorization\EchoPhase.Security.Authorization.csproj" />

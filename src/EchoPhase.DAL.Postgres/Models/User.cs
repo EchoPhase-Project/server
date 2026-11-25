@@ -4,7 +4,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using EchoPhase.DAL.Abstractions;
-using EchoPhase.Projection.Attributes;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using UUIDNext;
@@ -14,12 +13,12 @@ namespace EchoPhase.DAL.Postgres.Models
     [Comment("Authorised User Model")]
     public class User : IdentityUser<Guid>, ITrackingEntity, IDisposable, IIdentifiable
     {
-        [Expose] public override Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
-        [Expose] public override string? UserName { get; set; }
-        [Expose] public string Name { get; set; }
+        public override Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
+        public override string? UserName { get; set; }
+        public string Name { get; set; }
 
         /// <summary>The user's picture (a file of purpose Avatar); null: none.</summary>
-        [Expose] public Guid? AvatarFileId { get; set; }
+        public Guid? AvatarFileId { get; set; }
         public StoredFile? AvatarFile { get; set; }
 
         /// <summary>
@@ -27,7 +26,7 @@ namespace EchoPhase.DAL.Postgres.Models
         /// scheduling in the user's local time. Times are stored in UTC
         /// regardless; this is a preference, not part of any timestamp.
         /// </summary>
-        [Expose][MaxLength(64)] public string TimeZone { get; set; } = "UTC";
+        [MaxLength(64)] public string TimeZone { get; set; } = "UTC";
 
         public ICollection<Session> Sessions { get; set; } = new List<Session>();
         public ICollection<ApiClient> ApiClients { get; set; } = new List<ApiClient>();

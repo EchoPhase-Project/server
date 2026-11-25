@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.DAL.Abstractions;
-using EchoPhase.Projection.Attributes;
 using UUIDNext;
 
 namespace EchoPhase.DAL.Postgres.Models
@@ -14,15 +13,15 @@ namespace EchoPhase.DAL.Postgres.Models
     /// </summary>
     public class Impersonation : ITrackingEntity, IConcurrentEntity, IIdentifiable
     {
-        [Expose] public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
+        public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
 
-        [Expose] public Guid ActorId { get; set; }
+        public Guid ActorId { get; set; }
         public User? Actor { get; set; }
 
-        [Expose] public Guid TargetId { get; set; }
+        public Guid TargetId { get; set; }
         public User? Target { get; set; }
 
-        [Expose] public string Reason { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
 
         /// <summary>
         /// The actor's stamp at start; a role or password change of the actor
@@ -30,11 +29,11 @@ namespace EchoPhase.DAL.Postgres.Models
         /// </summary>
         public string ActorSecurityStamp { get; set; } = string.Empty;
 
-        [Expose] public DateTime ExpiresAt { get; set; }
-        [Expose] public DateTime? EndedAt { get; set; }
+        public DateTime ExpiresAt { get; set; }
+        public DateTime? EndedAt { get; set; }
 
-        [Expose] public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-        [Expose] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public Guid ConcurrencyStamp { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
     }
 }

@@ -27,12 +27,12 @@ namespace EchoPhase.Server.Controllers.Api.v1.Maintenance
         /// <summary>Turns maintenance on (again: replaces message and end).</summary>
         [HttpPut]
         [ValidateAntiForgery]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType<MaintenanceResponse>(StatusCodes.Status200OK)]
         public async Task<IActionResult> Enable([FromBody] EnableMaintenanceRequest dto, CancellationToken ct = default)
         {
             var duration = dto.Minutes is { } minutes ? TimeSpan.FromMinutes(minutes) : (TimeSpan?)null;
             var state = await _maintenance.EnableAsync(dto.Message, duration, ct);
-            return Ok(new { maintenance = true, message = state.Message, since = state.Since, until = state.Until });
+            return Ok(new MaintenanceResponse(true, state.Message, state.Since, state.Until));
         }
 
         [HttpDelete]
@@ -44,4 +44,11 @@ namespace EchoPhase.Server.Controllers.Api.v1.Maintenance
             return NoContent();
         }
     }
+
+    /// <summary>The maintenance now in force.</summary>
+    /// <param name="Maintenance">Always true: the service is closed.</param>
+    /// <param name="Message">The message for users.</param>
+    /// <param name="Since">When it started.</param>
+    /// <param name="Until">When it is planned to end; none: until it is turned off.</param>
+    public sealed record MaintenanceResponse(bool Maintenance, string? Message, DateTimeOffset Since, DateTimeOffset? Until);
 }

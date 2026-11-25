@@ -84,9 +84,8 @@ The tests do not use a database or Docker. Do not start services for the tests.
 - Map to the record with a static `From` method on it. For a list, use
   `.Select(XResponse.From)`.
 - Declare the record with `[ProducesResponseType<XResponse>(...)]`.
-- Do not return an entity, an anonymous object, or the output of
-  `Projector` in new code. `ResponseTypeTests` fails on a new action
-  without a typed response.
+- Do not return an entity or an anonymous object. `ResponseTypeTests`
+  fails if an action does not declare a typed success response.
 - Write `/// <param>` docs for request and response records. These docs
   become the descriptions in the contract.
 - Nullability is part of the contract.

@@ -24,21 +24,26 @@ namespace EchoPhase.Server.Controllers.Api.v1.Gateway
         /// token has it (an intent without a requirement is never allowed).
         /// </summary>
         [HttpGet]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType<GatewayIntentResponse[]>(StatusCodes.Status200OK)]
         public IActionResult List()
         {
             var granted = _permissions.GetPermissions(User);
             return Ok(Intents.AsEnumerable().Order(StringComparer.Ordinal).Select(name =>
             {
-                var requirement = IntentRequirements.Map.TryGetValue(name, out var r) ? r : default;
-                return new
-                {
+                bool known = IntentRequirements.Map.TryGetValue(name, out var requirement);
+                return new GatewayIntentResponse(
                     name,
-                    resource = requirement.Resource,
-                    permission = requirement.Permission,
-                    allowed = IntentRequirements.Disallowed([name], granted).Count == 0
-                };
-            }));
+                    known ? requirement.Resource : null,
+                    known ? requirement.Permission : null,
+                    IntentRequirements.Disallowed([name], granted).Count == 0);
+            }).ToList());
         }
     }
+
+    /// <summary>One intent of the gateway, and whether the caller may subscribe to it.</summary>
+    /// <param name="Name">The intent, as in the handshake.</param>
+    /// <param name="Resource">The resource its permission is on; none: the intent is never allowed.</param>
+    /// <param name="Permission">The action needed on that resource.</param>
+    /// <param name="Allowed">Whether the caller's token has that permission.</param>
+    public sealed record GatewayIntentResponse(string Name, string? Resource, string? Permission, bool Allowed);
 }

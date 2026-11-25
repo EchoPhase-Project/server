@@ -11,7 +11,8 @@ namespace EchoPhase.Server.Tests
 {
     /// <summary>
     /// Every API action declares its success response: a typed body
-    /// (<c>[ProducesResponseType&lt;XResponse&gt;]</c>), or 204 with none. A body
+    /// (<c>[ProducesResponseType&lt;XResponse&gt;]</c>), or 204 / 202 with none, or a
+    /// redirect. A body
     /// without a type is not in the contract, so the web client cannot get its
     /// type and <c>openapi:check</c> cannot see it change.
     /// </summary>
@@ -19,49 +20,20 @@ namespace EchoPhase.Server.Tests
     {
         /// <summary>
         /// Actions from before the rule, without a typed success response.
-        /// Remove one when it gets a response record; never add one.
+        /// Empty since 2026-11-25; keep it that way.
         /// </summary>
         private static readonly HashSet<string> Untyped = new(StringComparer.Ordinal)
         {
-            "ApiClientsController.Create",
-            "ApiClientsController.Delete",
-            "ApiClientsController.List",
-            "ApiClientsController.RevokePreviousSecret",
-            "ApiClientsController.RotateSecret",
-            "BlockRunsController.Cancel",
-            "ConnectionsController.Authorize",
-            "ConnectionsController.Callback",
-            "ConnectionsController.Delete",
-            "ConnectionsController.SaveManual",
-            "DiscordController.GetGuildsAsync",
-            "DiscordGatewayController.Connect",
-            "DiscordGatewayController.Disconnect",
-            "DiscordGatewayController.GetConnections",
-            "GatewayIntentsController.List",
-            "ImpersonationController.End",
-            "ImpersonationController.EndCurrent",
-            "ImpersonationController.List",
-            "ImpersonationController.Start",
-            "MaintenanceController.Enable",
-            "OAuthAppsController.Delete",
-            "OAuthAppsController.List",
-            "OAuthAppsController.Save",
-            "RefreshTokenController.Refresh",
-            "RolesController.AssignRole",
-            "RolesController.GetRoles",
-            "RolesController.GetUserRoles",
-            "RolesController.GetUsersInRole",
-            "RolesController.RevokeRole",
-            "StatusController.Get",
-            "TokenController.Token",
-            "TwitchController.GetVipsAsync",
-            "UserPermissionsController.Get",
-            "UserPermissionsController.GetMine",
-            "UserPermissionsController.Grant",
-            "UserPermissionsController.Revoke",
-            "UsersController.GetUser",
-            "WebhooksController.Trigger",
         };
+
+        /// <summary>
+        /// Success responses whose body is not ours to type: the webhook's 200 is the
+        /// program's own answer (its status, headers and body, any content).
+        /// </summary>
+        private static readonly (string Action, int Status)[] FreeFormResponses =
+        [
+            ("WebhooksController.Trigger", StatusCodes.Status200OK),
+        ];
 
         [Fact]
         public void EveryAction_DeclaresATypedSuccessResponse()
@@ -92,20 +64,21 @@ namespace EchoPhase.Server.Tests
         }
 
         /// <summary>
-        /// Each declared success status is 204 or has a type: on the attribute, or
+        /// Each declared success status is 204, 202 without a body, a redirect, or has a type: on the attribute, or
         /// from an <c>ActionResult&lt;T&gt;</c> return (the compiler checks it), which also
         /// stands for an undeclared 200.
         /// </summary>
         private static bool HasTypedSuccess(MethodInfo method)
         {
             var success = method.GetCustomAttributes<ProducesResponseTypeAttribute>()
-                .Where(a => a.StatusCode is >= 200 and < 300)
+                .Where(a => a.StatusCode is >= 200 and < 400)
                 .ToList();
             bool typedReturn = ActionResultType(method.ReturnType) is not null;
             if (success.Count == 0)
                 return typedReturn;
             return success.All(a =>
-                a.StatusCode == StatusCodes.Status204NoContent
+                a.StatusCode is StatusCodes.Status204NoContent or StatusCodes.Status202Accepted or >= 300
+                || FreeFormResponses.Contains(($"{method.DeclaringType?.Name}.{method.Name}", a.StatusCode))
                 || (a.Type is not null && a.Type != typeof(void) && a.Type != typeof(object))
                 || typedReturn);
         }

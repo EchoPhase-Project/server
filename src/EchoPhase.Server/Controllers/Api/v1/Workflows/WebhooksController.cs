@@ -6,6 +6,8 @@ using EchoPhase.Configuration.Runner;
 using EchoPhase.DAL.Scylla.Entities;
 using EchoPhase.Runners.Blocks.Contexts;
 using EchoPhase.Scripting;
+using EchoPhase.Server.Controllers.Api.v1.Blocks;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using EchoPhase.Server.Services.Workflows;
 using EchoPhase.Types.Result.Extensions;
 using Microsoft.AspNetCore.Authorization;
@@ -40,10 +42,12 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
 
         [HttpPost("{workflowId:guid}/{blockId:int}")]
         [AllowAnonymous]
-        [ProducesResponseType(StatusCodes.Status202Accepted)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status504GatewayTimeout)]
+        // 200: the program's own answer (its status, headers and body), any content.
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType<RunStartedResponse>(StatusCodes.Status202Accepted)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<RunStartedResponse>(StatusCodes.Status504GatewayTimeout)]
         public async Task<IActionResult> Trigger(
             Guid workflowId, int blockId, [FromHeader(Name = SecretHeader)] string? secret,
             [FromBody] JsonElement? body, CancellationToken ct = default)
@@ -56,7 +60,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
 
             var (run, reply) = started;
             if (reply is null)
-                return Accepted(new { runId = run.RunId, status = BlockRunStatus.Queued });
+                return Accepted(new RunStartedResponse(run.RunId, BlockRunStatus.Queued));
 
             WebhookResponse response;
             try
@@ -65,7 +69,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Workflows
             }
             catch (TimeoutException)
             {
-                return StatusCode(StatusCodes.Status504GatewayTimeout, new { runId = run.RunId, status = BlockRunStatus.Running });
+                return StatusCode(StatusCodes.Status504GatewayTimeout, new RunStartedResponse(run.RunId, BlockRunStatus.Running));
             }
 
             return Respond(response);

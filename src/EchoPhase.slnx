@@ -13,7 +13,6 @@
   <Project Path="EchoPhase.DAL.Scylla/EchoPhase.DAL.Scylla.csproj" />
   <Project Path="EchoPhase.Identity/EchoPhase.Identity.csproj" />
   <Project Path="EchoPhase.Profilers/EchoPhase.Profilers.csproj" />
-  <Project Path="EchoPhase.Projection/EchoPhase.Projection.csproj" />
   <Project Path="EchoPhase.QRCodes/EchoPhase.QRCodes.csproj" />
   <Project Path="EchoPhase.Runners/EchoPhase.Runners.csproj" />
   <Project Path="EchoPhase.Scripting/EchoPhase.Scripting.csproj" />

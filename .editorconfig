@@ -83,7 +83,7 @@ dotnet_naming_rule.local_function_pascalcase.style = pascalcase
 #
 # Covers:
 #   private          TFoo _foo
-#   internal         TFoo _foo   (e.g. internal readonly ProjectionOptions _defaultOptions)
+#   internal         TFoo _foo   (e.g. internal readonly SomeOptions _options)
 #
 # protected fields are visible to derived types, so they stay PascalCase
 # (public_members above).

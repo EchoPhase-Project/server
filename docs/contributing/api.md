@@ -51,12 +51,11 @@ Declare the record with `[ProducesResponseType<XResponse>(...)]`. Then the
 contract contains the type, the `/// <param>` docs, and the nullability, and
 the web client gets its types from the contract.
 
-Do not return an entity, an anonymous object, or the output of `Projector`
-in new code. The contract does not contain such a body, so `openapi:check`
-cannot see its changes. `ResponseTypeTests` fails if an action does not
-declare a typed success response. The test has a list of the old actions
-without one. Remove an action from that list when you give it a record. Do
-not add an action to it.
+Do not return an entity or an anonymous object. The contract does not
+contain such a body, so `openapi:check` cannot see its changes.
+`ResponseTypeTests` fails if an action does not declare a typed success
+response. A response without a body is 204, or 202 for work that continues
+after the response. A redirect is 302.
 
 If a list loads large rows, you can also give the record a static
 `Expression<Func<TEntity, XResponse>>` and use it in the query (`Select`).

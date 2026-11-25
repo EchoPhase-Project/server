@@ -1,12 +1,12 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using EchoPhase.Projection;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.ApiClients;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Server.Controllers.Api.v1.ApiClients
@@ -20,20 +20,19 @@ namespace EchoPhase.Server.Controllers.Api.v1.ApiClients
     public class ApiClientsController : ApiControllerBase
     {
         private readonly IApiClientService _clients;
-        private readonly Projector _projector;
 
-        public ApiClientsController(IApiClientService clients, Projector projector)
+        public ApiClientsController(IApiClientService clients)
         {
             _clients = clients;
-            _projector = projector;
         }
 
         [HttpGet]
         [RequirePermission(Resources.ApiClients, Permissions.Read)]
+        [ProducesResponseType<ApiClientResponse[]>(StatusCodes.Status200OK)]
         public async Task<IActionResult> List(CancellationToken ct = default)
         {
             var clients = await _clients.ListAsync(User.GetUserId(), ct);
-            return Ok(_projector.ForCollection(clients).Build());
+            return Ok(clients.Select(ApiClientResponse.From).ToList());
         }
 
         /// <summary>
@@ -42,6 +41,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.ApiClients
         [HttpPost]
         [ValidateAntiForgery]
         [RequirePermission(Resources.ApiClients, Permissions.Create)]
+        [ProducesResponseType<CreatedApiClientResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromBody] CreateApiClientRequest dto, CancellationToken ct = default)
         {
             var grant = new ApiClientGrant(
@@ -51,11 +52,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.ApiClients
             if (!result.Successful)
                 return Failure(result.Error);
 
-            return Ok(new
-            {
-                client = _projector.For(result.Value.Client).Build(),
-                clientSecret = result.Value.ClientSecret
-            });
+            return Ok(new CreatedApiClientResponse(ApiClientResponse.From(result.Value.Client), result.Value.ClientSecret));
         }
 
         /// <summary>
@@ -65,15 +62,19 @@ namespace EchoPhase.Server.Controllers.Api.v1.ApiClients
         [HttpPost("{id:guid}/secret")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.ApiClients, Permissions.Update)]
+        [ProducesResponseType<ApiClientSecretResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> RotateSecret(Guid id, CancellationToken ct = default)
         {
             var result = await _clients.RotateSecretAsync(User.GetUserId(), id, ct);
-            return result.Successful ? Ok(new { clientSecret = result.Value }) : Failure(result.Error);
+            return result.Successful ? Ok(new ApiClientSecretResponse(result.Value)) : Failure(result.Error);
         }
 
         [HttpDelete("{id:guid}/secret/previous")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.ApiClients, Permissions.Update)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> RevokePreviousSecret(Guid id, CancellationToken ct = default)
         {
             var result = await _clients.RevokePreviousSecretAsync(User.GetUserId(), id, ct);
@@ -86,6 +87,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.ApiClients
         [HttpDelete("{id:guid}")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.ApiClients, Permissions.Delete)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
         {
             var result = await _clients.DeleteAsync(User.GetUserId(), id, ct);

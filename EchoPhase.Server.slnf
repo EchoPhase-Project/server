@@ -16,7 +16,6 @@
       "src/EchoPhase.DAL.Scylla/EchoPhase.DAL.Scylla.csproj",
       "src/EchoPhase.Identity/EchoPhase.Identity.csproj",
       "src/EchoPhase.Profilers/EchoPhase.Profilers.csproj",
-      "src/EchoPhase.Projection/EchoPhase.Projection.csproj",
       "src/EchoPhase.QRCodes/EchoPhase.QRCodes.csproj",
       "src/EchoPhase.Runners/EchoPhase.Runners.csproj",
       "src/EchoPhase.Scripting/EchoPhase.Scripting.csproj",

@@ -9,6 +9,7 @@ using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Users;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Roles
@@ -55,14 +56,17 @@ namespace EchoPhase.Server.Controllers.Api.v1.Roles
         /// ones every user has.
         /// </summary>
         [HttpGet]
+        [ProducesResponseType<RolePermissionsResponse>(StatusCodes.Status200OK)]
         public IActionResult GetRoles()
-            => Ok(new { everyone = RolePermissions.Everyone, roles = RolePermissions.ByRole });
+            => Ok(new RolePermissionsResponse(RolePermissions.Everyone, RolePermissions.ByRole));
 
         /// <summary>
         /// Returns all roles assigned to the specified user. Requires roles:read.
         /// </summary>
         [HttpGet("users/{username}")]
         [RequirePermission(Resources.Roles, Permissions.Read)]
+        [ProducesResponseType<UserRolesResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetUserRoles([FromRoute] string username, CancellationToken ct = default)
         {
             var targetUser = await FindUserAsync(username, ct);
@@ -70,7 +74,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Roles
                 return NotFound($"User '{username}' not found.");
 
             var roles = await _roleService.GetRolesAsync(targetUser);
-            return Ok(new { Username = username, Roles = roles });
+            return Ok(new UserRolesResponse(username, roles.ToList()));
         }
 
         /// <summary>
@@ -78,16 +82,19 @@ namespace EchoPhase.Server.Controllers.Api.v1.Roles
         /// </summary>
         [HttpGet("{roleName}/users")]
         [RequirePermission(Resources.Roles, Permissions.Read)]
+        [ProducesResponseType<UserSummaryResponse[]>(StatusCodes.Status200OK)]
         public async Task<IActionResult> GetUsersInRole([FromRoute] string roleName)
         {
             var users = await _roleService.GetUsersInRoleAsync(roleName);
-            return Ok(users.Select(u => new { u.Id, u.UserName, u.Name }));
+            return Ok(users.Select(UserSummaryResponse.From).ToList());
         }
 
         /// <summary>Gives the user one role; already having it is not an error.</summary>
         [HttpPut("{roleName}/users/{username}")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Roles, Permissions.Assign)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> AssignRole(
             [FromRoute] string roleName,
             [FromRoute] string username,
@@ -105,6 +112,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Roles
         [HttpDelete("{roleName}/users/{username}")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Roles, Permissions.Assign)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> RevokeRole(
             [FromRoute] string roleName,
             [FromRoute] string username,
@@ -119,4 +128,15 @@ namespace EchoPhase.Server.Controllers.Api.v1.Roles
         }
     }
 
+    /// <summary>What each role grants, and what everyone has.</summary>
+    /// <param name="Everyone">The permissions of every signed-in user, by resource.</param>
+    /// <param name="Roles">Each role's permissions, by resource.</param>
+    public sealed record RolePermissionsResponse(
+        IReadOnlyDictionary<string, string[]> Everyone,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string[]>> Roles);
+
+    /// <summary>The roles of one user.</summary>
+    /// <param name="Username">The user name that was asked for.</param>
+    /// <param name="Roles">The user's roles.</param>
+    public sealed record UserRolesResponse(string Username, IReadOnlyList<string> Roles);
 }

@@ -8,6 +8,7 @@ using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using EchoPhase.Server.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -52,6 +53,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Connections
         [ValidateAntiForgery]
         [RequirePermission(Resources.Connections, Permissions.Create)]
         [RequirePrincipal(PrincipalKind.Session)]
+        [ProducesResponseType<ConnectionSummary>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> SaveManual(
             string provider, [FromBody] SaveManualConnectionRequest dto, CancellationToken ct = default)
         {
@@ -72,6 +75,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Connections
         [RequirePermission(Resources.Connections, Permissions.Create)]
         [RequirePrincipal(PrincipalKind.Session)]
         [EnableRateLimiting(RateLimitPolicies.Auth)]
+        [ProducesResponseType<AuthorizeConnectionResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Authorize(
             string provider, [FromBody] AuthorizeConnectionRequest dto, CancellationToken ct = default)
         {
@@ -89,7 +94,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Connections
                 MaxAge = NonceLifetime
             });
 
-            return Ok(new { url = result.Value.Url });
+            return Ok(new AuthorizeConnectionResponse(result.Value.Url));
         }
 
         /// <summary>
@@ -100,6 +105,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Connections
         [HttpGet("{provider}/callback")]
         [AllowAnonymous]
         [EnableRateLimiting(RateLimitPolicies.Auth)]
+        [ProducesResponseType(StatusCodes.Status302Found)]
         public async Task<IActionResult> Callback(
             string provider,
             [FromQuery] string? code,
@@ -127,6 +133,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Connections
         [ValidateAntiForgery]
         [RequirePermission(Resources.Connections, Permissions.Delete)]
         [RequirePrincipal(PrincipalKind.Session)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
         {
             var result = await _connections.DeleteAsync(User.GetUserId(), id, ct);
@@ -144,4 +152,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Connections
             return Redirect(QueryHelpers.AddQueryString(_options.ConnectionsReturnUrl, query));
         }
     }
+
+    /// <summary>Where the browser goes to sign in at the provider.</summary>
+    /// <param name="Url">The provider's sign-in page, with the state of this flow.</param>
+    public sealed record AuthorizeConnectionResponse(string Url);
 }

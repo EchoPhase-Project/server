@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Text;
+using System.Text.Json.Serialization;
 using EchoPhase.Security.Authentication.ApiClients;
 using EchoPhase.Server.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
@@ -35,6 +36,9 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
         [AllowAnonymous]
         [Consumes("application/x-www-form-urlencoded")]
         [EnableRateLimiting(RateLimitPolicies.Auth)]
+        [ProducesResponseType<ClientTokenResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<OAuthErrorResponse>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<OAuthErrorResponse>(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> Token(
             [FromForm(Name = "grant_type")] string? grantType,
             [FromForm(Name = "client_id")] string? clientIdField,
@@ -62,12 +66,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
             if (!result.Successful)
                 return InvalidClient(basic is not null);
 
-            return Ok(new
-            {
-                access_token = result.Value.AccessToken,
-                token_type = "Bearer",
-                expires_in = result.Value.ExpiresIn
-            });
+            return Ok(new ClientTokenResponse(result.Value.AccessToken, "Bearer", result.Value.ExpiresIn));
         }
 
         private (string? Id, string? Secret)? ReadBasicCredentials()
@@ -102,8 +101,22 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
         }
 
         private ObjectResult OAuthError(int status, string error, string? description = null)
-            => StatusCode(status, description is null
-                ? new { error }
-                : new { error, error_description = description });
+            => StatusCode(status, new OAuthErrorResponse(error, description));
     }
+
+    /// <summary>An access token for an API client (RFC 6749 §5.1; the field names are OAuth's).</summary>
+    /// <param name="AccessToken">The token; send it as <c>Authorization: Bearer</c>.</param>
+    /// <param name="TokenType">Always <c>Bearer</c>.</param>
+    /// <param name="ExpiresIn">Seconds until it expires.</param>
+    public sealed record ClientTokenResponse(
+        [property: JsonPropertyName("access_token")] string AccessToken,
+        [property: JsonPropertyName("token_type")] string TokenType,
+        [property: JsonPropertyName("expires_in")] int ExpiresIn);
+
+    /// <summary>An OAuth error (RFC 6749 §5.2).</summary>
+    /// <param name="Error">The error code, such as <c>invalid_client</c>.</param>
+    /// <param name="ErrorDescription">A text for the developer; often none.</param>
+    public sealed record OAuthErrorResponse(
+        [property: JsonPropertyName("error")] string Error,
+        [property: JsonPropertyName("error_description"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ErrorDescription = null);
 }

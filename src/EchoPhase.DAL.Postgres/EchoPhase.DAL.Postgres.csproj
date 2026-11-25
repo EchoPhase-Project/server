@@ -16,7 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EchoPhase.Projection\EchoPhase.Projection.csproj" />
     <ProjectReference Include="..\EchoPhase.Security.Cryptography\EchoPhase.Security.Cryptography.csproj" />
     <ProjectReference Include="..\EchoPhase.DAL.Abstractions\EchoPhase.DAL.Abstractions.csproj" />
   </ItemGroup>

@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.DAL.Abstractions;
-using EchoPhase.Projection.Attributes;
 using UUIDNext;
 
 namespace EchoPhase.DAL.Postgres.Models
@@ -14,11 +13,11 @@ namespace EchoPhase.DAL.Postgres.Models
     /// </summary>
     public class ApiClient : ITrackingEntity, IConcurrentEntity, IIdentifiable
     {
-        [Expose] public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
-        [Expose] public Guid UserId { get; set; }
+        public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
+        public Guid UserId { get; set; }
         public User? User { get; set; }
 
-        [Expose] public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Hex HMAC-SHA256 of the current secret.
@@ -31,14 +30,14 @@ namespace EchoPhase.DAL.Postgres.Models
         /// </summary>
         public string? PreviousSecretHash { get; set; }
 
-        [Expose] public ICollection<ApiClientPermissionEntry> Permissions { get; set; } = [];
+        public ICollection<ApiClientPermissionEntry> Permissions { get; set; } = [];
 
-        [Expose] public DateTime? ExpiresAt { get; set; }
-        [Expose] public DateTime? LastUsedAt { get; set; }
-        [Expose] public DateTime? SecretRotatedAt { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        public DateTime? LastUsedAt { get; set; }
+        public DateTime? SecretRotatedAt { get; set; }
 
-        [Expose] public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-        [Expose] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public Guid ConcurrencyStamp { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
     }
 
@@ -47,7 +46,7 @@ namespace EchoPhase.DAL.Postgres.Models
         public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
         public Guid ApiClientId { get; set; }
         public ApiClient? ApiClient { get; set; }
-        [Expose] public string Resource { get; set; } = string.Empty;
-        [Expose] public string[] Permissions { get; set; } = [];
+        public string Resource { get; set; } = string.Empty;
+        public string[] Permissions { get; set; } = [];
     }
 }

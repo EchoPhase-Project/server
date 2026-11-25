@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.DAL.Abstractions;
-using EchoPhase.Projection.Attributes;
 using UUIDNext;
 
 namespace EchoPhase.DAL.Postgres.Models
@@ -14,8 +13,8 @@ namespace EchoPhase.DAL.Postgres.Models
     /// </summary>
     public class Session : ITrackingEntity, IConcurrentEntity, IIdentifiable
     {
-        [Expose] public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
-        [Expose] public Guid UserId { get; set; }
+        public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
+        public Guid UserId { get; set; }
         public User? User { get; set; } = default;
 
         /// <summary>
@@ -23,7 +22,7 @@ namespace EchoPhase.DAL.Postgres.Models
         /// </summary>
         public string RefreshTokenHash { get; set; } = string.Empty;
 
-        [Expose] public string? DeviceId { get; set; }
+        public string? DeviceId { get; set; }
 
         /// <summary>
         /// Hashes of refresh tokens this session has already rotated away from.

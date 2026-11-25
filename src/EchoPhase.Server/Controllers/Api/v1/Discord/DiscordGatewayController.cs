@@ -9,6 +9,7 @@ using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Discord
@@ -31,6 +32,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Discord
         [HttpPost("connections")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Discord, Permissions.Connect)]
+        [ProducesResponseType<DiscordGatewayConnectionResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Connect([FromBody] GatewayConnectRequest dto, CancellationToken ct = default)
         {
             var userId = User.GetUserId();
@@ -45,13 +48,14 @@ namespace EchoPhase.Server.Controllers.Api.v1.Discord
             var connectionId = await _manager.ConnectAsync(
                 userId, dto.Name, credential.Value.AccessToken, dto.Intents ?? DiscordGatewayIntents.Default, ct);
 
-            return Ok(new { connectionId });
+            return Ok(new DiscordGatewayConnectionResponse(connectionId));
         }
 
         /// <summary>Closes one of the caller's gateway connections.</summary>
         [HttpDelete("connections/{connectionId:guid}")]
         [ValidateAntiForgery]
         [RequirePermission(Resources.Discord, Permissions.Connect)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         public async Task<IActionResult> Disconnect(Guid connectionId)
         {
             var userId = User.GetUserId();
@@ -63,6 +67,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Discord
         /// <summary>The caller's open gateway connections.</summary>
         [HttpGet("connections")]
         [RequirePermission(Resources.Discord, Permissions.Connect)]
+        [ProducesResponseType<Dictionary<string, Guid[]>>(StatusCodes.Status200OK)]
         public IActionResult GetConnections()
         {
             var userId = User.GetUserId();
@@ -71,4 +76,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Discord
             return Ok(connections);
         }
     }
+
+    /// <summary>An open gateway connection.</summary>
+    /// <param name="ConnectionId">Its id, to close it.</param>
+    public sealed record DiscordGatewayConnectionResponse(Guid ConnectionId);
 }

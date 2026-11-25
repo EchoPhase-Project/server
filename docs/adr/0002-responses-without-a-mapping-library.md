@@ -44,10 +44,11 @@ image. Entities already left the server in two hand-written ways:
   in `openapi:check`.
 - The rule (2026-11-25): every response body is a `sealed record` with
   `From`, declared with `[ProducesResponseType<T>]`. `ResponseTypeTests`
-  enforces it for new actions; 38 older actions are listed there and may
-  only leave the list (the 30 bodies without a type, and actions that do
-  not declare their success status at all). `Projector` and `[Expose]`
-  are on their way out.
+  enforces it. The 38 older actions without one (30 bodies without a type,
+  8 without a declared success status) got records the same day, and
+  `EchoPhase.Projection` with `[Expose]` was removed (a copy is kept
+  outside the repository). The only success bodies not typed now are the
+  webhook's 200, the program's own answer, and the WebSocket upgrade.
 
 ## Growth of the API (2026-11-25)
 

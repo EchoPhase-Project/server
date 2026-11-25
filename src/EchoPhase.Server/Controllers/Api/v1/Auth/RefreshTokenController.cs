@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.Security.Authentication.Jwt;
+using EchoPhase.Security.Authentication.Jwt.Providers;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using EchoPhase.Server.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +28,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
         [HttpPost]
         [AllowAnonymous]
         [EnableRateLimiting(RateLimitPolicies.Auth)]
+        [ProducesResponseType<TokenPair>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> Refresh([FromBody] RefreshRequest request, CancellationToken ct = default)
         {
             // RefreshToken is null when a parallel call already rotated the

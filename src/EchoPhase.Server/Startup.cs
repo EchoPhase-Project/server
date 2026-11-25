@@ -20,7 +20,6 @@ using EchoPhase.Notes.Extensions;
 using EchoPhase.Notifications;
 using EchoPhase.Notifications.Extensions;
 using EchoPhase.Profilers.Extensions;
-using EchoPhase.Projection.Extensions;
 using EchoPhase.QRCodes.Extensions;
 using EchoPhase.Runners.Blocks;
 using EchoPhase.Runners.Blocks.Notes;
@@ -176,8 +175,6 @@ namespace EchoPhase.Server
             services.AddSingleton<IStringLocalizerFactory, ResourceManagerStringLocalizerFactory>();
             services.AddHostedService<RealtimeCredentialMonitor>();
             services.AddHostedService<PermissionGrantExpiryWorker>();
-
-            services.AddProjection();
 
             services.AddCryptography();
             services.AddPasswordHasher();

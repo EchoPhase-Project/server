@@ -25,19 +25,26 @@ namespace EchoPhase.Server.Controllers.Api.v1.Status
 
         [HttpGet]
         [AllowAnonymous]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType<ServiceStatusResponse>(StatusCodes.Status200OK)]
         public async Task<IActionResult> Get(CancellationToken ct = default)
         {
             Response.Headers.CacheControl = "no-store";
             var state = await _maintenance.CurrentAsync(ct);
-            return Ok(new
-            {
-                maintenance = state is not null,
-                message = state?.Message,
-                since = state?.Since,
-                until = state?.Until,
-                retryAfterSeconds = state is null ? (long?)null : (long)state.RetryAfter(_time.GetUtcNow()).TotalSeconds
-            });
+            return Ok(ServiceStatusResponse.From(state, _time.GetUtcNow()));
         }
+    }
+
+    /// <summary>Whether the service is open, and if not, until when.</summary>
+    /// <param name="Maintenance">True while the service is closed for maintenance.</param>
+    /// <param name="Message">The maintenance message for users.</param>
+    /// <param name="Since">When the maintenance started.</param>
+    /// <param name="Until">When it is planned to end; none: not known.</param>
+    /// <param name="RetryAfterSeconds">How long a client should wait before it asks again.</param>
+    public sealed record ServiceStatusResponse(
+        bool Maintenance, string? Message, DateTimeOffset? Since, DateTimeOffset? Until, long? RetryAfterSeconds)
+    {
+        public static ServiceStatusResponse From(MaintenanceState? state, DateTimeOffset now) => state is null
+            ? new(false, null, null, null, null)
+            : new(true, state.Message, state.Since, state.Until, (long)state.RetryAfter(now).TotalSeconds);
     }
 }

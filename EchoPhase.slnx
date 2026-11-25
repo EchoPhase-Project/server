@@ -14,7 +14,6 @@
     <Project Path="src/EchoPhase.DAL.Scylla/EchoPhase.DAL.Scylla.csproj" />
     <Project Path="src/EchoPhase.Identity/EchoPhase.Identity.csproj" />
     <Project Path="src/EchoPhase.Profilers/EchoPhase.Profilers.csproj" />
-    <Project Path="src/EchoPhase.Projection/EchoPhase.Projection.csproj" />
     <Project Path="src/EchoPhase.QRCodes/EchoPhase.QRCodes.csproj" />
     <Project Path="src/EchoPhase.Runners/EchoPhase.Runners.csproj" />
     <Project Path="src/EchoPhase.Scripting/EchoPhase.Scripting.csproj" />
@@ -38,7 +37,6 @@
     <Project Path="tests/EchoPhase.DAL.Scylla.Benchmarks/EchoPhase.DAL.Scylla.Benchmarks.csproj" />
     <Project Path="tests/EchoPhase.Scripting.Benchmarks/EchoPhase.Scripting.Benchmarks.csproj" />
     <Project Path="tests/EchoPhase.Server.Tests/EchoPhase.Server.Tests.csproj" />
-    <Project Path="tests/EchoPhase.Projection.Tests/EchoPhase.Projection.Tests.csproj" />
     <Project Path="tests/EchoPhase.DAL.Postgres.Tests/EchoPhase.DAL.Postgres.Tests.csproj" />
     <Project Path="tests/EchoPhase.DAL.Scylla.Tests/EchoPhase.DAL.Scylla.Tests.csproj" />
     <Project Path="tests/EchoPhase.Types.Tests/EchoPhase.Types.Tests.csproj" />

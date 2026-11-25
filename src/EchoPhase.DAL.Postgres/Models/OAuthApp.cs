@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using EchoPhase.DAL.Abstractions;
-using EchoPhase.Projection.Attributes;
 using UUIDNext;
 
 namespace EchoPhase.DAL.Postgres.Models
@@ -13,13 +12,13 @@ namespace EchoPhase.DAL.Postgres.Models
     /// </summary>
     public class OAuthApp : ITrackingEntity, IConcurrentEntity, IIdentifiable
     {
-        [Expose] public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
-        [Expose] public Guid UserId { get; set; }
+        public Guid Id { get; set; } = Uuid.NewDatabaseFriendly(Database.PostgreSql);
+        public Guid UserId { get; set; }
         public User? User { get; set; }
 
-        [Expose] public string Provider { get; set; } = string.Empty;
-        [Expose] public string Name { get; set; } = string.Empty;
-        [Expose] public string ClientId { get; set; } = string.Empty;
+        public string Provider { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string ClientId { get; set; } = string.Empty;
 
         /// <summary>
         /// Encrypted client secret; <c>null</c> for public clients.

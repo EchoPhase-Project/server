@@ -1,12 +1,12 @@
 // Copyright (c) 2025-2026 EchoPhase. Licensed under the BSD-3-Clause License.
 // See the LICENCE file in the repository root for full licence text.
 
-using EchoPhase.Projection;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authentication.Impersonation;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using EchoPhase.Server.RateLimiting;
 using EchoPhase.Types.Claims;
 using Microsoft.AspNetCore.Mvc;
@@ -22,12 +22,10 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
     public class ImpersonationController : ApiControllerBase
     {
         private readonly IImpersonationService _impersonation;
-        private readonly Projector _projector;
 
-        public ImpersonationController(IImpersonationService impersonation, Projector projector)
+        public ImpersonationController(IImpersonationService impersonation)
         {
             _impersonation = impersonation;
-            _projector = projector;
         }
 
         /// <summary>
@@ -39,6 +37,9 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         [RequirePermission(Resources.Users, Permissions.Impersonate)]
         [ValidateAntiForgery]
         [EnableRateLimiting(RateLimitPolicies.Auth)]
+        [ProducesResponseType<ImpersonationStarted>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> Start([FromBody] StartImpersonationRequest dto, CancellationToken ct = default)
         {
             var result = await _impersonation.StartAsync(User.GetUserId(), dto.Username, dto.Reason, dto.Password, ct);
@@ -49,6 +50,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         [HttpDelete("{id:guid}")]
         [RequirePrincipal(PrincipalKind.Session)]
         [ValidateAntiForgery]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> End(Guid id, CancellationToken ct = default)
         {
             var result = await _impersonation.EndAsync(User.GetUserId(), id, ct);
@@ -59,6 +62,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         [HttpDelete("current")]
         [RequirePrincipal(PrincipalKind.Impersonation)]
         [ValidateAntiForgery]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> EndCurrent(CancellationToken ct = default)
         {
             if (!Guid.TryParse(User.FindFirst(EchoPhaseClaimTypes.ImpersonationId)?.Value, out var id))
@@ -74,7 +79,25 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         [HttpGet]
         [RequirePrincipal(PrincipalKind.Session)]
         [RequirePermission(Resources.Sessions, Permissions.Read)]
+        [ProducesResponseType<ImpersonationResponse[]>(StatusCodes.Status200OK)]
         public async Task<IActionResult> List(CancellationToken ct = default)
-            => Ok(_projector.ForCollection(await _impersonation.ListAsync(User.GetUserId(), ct)).Build());
+            => Ok((await _impersonation.ListAsync(User.GetUserId(), ct)).Select(ImpersonationResponse.From).ToList());
+    }
+
+    /// <summary>An impersonation the caller took part in, as actor or as target.</summary>
+    /// <param name="Id">Its id.</param>
+    /// <param name="ActorId">Who acted.</param>
+    /// <param name="TargetId">Whom they acted as.</param>
+    /// <param name="Reason">Why, as the actor wrote it.</param>
+    /// <param name="ExpiresAt">When its tokens stop working.</param>
+    /// <param name="EndedAt">When it was ended; none: not ended (it may have expired).</param>
+    /// <param name="CreatedAt">When it started.</param>
+    /// <param name="UpdatedAt">The last change.</param>
+    public sealed record ImpersonationResponse(
+        Guid Id, Guid ActorId, Guid TargetId, string Reason, DateTime ExpiresAt, DateTime? EndedAt,
+        DateTime CreatedAt, DateTime UpdatedAt)
+    {
+        public static ImpersonationResponse From(DAL.Postgres.Models.Impersonation i) => new(
+            i.Id, i.ActorId, i.TargetId, i.Reason, i.ExpiresAt, i.EndedAt, i.CreatedAt, i.UpdatedAt);
     }
 }

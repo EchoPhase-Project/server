@@ -23,6 +23,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Discord
 
         [HttpGet("users/@me/guilds")]
         [RequirePermission(Resources.Discord, Permissions.Read)]
+        [ProducesResponseType<DiscordUserGuildsResponseDto[]>(StatusCodes.Status200OK)]
         public async Task<IActionResult> GetGuildsAsync(
             [FromQuery] DiscordUserGuildsQueryDto query,
             [FromQuery] string connection,
