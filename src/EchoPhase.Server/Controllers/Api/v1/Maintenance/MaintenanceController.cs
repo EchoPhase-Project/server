@@ -5,6 +5,7 @@ using EchoPhase.DAL.Redis.Maintenance;
 using EchoPhase.Security.Antiforgery.Attributes;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Status;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Maintenance
@@ -18,21 +19,23 @@ namespace EchoPhase.Server.Controllers.Api.v1.Maintenance
     public class MaintenanceController : ApiControllerBase
     {
         private readonly MaintenanceSwitch _maintenance;
+        private readonly TimeProvider _time;
 
-        public MaintenanceController(MaintenanceSwitch maintenance)
+        public MaintenanceController(MaintenanceSwitch maintenance, TimeProvider time)
         {
             _maintenance = maintenance;
+            _time = time;
         }
 
         /// <summary>Turns maintenance on (again: replaces message and end).</summary>
         [HttpPut]
         [ValidateAntiForgery]
-        [ProducesResponseType<MaintenanceResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ServiceStatusResponse>(StatusCodes.Status200OK)]
         public async Task<IActionResult> Enable([FromBody] EnableMaintenanceRequest dto, CancellationToken ct = default)
         {
             var duration = dto.Minutes is { } minutes ? TimeSpan.FromMinutes(minutes) : (TimeSpan?)null;
             var state = await _maintenance.EnableAsync(dto.Message, duration, ct);
-            return Ok(new MaintenanceResponse(true, state.Message, state.Since, state.Until));
+            return Ok(ServiceStatusResponse.From(state, _time.GetUtcNow()));
         }
 
         [HttpDelete]
@@ -45,10 +48,4 @@ namespace EchoPhase.Server.Controllers.Api.v1.Maintenance
         }
     }
 
-    /// <summary>The maintenance now in force.</summary>
-    /// <param name="Maintenance">Always true: the service is closed.</param>
-    /// <param name="Message">The message for users.</param>
-    /// <param name="Since">When it started.</param>
-    /// <param name="Until">When it is planned to end; none: until it is turned off.</param>
-    public sealed record MaintenanceResponse(bool Maintenance, string? Message, DateTimeOffset Since, DateTimeOffset? Until);
 }

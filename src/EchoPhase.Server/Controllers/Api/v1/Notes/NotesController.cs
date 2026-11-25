@@ -10,18 +10,11 @@ using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
 using EchoPhase.Server.Controllers.Api.v1.Common;
+using EchoPhase.Server.Controllers.Api.v1.Users;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Notes
 {
-    /// <param name="Id">The user's id.</param>
-    /// <param name="UserName">Their username.</param>
-    /// <param name="Name">Their display name.</param>
-    public sealed record NoteUserResponse(Guid Id, string? UserName, string Name)
-    {
-        public static NoteUserResponse From(User? user, Guid id) => new(id, user?.UserName, user?.Name ?? string.Empty);
-    }
-
     /// <param name="Id">The note's id.</param>
     /// <param name="Title">Its title.</param>
     /// <param name="Body">Markdown; render it without raw HTML.</param>
@@ -33,14 +26,14 @@ namespace EchoPhase.Server.Controllers.Api.v1.Notes
     /// <param name="CreatedAt">When it was created.</param>
     /// <param name="UpdatedAt">When it last changed.</param>
     public sealed record NoteResponse(Guid Id, string Title, string Body, bool Pinned, DateTime? RemindAt,
-        NoteAccess Access, NoteUserResponse Owner, Guid Stamp, DateTime CreatedAt, DateTime UpdatedAt)
+        NoteAccess Access, UserSummaryResponse Owner, Guid Stamp, DateTime CreatedAt, DateTime UpdatedAt)
     {
         public static NoteResponse From(NoteView view)
         {
             var note = view.Note;
             var mine = view.Access == NoteAccess.Owner;
             return new(note.Id, note.Title, note.Body, mine && note.Pinned, mine ? note.RemindAt : null, view.Access,
-                NoteUserResponse.From(note.Owner, note.OwnerId), note.ConcurrencyStamp, note.CreatedAt, note.UpdatedAt);
+                UserSummaryResponse.From(note.Owner, note.OwnerId), note.ConcurrencyStamp, note.CreatedAt, note.UpdatedAt);
         }
     }
 
@@ -66,10 +59,10 @@ namespace EchoPhase.Server.Controllers.Api.v1.Notes
     /// <param name="User">Whom it is shared with.</param>
     /// <param name="CanEdit">May change the title and text.</param>
     /// <param name="CreatedAt">Since when.</param>
-    public sealed record NoteShareResponse(NoteUserResponse User, bool CanEdit, DateTime CreatedAt)
+    public sealed record NoteShareResponse(UserSummaryResponse User, bool CanEdit, DateTime CreatedAt)
     {
         public static NoteShareResponse From(NoteShare share) =>
-            new(NoteUserResponse.From(share.User, share.UserId), share.CanEdit, share.CreatedAt);
+            new(UserSummaryResponse.From(share.User, share.UserId), share.CanEdit, share.CreatedAt);
     }
 
     /// <summary>

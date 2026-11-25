@@ -52,5 +52,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Users
     public sealed record UserSummaryResponse(Guid Id, string? UserName, string Name)
     {
         public static UserSummaryResponse From(User user) => new(user.Id, user.UserName, user.Name);
+
+        /// <summary>A user that may be gone (deleted): only the id is left then.</summary>
+        public static UserSummaryResponse From(User? user, Guid id) => new(id, user?.UserName, user?.Name ?? string.Empty);
     }
 }
