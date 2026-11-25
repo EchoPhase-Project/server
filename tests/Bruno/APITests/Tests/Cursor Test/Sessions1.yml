@@ -17,7 +17,7 @@ runtime:
     - type: set-variable
       phase: after-response
       selector:
-        expression: res.body["NextCursor"]
+        expression: res.body["nextCursor"]
         method: jsonq
       variable:
         name: after
