@@ -15,13 +15,9 @@ RUN dotnet restore EchoPhase.slnx
 
 COPY . .
 
-# The image tag (scripts/image-tag.sh): the version the server reports. Not
-# named VERSION: a build argument is an environment variable in RUN, and
-# MSBuild would take that one as $(Version), which must be a NuGet version.
-ARG ECHOPHASE_VERSION=0.0.0-local
-# --no-restore: restored above already.
-RUN dotnet publish EchoPhase.Server/EchoPhase.Server.csproj -c Release -o /app --no-restore \
-    -p:EchoPhaseVersion="$ECHOPHASE_VERSION"
+# --no-restore: restored above already. No version here: it goes into the
+# image below, so a new tag alone does not publish again.
+RUN dotnet publish EchoPhase.Server/EchoPhase.Server.csproj -c Release -o /app --no-restore
 
 # The API contract, from the published build above (its XML docs give the
 # descriptions): `--opt target=contract --output type=local,dest=artifacts`.
@@ -44,5 +40,9 @@ WORKDIR /app
 COPY --from=dotnet-build /app .
 # Runs as the image's unprivileged "app" user; file logs go to /app/Logs.
 RUN mkdir -p /app/Logs && chown "$APP_UID:$APP_UID" /app/Logs
+# The image tag (scripts/image-tag.sh): the version the server reports
+# (ServerVersion). Last, so only this layer changes from one tag to the next.
+ARG ECHOPHASE_VERSION=0.0.0-local
+ENV ECHOPHASE_VERSION=$ECHOPHASE_VERSION
 USER $APP_UID
 ENTRYPOINT ["dotnet", "EchoPhase.Server.dll"]
