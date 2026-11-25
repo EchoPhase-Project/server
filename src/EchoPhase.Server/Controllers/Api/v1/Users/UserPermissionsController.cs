@@ -9,6 +9,7 @@ using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
 using EchoPhase.Server.Controllers.Api.v1.Common;
+using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Users
@@ -62,7 +63,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Users
         [RequirePermission(Resources.Users, Permissions.Grant)]
         [ProducesResponseType<UserPermissionGrantResponse>(StatusCodes.Status200OK)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status403Forbidden)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Grant(
@@ -70,7 +71,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Users
         {
             var actor = await _users.Query().WithIds(User.GetUserId()).FirstOrDefaultAsync(ct);
             if (actor is null)
-                return Unauthorized();
+                return Error(ErrorCodes.Unauthorized, "The signed-in user is gone.", StatusCodes.Status401Unauthorized);
 
             var target = await FindAsync(username, ct);
             if (target is null)

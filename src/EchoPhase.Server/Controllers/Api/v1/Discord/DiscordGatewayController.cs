@@ -33,10 +33,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Discord
         [ValidateAntiForgery]
         [RequirePermission(Resources.Discord, Permissions.Connect)]
         [ProducesResponseType<DiscordGatewayConnectionResponse>(StatusCodes.Status200OK)]
-        [ProducesResponseType<ErrorBody>(StatusCodes.Status403Forbidden)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status409Conflict)]
-        [ProducesResponseType<ErrorBody>(StatusCodes.Status502BadGateway)]
         public async Task<IActionResult> Connect([FromBody] GatewayConnectRequest dto, CancellationToken ct = default)
         {
             var userId = User.GetUserId();

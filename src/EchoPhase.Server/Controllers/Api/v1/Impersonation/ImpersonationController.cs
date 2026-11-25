@@ -9,6 +9,7 @@ using EchoPhase.Security.BitMasks.Constants;
 using EchoPhase.Server.Controllers.Api.v1.Common;
 using EchoPhase.Server.RateLimiting;
 using EchoPhase.Types.Claims;
+using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -53,7 +54,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         [RequirePrincipal(PrincipalKind.Session)]
         [ValidateAntiForgery]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType<ErrorBody>(StatusCodes.Status403Forbidden)]
+        // 403 from the principal policy (not a session), with no body.
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> End(Guid id, CancellationToken ct = default)
         {
@@ -66,12 +68,12 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         [RequirePrincipal(PrincipalKind.Impersonation)]
         [ValidateAntiForgery]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> EndCurrent(CancellationToken ct = default)
         {
             if (!Guid.TryParse(User.FindFirst(EchoPhaseClaimTypes.ImpersonationId)?.Value, out var id))
-                return BadRequest();
+                return Error(ErrorCodes.Invalid, "The token names no impersonation.", StatusCodes.Status400BadRequest);
 
             var result = await _impersonation.EndCurrentAsync(User.GetUserId(), id, ct);
             return result.Successful ? NoContent() : Failure(result.Error);
