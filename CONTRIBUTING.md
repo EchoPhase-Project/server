@@ -67,7 +67,7 @@ in `tests/` (`EchoPhase.<Project>.Tests`).
 
 | Projects | Contents |
 |---|---|
-| `Types`, `Projection`, `Configuration` | Shared foundations: results and error codes, `[Expose]` projection, options and their validation |
+| `Types`, `Configuration` | Shared foundations: results and error codes, options and their validation |
 | `DAL.Abstractions`, `DAL.Postgres`, `DAL.Scylla`, `DAL.Redis` | Data access: Postgres (EF Core) for accounts and workflows, Scylla for block runs, Redis for shared state |
 | `Security.*`, `Identity` | Cryptography, password hashes, authentication, authorisation (permissions), antiforgery, users and roles |
 | `Scripting`, `Runners` | The expression engine and the workflow block runner |

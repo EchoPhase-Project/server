@@ -36,7 +36,7 @@ The tests do not use a database or Docker. Do not start services for the tests.
 ## Layout
 
 - `src/EchoPhase.*` contains these projects:
-  - Foundations: `Types`, `Projection`, `Configuration`.
+  - Foundations: `Types`, `Configuration`.
   - Data access: `DAL.*` (Postgres, Scylla, Redis).
   - Other libraries: `Security.*`, `Identity`, `Scripting`, `Runners`
     (workflow blocks), `Clients`, `Connections`, `WebHooks`, `WebSockets`,
