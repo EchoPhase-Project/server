@@ -4,7 +4,6 @@
 using EchoPhase.Clients.Abstractions;
 using EchoPhase.Clients.Discord;
 using EchoPhase.Clients.Discord.Dto;
-using EchoPhase.Connections;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
@@ -26,6 +25,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Discord
         [HttpGet("users/@me/guilds")]
         [RequirePermission(Resources.Discord, Permissions.Read)]
         [ProducesResponseType<DiscordUserGuildsResponseDto[]>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status409Conflict)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status502BadGateway)]
         [ProducesDefaultResponseType(typeof(ErrorBody))]
         public async Task<IActionResult> GetGuildsAsync(
             [FromQuery] DiscordUserGuildsQueryDto query,
@@ -37,8 +38,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Discord
 
             return result.Match(
                 guilds => Ok(guilds),
-                // The upstream's status, with its message as an ErrorBody.
-                err => Error(ConnectionErrors.Upstream, err.Message ?? "The provider refused the request.", (int)result.StatusCode));
+                err => UpstreamError(err.Message, (int)result.StatusCode));
         }
     }
 }

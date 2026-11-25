@@ -57,5 +57,21 @@ namespace EchoPhase.Server.Controllers.Api
         /// <summary>An error the controller raises itself (no service result behind it).</summary>
         protected ObjectResult Error(string code, string message, int status)
             => StatusCode(status, new ErrorBody(code, message));
+
+        /// <summary>
+        /// A refusal of an external API that the server passes through, as
+        /// <see cref="ErrorBody"/>. Its status stays, except where it would mislead
+        /// the caller: a success status (the answer could not be read) is 502, and
+        /// 401 (the stored token no longer works) is 409, so a client does not take
+        /// it for the end of its own session.
+        /// </summary>
+        protected ObjectResult UpstreamError(string? message, int status) => status switch
+        {
+            StatusCodes.Status401Unauthorized => Error(ConnectionErrors.ReauthRequired,
+                message ?? "The provider no longer accepts the connection.", StatusCodes.Status409Conflict),
+            < 400 => Error(ConnectionErrors.Upstream,
+                message ?? "The provider's answer could not be read.", StatusCodes.Status502BadGateway),
+            _ => Error(ConnectionErrors.Upstream, message ?? "The provider refused the request.", status),
+        };
     }
 }
