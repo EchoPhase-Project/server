@@ -9,7 +9,9 @@ using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using EchoPhase.Server.Controllers.Api.v1.Users;
+using EchoPhase.Types.Result;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Roles
@@ -66,12 +68,12 @@ namespace EchoPhase.Server.Controllers.Api.v1.Roles
         [HttpGet("users/{username}")]
         [RequirePermission(Resources.Roles, Permissions.Read)]
         [ProducesResponseType<UserRolesResponse>(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetUserRoles([FromRoute] string username, CancellationToken ct = default)
         {
             var targetUser = await FindUserAsync(username, ct);
             if (targetUser is null)
-                return NotFound($"User '{username}' not found.");
+                return Error(ErrorCodes.NotFound, $"User '{username}' not found.", StatusCodes.Status404NotFound);
 
             var roles = await _roleService.GetRolesAsync(targetUser);
             return Ok(new UserRolesResponse(username, roles.ToList()));
@@ -94,7 +96,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Roles
         [ValidateAntiForgery]
         [RequirePermission(Resources.Roles, Permissions.Assign)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> AssignRole(
             [FromRoute] string roleName,
             [FromRoute] string username,
@@ -102,7 +105,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Roles
         {
             var targetUser = await FindUserAsync(username, ct);
             if (targetUser is null)
-                return NotFound($"User '{username}' not found.");
+                return Error(ErrorCodes.NotFound, $"User '{username}' not found.", StatusCodes.Status404NotFound);
 
             var result = await _roleService.AddToRolesAsync(targetUser, roleName);
             return result.Successful ? NoContent() : Failure(result.Error);
@@ -113,7 +116,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Roles
         [ValidateAntiForgery]
         [RequirePermission(Resources.Roles, Permissions.Assign)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RevokeRole(
             [FromRoute] string roleName,
             [FromRoute] string username,
@@ -121,7 +125,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Roles
         {
             var targetUser = await FindUserAsync(username, ct);
             if (targetUser is null)
-                return NotFound($"User '{username}' not found.");
+                return Error(ErrorCodes.NotFound, $"User '{username}' not found.", StatusCodes.Status404NotFound);
 
             var result = await _roleService.RemoveFromRolesAsync(targetUser, new[] { roleName });
             return result.Successful ? NoContent() : Failure(result.Error);

@@ -62,6 +62,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Users
         [RequirePermission(Resources.Users, Permissions.Grant)]
         [ProducesResponseType<UserPermissionGrantResponse>(StatusCodes.Status200OK)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status403Forbidden)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Grant(
             string username, string resource, [FromBody] GrantPermissionsRequest dto, CancellationToken ct = default)

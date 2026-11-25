@@ -4,9 +4,11 @@
 using EchoPhase.Clients.Abstractions;
 using EchoPhase.Clients.Twitch;
 using EchoPhase.Clients.Twitch.Dto;
+using EchoPhase.Connections;
 using EchoPhase.Security.Authentication.Extensions;
 using EchoPhase.Security.Authorization.Attributes;
 using EchoPhase.Security.BitMasks.Constants;
+using EchoPhase.Server.Controllers.Api.v1.Common;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EchoPhase.Server.Controllers.Api.v1.Twitch
@@ -24,6 +26,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Twitch
         [HttpGet("channels/vips")]
         [RequirePermission(Resources.Twitch, Permissions.Read)]
         [ProducesResponseType<TwitchVipsResponse>(StatusCodes.Status200OK)]
+        [ProducesDefaultResponseType(typeof(ErrorBody))]
         public async Task<IActionResult> GetVipsAsync(
             [FromQuery] TwitchVipRequestQueryDto query,
             [FromQuery] string connection,
@@ -34,7 +37,8 @@ namespace EchoPhase.Server.Controllers.Api.v1.Twitch
 
             return result.Match(
                 (vips, page) => Ok(new TwitchVipsResponse(vips.ToList(), new TwitchPaginationResponse(page?.Cursor))),
-                err => StatusCode((int)result.StatusCode, err.Message));
+                // The upstream's status, with its message as an ErrorBody.
+                err => Error(ConnectionErrors.Upstream, err.Message ?? "The provider refused the request.", (int)result.StatusCode));
         }
     }
 

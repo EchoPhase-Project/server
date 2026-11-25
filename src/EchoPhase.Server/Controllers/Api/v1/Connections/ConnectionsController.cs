@@ -55,6 +55,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Connections
         [RequirePrincipal(PrincipalKind.Session)]
         [ProducesResponseType<ConnectionSummary>(StatusCodes.Status200OK)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status502BadGateway)]
         public async Task<IActionResult> SaveManual(
             string provider, [FromBody] SaveManualConnectionRequest dto, CancellationToken ct = default)
         {

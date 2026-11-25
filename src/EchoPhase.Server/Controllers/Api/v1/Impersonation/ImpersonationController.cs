@@ -39,7 +39,9 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         [EnableRateLimiting(RateLimitPolicies.Auth)]
         [ProducesResponseType<ImpersonationStarted>(StatusCodes.Status200OK)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Start([FromBody] StartImpersonationRequest dto, CancellationToken ct = default)
         {
             var result = await _impersonation.StartAsync(User.GetUserId(), dto.Username, dto.Reason, dto.Password, ct);
@@ -51,6 +53,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         [RequirePrincipal(PrincipalKind.Session)]
         [ValidateAntiForgery]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType<ErrorBody>(StatusCodes.Status403Forbidden)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> End(Guid id, CancellationToken ct = default)
         {
@@ -63,6 +66,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         [RequirePrincipal(PrincipalKind.Impersonation)]
         [ValidateAntiForgery]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> EndCurrent(CancellationToken ct = default)
         {
