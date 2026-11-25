@@ -38,8 +38,8 @@ returns 400.
 ## Responses
 
 Return each response body as a `sealed record` named `<Name>Response`. Put
-the record in the controller file, or in `<Area>/<Name>Response.cs` next to
-the controller. The record is the list of the fields that go out of the
+the record in the controller file, in `<Area>/<Name>Response.cs`, or with the
+other records of the area in `<Area>/<Area>Responses.cs`. The record is the list of the fields that go out of the
 server. Thus, a new property of an entity stays inside until you add it.
 
 Do not return a type of a library project, such as a service record. Only

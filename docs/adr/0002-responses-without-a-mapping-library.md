@@ -20,9 +20,10 @@ image. Entities already left the server in two hand-written ways:
 ## Decision
 
 - No mapping library. AutoMapper was removed (server `7556466`).
-- What goes out is written explicitly: a response record with `From`, or
-  `Projector` with `[Expose]`. Both are allow-lists: a new entity property
-  does not leave the server until someone adds it.
+- What goes out is written explicitly: a response record with `From`. The
+  record is an allow-list: a new entity property does not leave the server
+  until someone adds it. (Until 2026-11-25 `Projector` with `[Expose]` was
+  the second way; see Consequences.)
 - Response records carry the `/// <param>` docs and the nullability that
   become the OpenAPI contract.
 
@@ -44,8 +45,8 @@ image. Entities already left the server in two hand-written ways:
   in `openapi:check`.
 - The rule (2026-11-25): every response body is a `sealed record` with
   `From`, declared with `[ProducesResponseType<T>]`. `ResponseTypeTests`
-  enforces it. The 38 older actions without one (30 bodies without a type,
-  8 without a declared success status) got records the same day, and
+  enforces it. The 38 older actions without one (26 with an untyped body,
+  12 without a body or a declared success status) got records the same day, and
   `EchoPhase.Projection` with `[Expose]` was removed (a copy is kept
   outside the repository). The only success bodies not typed now are the
   webhook's 200, the program's own answer, and the WebSocket upgrade.
