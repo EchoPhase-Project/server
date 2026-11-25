@@ -16,7 +16,7 @@ runtime:
     - type: set-variable
       phase: after-response
       selector:
-        expression: res.body["Id"]
+        expression: res.body["id"]
         method: jsonq
       variable:
         name: Id
@@ -32,7 +32,7 @@ runtime:
     - type: set-variable
       phase: after-response
       selector:
-        expression: res.body["Name"]
+        expression: res.body["name"]
         method: jsonq
       variable:
         name: Name

@@ -28,7 +28,7 @@ runtime:
     - type: set-variable
       phase: after-response
       selector:
-        expression: res.body["client"]["Id"]
+        expression: res.body["client"]["id"]
         method: jsonq
       variable:
         name: ClientId
