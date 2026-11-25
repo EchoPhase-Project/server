@@ -2,6 +2,7 @@
   "solution": {
     "path": "../EchoPhase.slnx",
     "projects": [
+      "tests/EchoPhase.Clients.Tests/EchoPhase.Clients.Tests.csproj",
       "tests/EchoPhase.DAL.Postgres.Tests/EchoPhase.DAL.Postgres.Tests.csproj",
       "tests/EchoPhase.DAL.Scylla.Tests/EchoPhase.DAL.Scylla.Tests.csproj",
       "tests/EchoPhase.Runners.Tests/EchoPhase.Runners.Tests.csproj",

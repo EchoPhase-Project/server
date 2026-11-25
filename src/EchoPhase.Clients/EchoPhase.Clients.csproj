@@ -8,4 +8,8 @@
     <ProjectReference Include="..\EchoPhase.Configuration\EchoPhase.Configuration.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Polly.Core" />
+  </ItemGroup>
+
 </Project>

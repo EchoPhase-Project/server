@@ -98,16 +98,19 @@ namespace EchoPhase.Clients.Twitch.Auth
             Dictionary<string, string> form,
             CancellationToken ct)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, "token")
+            return await HttpSender.GuardAsync(async () =>
             {
-                Content = new FormUrlEncodedContent(form)
-            };
+                using var request = new HttpRequestMessage(HttpMethod.Post, "token")
+                {
+                    Content = new FormUrlEncodedContent(form)
+                };
 
-            using var response = await _client.SendAsync(request, ct);
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+                using var response = await _client.SendAsync(request, ct);
+                await using var stream = await response.Content.ReadAsStreamAsync(ct);
 
-            return await HttpSender.ReadResultAsync<TwitchTokenResponseDto, TwitchApiError>(
-                stream, response.StatusCode, ReadErrorAsync, ToApiError, ct);
+                return await HttpSender.ReadResultAsync<TwitchTokenResponseDto, TwitchApiError>(
+                    stream, response.StatusCode, ReadErrorAsync, ToApiError, ct);
+            }, ct);
         }
     }
 }

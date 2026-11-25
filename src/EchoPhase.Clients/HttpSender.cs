@@ -9,6 +9,8 @@ using System.Text.Json;
 using EchoPhase.Clients.Abstractions;
 using EchoPhase.Clients.Helpers;
 using EchoPhase.Clients.Models;
+using Polly;
+using Polly.Timeout;
 
 namespace EchoPhase.Clients
 {
@@ -112,16 +114,31 @@ namespace EchoPhase.Clients
         {
             if (IsSuccess(statusCode))
             {
-                var data = await JsonSerializer.DeserializeAsync<TR>(stream, JsonOptions, ct);
+                TR? data;
+                try
+                {
+                    data = await JsonSerializer.DeserializeAsync<TR>(stream, JsonOptions, ct);
+                }
+                catch (JsonException)
+                {
+                    data = null;
+                }
 
                 return data is null
-                    ? Result<TR>.Fail(
-                        new ApiError((int)statusCode, "Response deserialization returned null."),
-                        statusCode)
+                    ? Result<TR>.Fail(Unreadable, HttpStatusCode.BadGateway)
                     : Result<TR>.Ok(data, statusCode);
             }
 
-            var err = await readError(stream, ct);
+            TErr? err;
+            try
+            {
+                err = await readError(stream, ct);
+            }
+            catch (JsonException)
+            {
+                // Not JSON: a proxy's page in front of the provider.
+                return Result<TR>.Fail(Unexplained(statusCode), statusCode);
+            }
             return Result<TR>.Fail(toApiError(err), statusCode);
         }
 
@@ -141,20 +158,86 @@ namespace EchoPhase.Clients
         {
             if (IsSuccess(statusCode))
             {
-                var wrapper = await JsonSerializer.DeserializeAsync<TWrapper>(stream, JsonOptions, ct);
+                TWrapper? wrapper;
+                try
+                {
+                    wrapper = await JsonSerializer.DeserializeAsync<TWrapper>(stream, JsonOptions, ct);
+                }
+                catch (JsonException)
+                {
+                    wrapper = null;
+                }
 
                 return wrapper is null
-                    ? PagedResult<TR>.Fail(
-                        new ApiError((int)statusCode, "Response deserialization returned null."),
-                        statusCode)
+                    ? PagedResult<TR>.Fail(Unreadable, HttpStatusCode.BadGateway)
                     : PagedResult<TR>.Ok(selectData(wrapper), selectPage(wrapper), statusCode);
             }
 
-            var error = await readError(stream, ct);
-            return PagedResult<TR>.Fail(
-                error ?? new ApiError((int)statusCode, "Unknown error."),
-                statusCode);
+            ApiError? error;
+            try
+            {
+                error = await readError(stream, ct);
+            }
+            catch (JsonException)
+            {
+                error = null;
+            }
+            return PagedResult<TR>.Fail(error ?? Unexplained(statusCode), statusCode);
         }
+
+        // ── Failures that throw ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Runs a call to the provider. What throws instead of answering (the
+        /// network, a timeout, the resilience handler refusing) comes back as a
+        /// failed result; the caller's own cancellation still throws.
+        /// </summary>
+        public static async Task<Result<TR>> GuardAsync<TR>(Func<Task<Result<TR>>> call, CancellationToken ct)
+        {
+            try
+            {
+                return await call();
+            }
+            catch (Exception ex) when (Thrown(ex, ct) is { } failure)
+            {
+                return Result<TR>.Fail(failure.Error, failure.Status);
+            }
+        }
+
+        /// <inheritdoc cref="GuardAsync{TR}(Func{Task{Result{TR}}}, CancellationToken)"/>
+        public static async Task<PagedResult<TR>> GuardAsync<TR>(Func<Task<PagedResult<TR>>> call, CancellationToken ct)
+        {
+            try
+            {
+                return await call();
+            }
+            catch (Exception ex) when (Thrown(ex, ct) is { } failure)
+            {
+                return PagedResult<TR>.Fail(failure.Error, failure.Status);
+            }
+        }
+
+        private static (ApiError Error, HttpStatusCode Status)? Thrown(Exception ex, CancellationToken ct) => ex switch
+        {
+            OperationCanceledException when ct.IsCancellationRequested => null,
+            TimeoutRejectedException or OperationCanceledException or TimeoutException
+                => (new ApiError((int)HttpStatusCode.GatewayTimeout, "The provider did not answer in time."),
+                    HttpStatusCode.GatewayTimeout),
+            ExecutionRejectedException
+                => (new ApiError((int)HttpStatusCode.ServiceUnavailable,
+                        "Requests to the provider are paused after repeated failures."),
+                    HttpStatusCode.ServiceUnavailable),
+            HttpRequestException
+                => (new ApiError((int)HttpStatusCode.BadGateway, "The provider could not be reached."),
+                    HttpStatusCode.BadGateway),
+            _ => null,
+        };
+
+        private static readonly ApiError Unreadable =
+            new((int)HttpStatusCode.BadGateway, "The provider's answer could not be read.");
+
+        private static ApiError Unexplained(HttpStatusCode status) =>
+            new((int)status, $"The provider answered {(int)status} without a readable error.");
 
         // ── Helpers ──────────────────────────────────────────────────────────
 

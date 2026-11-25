@@ -69,14 +69,17 @@ namespace EchoPhase.Clients
             where TB : class
             where TR : class
         {
-            var (statusCode, stream) = await _sender
-                .SendAsync(uri, method, query, body, auth, ct, connection);
-
-            await using (stream)
+            return await HttpSender.GuardAsync(async () =>
             {
-                return await HttpSender
-                    .ReadResultAsync<TR, TErr>(stream, statusCode, readError, toApiError, ct);
-            }
+                var (statusCode, stream) = await _sender
+                    .SendAsync(uri, method, query, body, auth, ct, connection);
+
+                await using (stream)
+                {
+                    return await HttpSender
+                        .ReadResultAsync<TR, TErr>(stream, statusCode, readError, toApiError, ct);
+                }
+            }, ct);
         }
 
         // ── paged result ─────────────────────────────────────────────────────
@@ -100,15 +103,18 @@ namespace EchoPhase.Clients
             where TB : class
             where TWrapper : class
         {
-            var (statusCode, stream) = await _sender
-                .SendAsync(uri, method, query, body, auth, ct, connection);
-
-            await using (stream)
+            return await HttpSender.GuardAsync(async () =>
             {
-                return await HttpSender
-                    .ReadPagedResultAsync<TWrapper, TR>(
-                        stream, statusCode, selectData, selectPage, readError, ct);
-            }
+                var (statusCode, stream) = await _sender
+                    .SendAsync(uri, method, query, body, auth, ct, connection);
+
+                await using (stream)
+                {
+                    return await HttpSender
+                        .ReadPagedResultAsync<TWrapper, TR>(
+                            stream, statusCode, selectData, selectPage, readError, ct);
+                }
+            }, ct);
         }
     }
 }

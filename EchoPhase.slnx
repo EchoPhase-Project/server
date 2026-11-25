@@ -37,6 +37,7 @@
     <Project Path="tests/EchoPhase.DAL.Scylla.Benchmarks/EchoPhase.DAL.Scylla.Benchmarks.csproj" />
     <Project Path="tests/EchoPhase.Scripting.Benchmarks/EchoPhase.Scripting.Benchmarks.csproj" />
     <Project Path="tests/EchoPhase.Server.Tests/EchoPhase.Server.Tests.csproj" />
+    <Project Path="tests/EchoPhase.Clients.Tests/EchoPhase.Clients.Tests.csproj" />
     <Project Path="tests/EchoPhase.DAL.Postgres.Tests/EchoPhase.DAL.Postgres.Tests.csproj" />
     <Project Path="tests/EchoPhase.DAL.Scylla.Tests/EchoPhase.DAL.Scylla.Tests.csproj" />
     <Project Path="tests/EchoPhase.Types.Tests/EchoPhase.Types.Tests.csproj" />
