@@ -25,20 +25,20 @@ namespace EchoPhase.Server.Tests
         [Fact]
         public void Links_GoToFilesAndHeadingsThatAreThere()
         {
-            var root = RepositoryRoot();
+            string root = RepositoryRoot();
             var broken = new List<string>();
-            foreach (var doc in Docs(root))
+            foreach (string doc in Docs(root))
             {
-                var text = File.ReadAllText(doc);
-                foreach (var link in LinksOf(text))
+                string text = File.ReadAllText(doc);
+                foreach (string link in LinksOf(text))
                 {
-                    var hash = link.IndexOf('#', StringComparison.Ordinal);
-                    var path = hash < 0 ? link : link[..hash];
-                    var anchor = hash < 0 ? null : link[(hash + 1)..];
-                    var target = path.Length == 0
+                    int hash = link.IndexOf('#', StringComparison.Ordinal);
+                    string path = hash < 0 ? link : link[..hash];
+                    string? anchor = hash < 0 ? null : link[(hash + 1)..];
+                    string target = path.Length == 0
                         ? doc
                         : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(doc) ?? root, Uri.UnescapeDataString(path)));
-                    var relative = Path.GetRelativePath(root, doc);
+                    string relative = Path.GetRelativePath(root, doc);
                     if (!File.Exists(target) && !Directory.Exists(target))
                         broken.Add($"{relative}: no file {link}");
                     else if (anchor is not null && target.EndsWith(".md", StringComparison.Ordinal)
@@ -54,29 +54,43 @@ namespace EchoPhase.Server.Tests
         [InlineData("The API contract", "the-api-contract")]
         [InlineData("`Projector` and [Expose]", "projector-and-expose")]
         [InlineData("Commits and pull requests", "commits-and-pull-requests")]
+        [InlineData("`Member_Condition_Outcome`", "member_condition_outcome")]
         public void Slug_IsTheAnchorGitHubGives(string heading, string anchor)
             => Assert.Equal(anchor, Slug(heading));
 
-        /// <summary>The anchor GitHub gives a heading: lower case, spaces to dashes.</summary>
+        [Fact]
+        public void Anchors_NumberARepeatedHeading_AndSkipCode()
+            => Assert.Equal(new HashSet<string> { "example", "example-1" }, AnchorsOf("# Example\n## Example\n```\n# Not\n```"));
+
+        /// <summary>
+        /// The anchor GitHub gives a heading: lower case, spaces to dashes. An
+        /// underscore stays (GitHub keeps it); backticks and asterisks go.
+        /// </summary>
         public static string Slug(string heading)
         {
-            var text = heading.Trim().ToLowerInvariant().Replace("`", "").Replace("*", "").Replace("_", "");
+            string text = heading.Trim().ToLowerInvariant().Replace("`", "").Replace("*", "");
             return NotInSlug().Replace(text, "").Replace(' ', '-');
         }
 
-        private static HashSet<string> AnchorsOf(string text)
+        internal static HashSet<string> AnchorsOf(string text)
         {
             var anchors = new HashSet<string>(StringComparer.Ordinal);
-            var fenced = false;
-            foreach (var line in text.Split('\n'))
+            // A repeated heading gets -1, -2, … on GitHub.
+            var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+            bool fenced = false;
+            foreach (string line in text.Split('\n'))
             {
                 if (line.StartsWith("```", StringComparison.Ordinal))
                     fenced = !fenced;
                 if (fenced)
                     continue;
                 var heading = Heading().Match(line.TrimEnd('\r'));
-                if (heading.Success)
-                    anchors.Add(Slug(heading.Groups[1].Value));
+                if (!heading.Success)
+                    continue;
+                string slug = Slug(heading.Groups[1].Value);
+                int n = seen.GetValueOrDefault(slug);
+                seen[slug] = n + 1;
+                anchors.Add(n == 0 ? slug : $"{slug}-{n}");
             }
             return anchors;
         }
@@ -84,7 +98,7 @@ namespace EchoPhase.Server.Tests
         /// <summary>The [text](target) links outside code, but not to other sites.</summary>
         private static IEnumerable<string> LinksOf(string text)
         {
-            var prose = InlineCode().Replace(Fence().Replace(text, ""), "");
+            string prose = InlineCode().Replace(Fence().Replace(text, ""), "");
             return Link().Matches(prose)
                 .Select(m => m.Groups[1].Value)
                 .Where(target => !Scheme().IsMatch(target));
@@ -92,15 +106,15 @@ namespace EchoPhase.Server.Tests
 
         private static IEnumerable<string> Docs(string root)
         {
-            foreach (var name in new[] { "CONTRIBUTING.md", "AGENTS.md", "README.md" })
+            foreach (string name in new[] { "CONTRIBUTING.md", "AGENTS.md", "README.md" })
             {
-                var file = Path.Combine(root, name);
+                string file = Path.Combine(root, name);
                 if (File.Exists(file))
                     yield return file;
             }
-            var docs = Path.Combine(root, "docs");
+            string docs = Path.Combine(root, "docs");
             if (Directory.Exists(docs))
-                foreach (var file in Directory.EnumerateFiles(docs, "*.md", SearchOption.AllDirectories))
+                foreach (string file in Directory.EnumerateFiles(docs, "*.md", SearchOption.AllDirectories))
                     yield return file;
         }
 
@@ -112,7 +126,7 @@ namespace EchoPhase.Server.Tests
             return directory?.FullName ?? throw new InvalidOperationException("EchoPhase.slnx not found above the test binaries.");
         }
 
-        [GeneratedRegex(@"[^\p{L}\p{N}\- ]")]
+        [GeneratedRegex(@"[^\p{L}\p{N}_\- ]")]
         private static partial Regex NotInSlug();
 
         [GeneratedRegex(@"^#{1,6} (.+)$")]
