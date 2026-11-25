@@ -38,18 +38,20 @@ returns 400.
 ## Responses
 
 Return each response body as a `sealed record` named `<Name>Response`. Put
-the record in the controller file, in `<Area>/<Name>Response.cs`, or with the
-other records of the area in `<Area>/<Area>Responses.cs`. The record is the list of the fields that go out of the
-server. Thus, a new property of an entity stays inside until you add it.
+the record in the controller file or in `<Area>/<Name>Response.cs`. Put
+several records of one entity in `<Area>/<Entity>Responses.cs`, for example
+`Blocks/BlockRunResponses.cs`. The record is the list of the fields that go
+out of the server. Thus, a new property of an entity stays inside until you
+add it.
 
 Do not return a type of a library project, such as a service record. Only
 the XML docs of `EchoPhase.Server` go into the contract. Thus, a library
 type has no descriptions there, and a change in the library changes the
-contract without notice. Two exceptions are allowed:
+contract without notice. The rule has two exceptions:
 
 - A DTO of an external API that the server passes through (Discord,
   Twitch). It keeps the names of that API.
-- A list or a map of such typed values, for example
+- A list or a map of simple values or response records, for example
   `Dictionary<string, Guid[]>`.
 
 Map to the record with a static `From` method on the record. For a list,
@@ -64,8 +66,10 @@ the web client gets its types from the contract.
 Do not return an entity or an anonymous object. The contract does not
 contain such a body, so `openapi:check` cannot see its changes.
 `ResponseTypeTests` fails if an action does not declare a typed success
-response. A response without a body is 204, or 202 for work that continues
-after the response. A redirect is 302.
+response. A response without a body is 204. A redirect is 302. Use 202
+without a body only for work that continues after the response. Then add
+the action to `Untyped` in `ResponseTypeTests`, with the reason in a
+comment. The test refuses other untyped success responses.
 
 If a list loads large rows, you can also give the record a static
 `Expression<Func<TEntity, XResponse>>` and use it in the query (`Select`).

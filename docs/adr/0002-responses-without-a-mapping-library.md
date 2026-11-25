@@ -46,7 +46,8 @@ image. Entities already left the server in two hand-written ways:
 - The rule (2026-11-25): every response body is a `sealed record` with
   `From`, declared with `[ProducesResponseType<T>]`. `ResponseTypeTests`
   enforces it. The 38 older actions without one (26 with an untyped body,
-  12 without a body or a declared success status) got records the same day, and
+  12 without a body or a declared success status) got records or a
+  declared 204, 202 or 302 the same day, and
   `EchoPhase.Projection` with `[Expose]` was removed (a copy is kept
   outside the repository). The only success bodies not typed now are the
   webhook's 200, the program's own answer, and the WebSocket upgrade.
@@ -63,7 +64,8 @@ then there were 30 records and about 20 `From` methods. The plans ahead
 will add more endpoints at a similar pace.
 
 The failure seen so far is not the cost of writing `From`: it is responses
-that never got a type. 30 of the 107 operations have a success body that
+that never got a type. 30 of the 107 operations of the contract (a count of operations, not of
+the 38 actions above) have a success body that
 is not in the contract (Projector output, anonymous objects, raw values),
 and the web client writes types for some of them by hand; one of those
 (`CreatedApiClient`) already disagrees with the server. A mapping library
