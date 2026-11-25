@@ -17,3 +17,5 @@ English.
 | No. | Decision | Status |
 | --- | --- | --- |
 | [0001](0001-idempotency-keys.md) | Idempotency keys for incoming webhooks and for creating requests | Proposed |
+| [0002](0002-responses-without-a-mapping-library.md) | Responses without a mapping library | Accepted |
+| [0003](0003-close-sockets-when-a-session-ends.md) | Close a session's sockets when it ends, with close code 4000 | Accepted |
