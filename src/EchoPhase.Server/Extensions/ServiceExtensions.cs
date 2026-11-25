@@ -19,8 +19,7 @@ using EchoPhase.WebHooks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
-using Polly;
-using Polly.Extensions.Http;
+using Microsoft.Extensions.Http.Resilience;
 
 namespace EchoPhase.Server.Extensions
 {
@@ -34,7 +33,8 @@ namespace EchoPhase.Server.Extensions
 
                         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                     })
-                .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+                .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                .AddExternalApiResilience();
 
             services.AddHttpClient<ITwitchClient, TwitchClient>("Twitch", (serviceProvider, client) =>
                     {
@@ -44,11 +44,7 @@ namespace EchoPhase.Server.Extensions
                     })
                 .SetHandlerLifetime(TimeSpan.FromMinutes(5))
                 .AddConnectionAuth(ConnectionProviders.Twitch)
-                .AddPolicyHandler(request =>
-                    request.Method == HttpMethod.Get ?
-                        GetRetryPolicy() :
-                        GetNoOpPolicy()
-                );
+                .AddExternalApiResilience();
 
             return services;
         }
@@ -65,25 +61,29 @@ namespace EchoPhase.Server.Extensions
                     })
                 .SetHandlerLifetime(TimeSpan.FromMinutes(5))
                 .AddConnectionAuth(ConnectionProviders.Discord)
-                .AddPolicyHandler(request =>
-                    request.Method == HttpMethod.Get ?
-                        GetRetryPolicy() :
-                        GetNoOpPolicy()
-                );
+                .AddExternalApiResilience();
 
             return services;
         }
 
-        private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
-            HttpPolicyExtensions
-                .HandleTransientHttpError()
-                .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.NotFound)
-                .WaitAndRetryAsync(6, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
-
-        private static IAsyncPolicy<HttpResponseMessage> GetNoOpPolicy() =>
-            Policy
-                .NoOpAsync()
-                .AsAsyncPolicy<HttpResponseMessage>();
+        /// <summary>
+        /// Retries and timeouts for a client of an external API (Polly v8): only
+        /// safe methods are repeated, only for transient failures (5xx, 408,
+        /// network errors, timeouts) and 429, which waits as Retry-After says.
+        /// Any other answer, 404 included, is final. A total timeout keeps a
+        /// request, retries included, under HttpClient's own.
+        /// </summary>
+        public static IHttpClientBuilder AddExternalApiResilience(
+            this IHttpClientBuilder builder, Action<HttpStandardResilienceOptions>? tune = null)
+        {
+            builder.AddStandardResilienceHandler(options =>
+            {
+                options.Retry.DisableForUnsafeHttpMethods();
+                options.Retry.MaxRetryAttempts = 3;
+                tune?.Invoke(options);
+            });
+            return builder;
+        }
 
 
         public static IServiceCollection AddApiControllers(this IServiceCollection services)
