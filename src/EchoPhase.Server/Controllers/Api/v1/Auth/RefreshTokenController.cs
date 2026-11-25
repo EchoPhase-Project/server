@@ -28,14 +28,25 @@ namespace EchoPhase.Server.Controllers.Api.v1.Auth
         [HttpPost]
         [AllowAnonymous]
         [EnableRateLimiting(RateLimitPolicies.Auth)]
-        [ProducesResponseType<TokenPair>(StatusCodes.Status200OK)]
+        [ProducesResponseType<RefreshTokenResponse>(StatusCodes.Status200OK)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> Refresh([FromBody] RefreshRequest request, CancellationToken ct = default)
         {
             // RefreshToken is null when a parallel call already rotated the
             // token; keep using the one that call returned.
             var result = await _refreshSignInManager.RefreshAsync(request.RefreshToken, ct);
-            return result.Successful ? Ok(result.Value) : Failure(result.Error);
+            return result.Successful ? Ok(RefreshTokenResponse.From(result.Value)) : Failure(result.Error);
         }
+    }
+
+    /// <summary>A new access token, and the refresh token to keep.</summary>
+    /// <param name="AccessToken">The new access token.</param>
+    /// <param name="RefreshToken">
+    /// The rotated refresh token; none when a parallel request already rotated it:
+    /// keep the token from that answer.
+    /// </param>
+    public sealed record RefreshTokenResponse(string AccessToken, string? RefreshToken)
+    {
+        public static RefreshTokenResponse From(TokenPair pair) => new(pair.AccessToken, pair.RefreshToken);
     }
 }

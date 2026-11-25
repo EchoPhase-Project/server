@@ -42,6 +42,16 @@ the record in the controller file, or in `<Area>/<Name>Response.cs` next to
 the controller. The record is the list of the fields that go out of the
 server. Thus, a new property of an entity stays inside until you add it.
 
+Do not return a type of a library project, such as a service record. Only
+the XML docs of `EchoPhase.Server` go into the contract. Thus, a library
+type has no descriptions there, and a change in the library changes the
+contract without notice. Two exceptions are allowed:
+
+- A DTO of an external API that the server passes through (Discord,
+  Twitch). It keeps the names of that API.
+- A list or a map of such typed values, for example
+  `Dictionary<string, Guid[]>`.
+
 Map to the record with a static `From` method on the record. For a list,
 use `.Select(XResponse.From)`. If a field depends on the user, write that
 check in `From` (refer to `NoteResponse.From`). Then the access rule is in

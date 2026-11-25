@@ -29,21 +29,21 @@ namespace EchoPhase.Server.Controllers.Api.v1.OAuthApps
 
         [HttpGet]
         [RequirePermission(Resources.OAuthApps, Permissions.Read)]
-        [ProducesResponseType<OAuthAppInfo[]>(StatusCodes.Status200OK)]
+        [ProducesResponseType<OAuthAppResponse[]>(StatusCodes.Status200OK)]
         public async Task<IActionResult> List(CancellationToken ct = default)
-            => Ok(await _apps.ListAsync(User.GetUserId(), ct));
+            => Ok((await _apps.ListAsync(User.GetUserId(), ct)).Select(OAuthAppResponse.From).ToList());
 
         [HttpPost]
         [ValidateAntiForgery]
         [RequirePermission(Resources.OAuthApps, Permissions.Create)]
-        [ProducesResponseType<OAuthAppInfo>(StatusCodes.Status200OK)]
+        [ProducesResponseType<OAuthAppResponse>(StatusCodes.Status200OK)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Save([FromBody] SaveOAuthAppRequest dto, CancellationToken ct = default)
         {
             var result = await _apps.SaveAsync(
                 User.GetUserId(), dto.Provider, dto.Name, dto.ClientId, dto.ClientSecret, ct);
 
-            return result.Successful ? Ok(result.Value) : Failure(result.Error);
+            return result.Successful ? Ok(OAuthAppResponse.From(result.Value)) : Failure(result.Error);
         }
 
         [HttpDelete("{id:guid}")]
@@ -56,5 +56,17 @@ namespace EchoPhase.Server.Controllers.Api.v1.OAuthApps
             var result = await _apps.DeleteAsync(User.GetUserId(), id, ct);
             return result.Successful ? NoContent() : Failure(result.Error);
         }
+    }
+
+    /// <summary>An OAuth app of the user's own; its secret is never returned.</summary>
+    /// <param name="Id">The app's id.</param>
+    /// <param name="Provider">The service it is registered at.</param>
+    /// <param name="Name">The owner's name for it.</param>
+    /// <param name="ClientId">The client id at the provider (public).</param>
+    /// <param name="HasSecret">Whether a client secret is stored.</param>
+    /// <param name="CreatedAt">When it was added.</param>
+    public sealed record OAuthAppResponse(Guid Id, string Provider, string Name, string ClientId, bool HasSecret, DateTime CreatedAt)
+    {
+        public static OAuthAppResponse From(OAuthAppInfo a) => new(a.Id, a.Provider, a.Name, a.ClientId, a.HasSecret, a.CreatedAt);
     }
 }

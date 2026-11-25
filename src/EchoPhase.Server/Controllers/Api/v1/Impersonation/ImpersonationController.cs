@@ -37,7 +37,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         [RequirePermission(Resources.Users, Permissions.Impersonate)]
         [ValidateAntiForgery]
         [EnableRateLimiting(RateLimitPolicies.Auth)]
-        [ProducesResponseType<ImpersonationStarted>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ImpersonationStartedResponse>(StatusCodes.Status200OK)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status400BadRequest)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType<ErrorBody>(StatusCodes.Status403Forbidden)]
@@ -45,7 +45,7 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
         public async Task<IActionResult> Start([FromBody] StartImpersonationRequest dto, CancellationToken ct = default)
         {
             var result = await _impersonation.StartAsync(User.GetUserId(), dto.Username, dto.Reason, dto.Password, ct);
-            return result.Successful ? Ok(result.Value) : Failure(result.Error);
+            return result.Successful ? Ok(ImpersonationStartedResponse.From(result.Value)) : Failure(result.Error);
         }
 
         /// <summary>Ends an impersonation you started, from your own session.</summary>
@@ -103,5 +103,18 @@ namespace EchoPhase.Server.Controllers.Api.v1.Impersonation
     {
         public static ImpersonationResponse From(DAL.Postgres.Models.Impersonation i) => new(
             i.Id, i.ActorId, i.TargetId, i.Reason, i.ExpiresAt, i.EndedAt, i.CreatedAt, i.UpdatedAt);
+    }
+
+    /// <summary>A started impersonation; its token is returned only here.</summary>
+    /// <param name="ImpersonationId">The impersonation, to end it.</param>
+    /// <param name="TargetId">The user acted as.</param>
+    /// <param name="TargetUserName">Their user name.</param>
+    /// <param name="AccessToken">Send it as <c>Authorization: Bearer</c>; it never replaces your own session.</param>
+    /// <param name="ExpiresIn">Seconds until the token expires.</param>
+    public sealed record ImpersonationStartedResponse(
+        Guid ImpersonationId, Guid TargetId, string? TargetUserName, string AccessToken, int ExpiresIn)
+    {
+        public static ImpersonationStartedResponse From(ImpersonationStarted s)
+            => new(s.ImpersonationId, s.TargetId, s.TargetUserName, s.AccessToken, s.ExpiresIn);
     }
 }
